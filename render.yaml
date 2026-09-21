@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: gemini-pro-shop-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_ID
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: PRODUCT_NAME
+        value: "Gemini Pro 18 Months"
+      - key: PRODUCT_PRICE
+        sync: false
+      - key: SUPPORT_USERNAME
+        sync: false
+      - key: CBE_ACCOUNT
+        sync: false
+      - key: CBE_NAME
+        sync: false
+      - key: TELEBIRR_ACCOUNT
+        sync: false
+      - key: TELEBIRR_NAME
+        sync: false
