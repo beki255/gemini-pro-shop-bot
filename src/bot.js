@@ -16,6 +16,10 @@ bot.use(session());
 
 // Middleware: safely catch callback_query timeout/expired errors, and provide safe no-op on message updates
 bot.use(async (ctx, next) => {
+  const sender = ctx.from ? `${ctx.from.id} (@${ctx.from.username || ctx.from.first_name || 'unknown'})` : 'unknown';
+  const detail = ctx.message ? (ctx.message.text || '[media]') : (ctx.callbackQuery ? ctx.callbackQuery.data : '');
+  console.log(`📩 [${ctx.updateType}] from ${sender} — "${detail}"`);
+
   if (ctx.callbackQuery) {
     const origAnswerCbQuery = ctx.answerCbQuery.bind(ctx);
     ctx.answerCbQuery = async (...args) => {
@@ -311,13 +315,16 @@ async function main() {
   const reservationService = require('./services/reservationService');
   reservationService.startExpiryJob(bot);
 
+  // Delete any old webhook and drop pending stale updates to ensure clean polling
+  await bot.telegram.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
+
   // Launch bot with long polling
   const me = await bot.telegram.getMe();
   console.log(`🤖 Gemini Pro Shop Bot started! (@${me.username})`);
   console.log(`👤 Admin ID: ${config.adminId}`);
   console.log(`💰 Product: ${config.productName} — ${config.productPrice} ETB`);
 
-  bot.launch().catch((err) => {
+  bot.launch({ dropPendingUpdates: true }).catch((err) => {
     console.error('Fatal bot launch error:', err.message);
   });
 }
