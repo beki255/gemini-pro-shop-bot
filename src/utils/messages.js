@@ -150,80 +150,107 @@ const msg = {
   paymentInstructions(method, lang = 'am', quantity = 1, amount = null) {
     const unitPrice = config.productPrice || 250;
     const totalAmount = amount || (quantity * unitPrice);
+
     if (lang === 'en') {
       const baseEn =
-        `💳 *Payment Details*\n\n` +
-        `📦 *Product:* ${config.productName}\n` +
-        `🔢 *Quantity:* *${quantity} item(s)*\n` +
-        `💵 *Unit Price:* *${unitPrice} ETB*\n` +
-        `💰 *Total Amount:* *${quantity} × ${unitPrice} = ${totalAmount} ETB*\n\n`;
+        `💳 <b>Payment Details</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 <b>Product:</b> ${config.productName}\n` +
+        `🔢 <b>Quantity:</b> <b>${quantity} item(s)</b>\n` +
+        `💵 <b>Unit Price:</b> <b>${unitPrice} ETB</b>\n` +
+        `💰 <b>Total Amount:</b> <b>${quantity} × ${unitPrice} = ${totalAmount} ETB</b>\n\n`;
 
       if (method === 'CBE') {
         return (
           baseEn +
-          `🏦 *Commercial Bank of Ethiopia (CBE)*\n` +
-          `📋 Account Number: \`${config.payment.cbe.account}\`\n` +
-          `👤 Account Name: ${config.payment.cbe.name}\n\n` +
-          `📸 *Steps to pay:*\n` +
-          `1️⃣ Transfer *${totalAmount} ETB* (${quantity} × ${unitPrice}) to the CBE account above\n` +
-          `2️⃣ Take a clear screenshot of the transaction receipt\n` +
-          `3️⃣ Send the screenshot directly into this chat\n\n` +
-          `⏱️ *Notice:* Reserved for *5 minutes* only. Send receipt before time expires!\n` +
-          `⏰ Orders are reviewed and delivered promptly!`
+          `🏦 <b>Commercial Bank of Ethiopia (CBE)</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📋 <b>Account Number:</b>\n` +
+          `👉 <code>${config.payment.cbe.account}</code> 👈\n` +
+          `<i>(👆 Tap account number to copy instantly!)</i>\n\n` +
+          `👤 <b>Account Name:</b>\n` +
+          `👉 <b>${config.payment.cbe.name}</b>\n\n` +
+          `💰 <b>Total to Pay:</b>\n` +
+          `👉 <b>${totalAmount} ETB</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `📸 <b>Payment Steps:</b>\n` +
+          `1️⃣ Tap the account number above to copy it\n` +
+          `2️⃣ Transfer <b>${totalAmount} ETB</b> via CBE Birr / Mobile Banking\n` +
+          `3️⃣ Take a clear screenshot of the completed receipt\n` +
+          `4️⃣ Send the screenshot directly into this chat\n\n` +
+          `⏱️ <i>Reserved for 5 minutes. Deliveries are processed immediately upon verification!</i>`
         );
       } else if (method === 'Telebirr') {
         return (
           baseEn +
-          `📱 *Telebirr*\n` +
-          `📋 Phone Number: \`${config.payment.telebirr.account}\`\n` +
-          `👤 Name: ${config.payment.telebirr.name}\n\n` +
-          `📸 *Steps to pay:*\n` +
-          `1️⃣ Open Telebirr app → Send Money\n` +
-          `2️⃣ Enter phone: ${config.payment.telebirr.account}\n` +
-          `3️⃣ Send *${totalAmount} ETB* (${quantity} × ${unitPrice})\n` +
-          `4️⃣ Take a screenshot of the transaction receipt\n` +
-          `5️⃣ Send the screenshot directly into this chat\n\n` +
-          `⏱️ *Notice:* Reserved for *5 minutes* only. Send receipt before time expires!\n` +
-          `⏰ Orders are reviewed and delivered promptly!`
+          `📱 <b>Telebirr</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📋 <b>Phone Number:</b>\n` +
+          `👉 <code>${config.payment.telebirr.account}</code> 👈\n` +
+          `<i>(👆 Tap phone number to copy instantly!)</i>\n\n` +
+          `👤 <b>Account Name:</b>\n` +
+          `👉 <b>${config.payment.telebirr.name}</b>\n\n` +
+          `💰 <b>Total to Pay:</b>\n` +
+          `👉 <b>${totalAmount} ETB</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `📸 <b>Payment Steps:</b>\n` +
+          `1️⃣ Tap the phone number above to copy it\n` +
+          `2️⃣ Open Telebirr app → Send <b>${totalAmount} ETB</b>\n` +
+          `3️⃣ Take a screenshot of the completed transaction\n` +
+          `4️⃣ Send the screenshot directly into this chat\n\n` +
+          `⏱️ <i>Reserved for 5 minutes. Deliveries are processed immediately upon verification!</i>`
         );
       }
       return baseEn;
     }
 
     const baseAm =
-      `💳 *የክፍያ መረጃ*\n\n` +
-      `📦 *ምርት:* ${config.productName}\n` +
-      `🔢 *የተመረጠው ብዛት:* *${quantity} ሊንክ*\n` +
-      `💵 *የነጠላ ዋጋ:* *${unitPrice} ብር*\n` +
-      `💰 *ጠቅላላ ክፍያ:* *${quantity} × ${unitPrice} = ${totalAmount} ብር*\n\n`;
+      `💳 <b>የክፍያ መረጃ</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 <b>ምርት:</b> ${config.productName}\n` +
+      `🔢 <b>የተመረጠው ብዛት:</b> <b>${quantity} ሊንክ</b>\n` +
+      `💵 <b>የነጠላ ዋጋ:</b> <b>${unitPrice} ብር</b>\n` +
+      `💰 <b>ጠቅላላ ክፍያ:</b> <b>${quantity} × ${unitPrice} = ${totalAmount} ብር</b>\n\n`;
 
     if (method === 'CBE') {
       return (
         baseAm +
-        `🏦 *የኢትዮጵያ ንግድ ባንክ (CBE)*\n` +
-        `📋 የሒሳብ ቁጥር: \`${config.payment.cbe.account}\`\n` +
-        `👤 ስም: ${config.payment.cbe.name}\n\n` +
-        `📸 *የአከፋፈል ቅደም ተከተል:*\n` +
-        `1️⃣ *${totalAmount} ብር* (${quantity} × ${unitPrice}) ወደ ተጠቀሰው የ CBE ሂሳብ ያስተላልፉ\n` +
-        `2️⃣ የደረሰኙን Screenshot ፎቶ ያንሱ\n` +
-        `3️⃣ ፎቶውን እዚህ ቦቱ ላይ ይላኩ\n\n` +
-        `⏱️ *ማሳሰቢያ:* ይህ ትዕዛዝ ለ *5 ደቂቃዎች* ብቻ የተጠበቀ ነው። ጊዜው ከማለፉ በፊት ደረሰኙን ይላኩ!\n` +
-        `⏰ ደረሰኙ እንደደረሰን ተረጋግጦ ሊንኩ ወዲያው ይላካል!`
+        `🏦 <b>የኢትዮጵያ ንግድ ባንክ (CBE)</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📋 <b>የሒሳብ ቁጥር (Account Number):</b>\n` +
+        `👉 <code>${config.payment.cbe.account}</code> 👈\n` +
+        `<i>(👆 ለመቅዳት ቁጥሩን ይጫኑ / Tap to copy!)</i>\n\n` +
+        `👤 <b>የሂሳብ ስም (Account Name):</b>\n` +
+        `👉 <b>${config.payment.cbe.name}</b>\n\n` +
+        `💰 <b>የሚከፈለው ጠቅላላ መጠን:</b>\n` +
+        `👉 <b>${totalAmount} ብር</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `📸 <b>የአከፋፈል ቅደም ተከተል:</b>\n` +
+        `1️⃣ ከላይ ያለውን የሂሳብ ቁጥር ነክተው ይቅዱ\n` +
+        `2️⃣ በ CBE Birr ወይም Mobile Banking <b>${totalAmount} ብር</b> ያስተላልፉ\n` +
+        `3️⃣ የተላከበትን <b>የደረሰኝ Screenshot ፎቶ</b> ያንሱ\n` +
+        `4️⃣ ፎቶውን እዚህ ቦቱ ላይ ይላኩ\n\n` +
+        `⏱️ <i>ማሳሰቢያ፦ ይህ ትዕዛዝ ለ 5 ደቂቃዎች ብቻ የተጠበቀ ነው። ደረሰኙ እንደደረሰን ወዲያው ይላካል!</i>`
       );
     } else if (method === 'Telebirr') {
       return (
         baseAm +
-        `📱 *ቴሌብር (Telebirr)*\n` +
-        `📋 ስልክ ቁጥር: \`${config.payment.telebirr.account}\`\n` +
-        `👤 ስም: ${config.payment.telebirr.name}\n\n` +
-        `📸 *የአከፋፈል ቅደም ተከተል:*\n` +
-        `1️⃣ Telebirr app ክፈቱ → Send Money\n` +
-        `2️⃣ ስልክ ቁጥሩን ያስገቡ: ${config.payment.telebirr.account}\n` +
-        `3️⃣ *${totalAmount} ብር* (${quantity} × ${unitPrice}) ይላኩ\n` +
-        `4️⃣ የደረሰኙን Screenshot ያንሱ\n` +
-        `5️⃣ ፎቶውን እዚህ ቦቱ ላይ ይላኩ\n\n` +
-        `⏱️ *ማሳሰቢያ:* ይህ ትዕዛዝ ለ *5 ደቂቃዎች* ብቻ የተጠበቀ ነው። ጊዜው ከማለፉ በፊት ደረሰኙን ይላኩ!\n` +
-        `⏰ ደረሰኙ እንደደረሰን ተረጋግጦ ሊንኩ ወዲያው ይላካል!`
+        `📱 <b>ቴሌብር (Telebirr)</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📋 <b>የስልክ ቁጥር (Phone Number):</b>\n` +
+        `👉 <code>${config.payment.telebirr.account}</code> 👈\n` +
+        `<i>(👆 ለመቅዳት ቁጥሩን ይጫኑ / Tap to copy!)</i>\n\n` +
+        `👤 <b>የተጠቃሚ ስም (Account Name):</b>\n` +
+        `👉 <b>${config.payment.telebirr.name}</b>\n\n` +
+        `💰 <b>የሚከፈለው ጠቅላላ መጠን:</b>\n` +
+        `👉 <b>${totalAmount} ብር</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `📸 <b>የአከፋፈል ቅደም ተከተል:</b>\n` +
+        `1️⃣ ከላይ ያለውን ስልክ ቁጥር ነክተው ይቅዱ\n` +
+        `2️⃣ በ Telebirr App Send Money በማድረግ <b>${totalAmount} ብር</b> ይላኩ\n` +
+        `3️⃣ የተላከበትን <b>የደረሰኝ Screenshot ፎቶ</b> ያንሱ\n` +
+        `4️⃣ ፎቶውን እዚህ ቦቱ ላይ ይላኩ\n\n` +
+        `⏱️ <i>ማሳሰቢያ፦ ይህ ትዕዛዝ ለ 5 ደቂቃዎች ብቻ የተጠበቀ ነው። ደረሰኙ እንደደረሰን ወዲያው ይላካል!</i>`
       );
     }
     return baseAm;

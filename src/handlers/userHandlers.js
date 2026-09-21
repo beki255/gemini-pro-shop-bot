@@ -402,15 +402,15 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
   };
 
   await ctx.reply(msg.paymentInstructions(method, lang, qty, totalAmount), {
-    parse_mode: 'Markdown',
+    parse_mode: 'HTML',
     ...keyboards.paymentDetails(method, lang),
   });
 
   const photoPrompt = lang === 'en'
-    ? '📸 *Send the transaction receipt screenshot below:*'
-    : '📸 *የደረሰኙን Screenshot ፎቶ እዚህ ይላኩ:*';
+    ? '📸 <b>Send the transaction receipt screenshot below:</b>'
+    : '📸 <b>የደረሰኙን Screenshot ፎቶ እዚህ ይላኩ:</b>';
 
-  await ctx.reply(photoPrompt, { parse_mode: 'Markdown' });
+  await ctx.reply(photoPrompt, { parse_mode: 'HTML' });
 }
 
 // ─── Photo Handler: Receive Receipt Screenshot ─────────────
