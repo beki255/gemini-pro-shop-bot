@@ -12,12 +12,12 @@ const config = {
   supportUsername: process.env.SUPPORT_USERNAME || process.env.BOT_USERNAME || 'Mnbvcnvhd',
   payment: {
     cbe: {
-      account: process.env.CBE_ACCOUNT || '',
-      name: process.env.CBE_NAME || '',
+      account: process.env.CBE_ACCOUNT || '1000311621576',
+      name: process.env.CBE_NAME || 'bereket s/maryiam',
     },
     telebirr: {
-      account: process.env.TELEBIRR_ACCOUNT || '',
-      name: process.env.TELEBIRR_NAME || '',
+      account: process.env.TELEBIRR_ACCOUNT || '0925537199',
+      name: process.env.TELEBIRR_NAME || 'bereket',
     },
   },
 };
