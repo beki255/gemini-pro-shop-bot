@@ -72,7 +72,7 @@ async function handleStart(ctx) {
   if (isAdmin) {
     const adminName = ctx.from.first_name || 'Admin';
     return ctx.reply(msg.adminWelcome(adminName, lang), {
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       ...keyboards.adminMainMenu(lang),
     });
   }
@@ -83,7 +83,7 @@ async function handleStart(ctx) {
 
   // 3. Customer Welcome & Main Menu in their chosen language
   await ctx.reply(msg.welcome(ctx.from.first_name, lang), {
-    parse_mode: 'Markdown',
+    parse_mode: 'HTML',
     ...keyboards.mainMenu(lang, false, stockCount),
   });
 }

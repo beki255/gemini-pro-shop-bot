@@ -18,39 +18,40 @@ const msg = {
   welcome(firstName, lang = 'am') {
     if (lang === 'en') {
       return (
-        `🛍️ *Welcome to Gemini Pro Store*\n\n` +
-        `💵 *Best prices*\n` +
-        `⚡ *Fast delivery after payment*\n` +
-        `⚠️ *No warranty*\n` +
-        `💬 *Can't find what you need? Contact support*\n\n` +
+        `🛍️ <b>Welcome to Gemini Pro Store</b>\n\n` +
+        `💵 <b>Best prices</b>\n` +
+        `⚡ <b>Fast delivery after payment</b>\n` +
+        `⚠️ <b>No warranty</b>\n` +
+        `💬 <b>Can't find what you need? Contact support</b>\n\n` +
         `Choose a section below:`
       );
     }
 
     return (
-      `🛍️ *ወደ Gemini Pro መደብር እንኳን ደህና መጡ!*\n\n` +
-      `💵 *ምርጥ እና ተመጣጣኝ ዋጋ*\n` +
-      `⚡ *ከክፍያ በኋላ ፈጣን ማድረስ*\n` +
-      `⚠️ *ዋስትና የለውም (No warranty)*\n` +
-      `💬 *እርዳታ ይፈልጋሉ? ድጋፍ ሰጪን ያነጋግሩ*\n\n` +
+      `🛍️ <b>ወደ Gemini Pro መደብር እንኳን ደህና መጡ!</b>\n\n` +
+      `💵 <b>ምርጥ እና ተመጣጣኝ ዋጋ</b>\n` +
+      `⚡ <b>ከክፍያ በኋላ ፈጣን ማድረስ</b>\n` +
+      `⚠️ <b>ዋስትና የለውም (No warranty)</b>\n` +
+      `💬 <b>እርዳታ ይፈልጋሉ? ድጋፍ ሰጪን ያነጋግሩ</b>\n\n` +
       `ከታች ካሉት ክፍሎች አንዱን ይምረጡ፦`
     );
   },
 
   // ─── ADMIN WELCOME MESSAGE ─────────────────────────────────
   adminWelcome(adminName, lang = 'am') {
+    const safeName = String(adminName || 'Admin').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     if (lang === 'en') {
       return (
-        `👋 *Hello Admin ${adminName}! Welcome to the Control Panel*\n\n` +
+        `👋 <b>Hello Admin ${safeName}! Welcome to the Control Panel</b>\n\n` +
         `Here you can manage the bot, add stock, and review customer orders.\n\n` +
-        `🛠️ *What would you like to do?* Use the buttons below:`
+        `🛠️ <b>What would you like to do?</b> Use the buttons below:`
       );
     }
 
     return (
-      `👋 *ሰላም አስተዳዳሪ ${adminName}! ወደ ቁጥጥር ፓነል እንኳን መጡ*\n\n` +
+      `👋 <b>ሰላም አስተዳዳሪ ${safeName}! ወደ ቁጥጥር ፓነል እንኳን መጡ</b>\n\n` +
       `እዚህ ሆነው ቦቱን ማስተዳደር፣ ስቶክ መጨመር እና የደንበኞችን ትዕዛዝ ማረጋገጥ ይችላሉ።\n\n` +
-      `🛠️ *ምን ማድረግ ይፈልጋሉ?* ከታች ያሉትን አዝራሮች ይጠቀሙ፦`
+      `🛠️ <b>ምን ማድረግ ይፈልጋሉ?</b> ከታች ያሉትን አዝራሮች ይጠቀሙ፦`
     );
   },
 
