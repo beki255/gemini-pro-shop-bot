@@ -167,15 +167,14 @@ const msg = {
           `🏦 <b>Commercial Bank of Ethiopia (CBE)</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `📋 <b>Account Number:</b>\n` +
-          `👉 <code>${config.payment.cbe.account}</code> 👈\n` +
-          `🔗 <b><a href="https://t.me/share/url?url=${config.payment.cbe.account}">👉 ${config.payment.cbe.account} 👈 (Tap to Copy Link)</a></b>\n\n` +
+          `👉 <code>${config.payment.cbe.account}</code> 👈\n\n` +
           `👤 <b>Account Name:</b>\n` +
           `👉 <b>${config.payment.cbe.name}</b>\n\n` +
           `💰 <b>Total to Pay:</b>\n` +
           `👉 <b>${totalAmount} ETB</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━\n\n` +
           `📸 <b>Payment Steps:</b>\n` +
-          `1️⃣ Tap the colored link or account number above to copy\n` +
+          `1️⃣ Tap the account number above to copy\n` +
           `2️⃣ Transfer <b>${totalAmount} ETB</b> via CBE Birr / Mobile Banking\n` +
           `3️⃣ Take a clear screenshot of the completed receipt\n` +
           `4️⃣ Send the screenshot directly into this chat\n\n` +
@@ -187,15 +186,14 @@ const msg = {
           `📱 <b>Telebirr</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
           `📋 <b>Phone Number:</b>\n` +
-          `👉 <code>${config.payment.telebirr.account}</code> 👈\n` +
-          `🔗 <b><a href="https://t.me/share/url?url=${config.payment.telebirr.account}">👉 ${config.payment.telebirr.account} 👈 (Tap to Copy Link)</a></b>\n\n` +
+          `👉 <code>${config.payment.telebirr.account}</code> 👈\n\n` +
           `👤 <b>Account Name:</b>\n` +
           `👉 <b>${config.payment.telebirr.name}</b>\n\n` +
           `💰 <b>Total to Pay:</b>\n` +
           `👉 <b>${totalAmount} ETB</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━\n\n` +
           `📸 <b>Payment Steps:</b>\n` +
-          `1️⃣ Tap the colored link or phone number above to copy\n` +
+          `1️⃣ Tap the phone number above to copy\n` +
           `2️⃣ Open Telebirr app → Send <b>${totalAmount} ETB</b>\n` +
           `3️⃣ Take a screenshot of the completed transaction\n` +
           `4️⃣ Send the screenshot directly into this chat\n\n` +
@@ -219,15 +217,14 @@ const msg = {
         `🏦 <b>የኢትዮጵያ ንግድ ባንክ (CBE)</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `📋 <b>የሒሳብ ቁጥር (Account Number):</b>\n` +
-        `👉 <code>${config.payment.cbe.account}</code> 👈\n` +
-        `🔗 <b><a href="https://t.me/share/url?url=${config.payment.cbe.account}">👉 ${config.payment.cbe.account} 👈 (በሰማያዊ ለመቅዳት ይጫኑ)</a></b>\n\n` +
+        `👉 <code>${config.payment.cbe.account}</code> 👈\n\n` +
         `👤 <b>የሂሳብ ስም (Account Name):</b>\n` +
         `👉 <b>${config.payment.cbe.name}</b>\n\n` +
         `💰 <b>የሚከፈለው ጠቅላላ መጠን:</b>\n` +
         `👉 <b>${totalAmount} ብር</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━\n\n` +
         `📸 <b>የአከፋፈል ቅደም ተከተል:</b>\n` +
-        `1️⃣ ከላይ ያለውን የሂሳብ ቁጥር ወይም ሰማያዊ ሊንክ ነክተው ይቅዱ\n` +
+        `1️⃣ ከላይ ያለውን የሂሳብ ቁጥር ነክተው ይቅዱ\n` +
         `2️⃣ በ CBE Birr ወይም Mobile Banking <b>${totalAmount} ብር</b> ያስተላልፉ\n` +
         `3️⃣ የተላከበትን <b>የደረሰኝ Screenshot ፎቶ</b> ያንሱ\n` +
         `4️⃣ ፎቶውን እዚህ ቦቱ ላይ ይላኩ\n\n` +
@@ -239,15 +236,14 @@ const msg = {
         `📱 <b>ቴሌብር (Telebirr)</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `📋 <b>የስልክ ቁጥር (Phone Number):</b>\n` +
-        `👉 <code>${config.payment.telebirr.account}</code> 👈\n` +
-        `🔗 <b><a href="https://t.me/share/url?url=${config.payment.telebirr.account}">👉 ${config.payment.telebirr.account} 👈 (በሰማያዊ ለመቅዳት ይጫኑ)</a></b>\n\n` +
+        `👉 <code>${config.payment.telebirr.account}</code> 👈\n\n` +
         `👤 <b>የተጠቃሚ ስም (Account Name):</b>\n` +
         `👉 <b>${config.payment.telebirr.name}</b>\n\n` +
         `💰 <b>የሚከፈለው ጠቅላላ መጠን:</b>\n` +
         `👉 <b>${totalAmount} ብር</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━\n\n` +
         `📸 <b>የአከፋፈል ቅደም ተከተል:</b>\n` +
-        `1️⃣ ከላይ ያለውን ስልክ ቁጥር ወይም ሰማያዊ ሊንክ ነክተው ይቅዱ\n` +
+        `1️⃣ ከላይ ያለውን ስልክ ቁጥር ነክተው ይቅዱ\n` +
         `2️⃣ በ Telebirr App Send Money በማድረግ <b>${totalAmount} ብር</b> ይላኩ\n` +
         `3️⃣ የተላከበትን <b>የደረሰኝ Screenshot ፎቶ</b> ያንሱ\n` +
         `4️⃣ ፎቶውን እዚህ ቦቱ ላይ ይላኩ\n\n` +

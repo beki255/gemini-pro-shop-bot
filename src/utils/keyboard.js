@@ -171,8 +171,8 @@ const keyboards = {
     const isCbe = method === 'CBE';
     const account = isCbe ? config.payment.cbe.account : config.payment.telebirr.account;
     const copyLabel = isEn
-      ? (isCbe ? `📋 Copy CBE Account (${account})` : `📋 Copy Telebirr (${account})`)
-      : (isCbe ? `📋 የ CBE ቁጥር ቅዳ (${account})` : `📋 የቴሌብር ስልክ ቅዳ (${account})`);
+      ? (isCbe ? '📋 Copy CBE Account' : '📋 Copy Telebirr Number')
+      : (isCbe ? '📋 የ CBE ቁጥር ቅዳ' : '📋 የቴሌብር ስልክ ቅዳ');
 
     return Markup.inlineKeyboard([
       [
