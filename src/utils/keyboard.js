@@ -13,36 +13,34 @@ const keyboards = {
     ]);
   },
 
-  // ─── CUSTOMER MAIN INLINE MENU (Stock count & Refresh button included)
+  // ─── CUSTOMER MAIN INLINE MENU (Mobile-optimized, never truncated)
   mainMenu(lang = 'am', isAdmin = false, stockCount = null) {
     const isEn = lang === 'en';
     const price = config.productPrice || 250;
-    const stockLabel = isEn ? '🟢 In Stock' : '🟢 በስቶክ አለ';
-    const productButtonText = `Gemini Pro 18 Month Link · ${price} ETB · ${stockLabel}`;
 
     const buttons = [
-      // Green product button
+      // Product Name & Price (Full-width headline button)
       [
         {
-          text: productButtonText,
+          text: isEn ? `💎 Gemini Pro 18M · ${price} ETB` : `💎 Gemini Pro 18 ወራት · ${price} ብር`,
+          callback_data: 'buy',
+          style: 'primary',
+        },
+      ],
+      // Prominent Green Stock Status & Buy Now (Side-by-side, 100% visible on all mobile screens)
+      [
+        {
+          text: isEn ? '🟢 In Stock' : '🟢 በስቶክ አለ',
           callback_data: 'buy',
           style: 'success',
         },
-      ],
-      // Green action button & Blue Refresh button
-      [
         {
           text: isEn ? '🛍️ Buy Now' : '🛍️ አሁን ግዛ',
           callback_data: 'buy',
           style: 'success',
         },
-        {
-          text: isEn ? '🔄 Refresh' : '🔄 አድስ',
-          callback_data: 'refresh_menu',
-          style: 'primary',
-        },
       ],
-      // Blue navigation buttons
+      // Navigation: My Orders & Refresh
       [
         {
           text: isEn ? '📦 My Orders' : '📦 የኔ ትዕዛዞች',
@@ -50,12 +48,18 @@ const keyboards = {
           style: 'primary',
         },
         {
+          text: isEn ? '🔄 Refresh' : '🔄 አድስ',
+          callback_data: 'refresh_menu',
+          style: 'primary',
+        },
+      ],
+      // Language & Support
+      [
+        {
           text: isEn ? '🌐 Language' : '🌐 ቋንቋ / Language',
           callback_data: 'change_language',
           style: 'primary',
         },
-      ],
-      [
         {
           text: isEn ? '💬 Support' : '💬 እርዳታ እና ድጋፍ',
           callback_data: 'contact',
