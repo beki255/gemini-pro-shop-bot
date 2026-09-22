@@ -221,15 +221,21 @@ bot.on('photo', async (ctx) => {
     if (handled) return;
   }
   // User receipt upload
-  await userHandlers.handlePhotoReceipt(ctx);
+  await userHandlers.handleReceipt(ctx);
 });
 
-// ─── Document Handler (bulk stock file for admin) ─────────
+// ─── Document Handler (bulk stock file for admin & user receipt) ─────────
 bot.on('document', async (ctx) => {
   const session = ctx.session || {};
   if (session.awaitingBulkStock && ctx.from.id === config.adminId) {
-    await adminHandlers.handleBulkStockFile(ctx);
+    return adminHandlers.handleBulkStockFile(ctx);
   }
+  if (ctx.from && ctx.from.id === config.adminId && session.awaitingBroadcastMessage) {
+    const handled = await adminHandlers.handleBroadcastMessage(ctx);
+    if (handled) return;
+  }
+  // User receipt upload (image sent as document, PDF receipt, etc.)
+  await userHandlers.handleReceipt(ctx);
 });
 
 // ─── Text Handler (custom quantity & admin rejection) ───
@@ -277,6 +283,17 @@ bot.on('text', async (ctx) => {
   // Admin rejection reason
   if (ctx.from.id === config.adminId && session.pendingRejection) {
     return adminHandlers.handleRejectionReason(ctx);
+  }
+
+  // Customer awaiting receipt but sent plain text
+  if (session.pendingOrder && ctx.from.id !== config.adminId) {
+    const lang = await userHandlers.getUserLang(ctx.from.id);
+    return ctx.reply(
+      lang === 'en'
+        ? '📸 Please send your payment receipt as a **photo (screenshot)** or **file/PDF**.'
+        : '📸 እባክዎ የክፍያ ደረሰኝዎን በ **ፎቶ (ስክሪንሾት)** ወይም በ **ሰነድ/PDF** ይላኩ።',
+      { parse_mode: 'Markdown' }
+    );
   }
 
   // Admin interactive stock adding flow

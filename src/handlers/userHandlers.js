@@ -413,15 +413,15 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
   await ctx.reply(photoPrompt, { parse_mode: 'HTML' });
 }
 
-// ─── Photo Handler: Receive Receipt Screenshot ─────────────
-async function handlePhotoReceipt(ctx) {
+// ─── Receipt Handler: Receive Photo or Document/PDF Receipt ─────
+async function handleReceipt(ctx) {
   const lang = await getUserLang(ctx.from.id);
   const session = ctx.session || {};
 
   if (!session.pendingOrder) {
     const warning = lang === 'en'
-      ? '⚠️ *To send a receipt, please first:*\n1. Tap /buy to start an order\n2. Select quantity and payment method (CBE or Telebirr)\n3. Then send your screenshot.'
-      : '⚠️ *ደረሰኝ ለመላክ እባክዎ መጀመሪያ:*\n1. /buy ብለው ይዘዙ\n2. ብዛት እና የክፍያ መንገድ ይምረጡ (CBE ወይም Telebirr)\n3. ከዚያ ደረሰኙን እዚህ ይላኩ።';
+      ? '⚠️ *To send a receipt, please first:*\n1. Tap /buy to start an order\n2. Select quantity and payment method (CBE or Telebirr)\n3. Then send your receipt photo or document.'
+      : '⚠️ *ደረሰኝ ለመላክ እባክዎ መጀመሪያ:*\n1. /buy ብለው ይዘዙ\n2. ብዛት እና የክፍያ መንገድ ይምረጡ (CBE ወይም Telebirr)\n3. ከዚያ ደረሰኙን (ስክሪንሾት ወይም ሰነድ) እዚህ ይላኩ።';
 
     return ctx.reply(warning, { parse_mode: 'Markdown' });
   }
@@ -460,14 +460,41 @@ async function handlePhotoReceipt(ctx) {
     }
   }
 
-  const photo = ctx.message.photo;
-  const fileId = photo[photo.length - 1].file_id;
+  // Extract file details (Supports both Photo and Document/PDF/File formats)
+  let fileId = null;
+  let isDocument = false;
+  let fileExt = 'jpg';
+
+  if (ctx.message.photo && ctx.message.photo.length > 0) {
+    const photo = ctx.message.photo;
+    fileId = photo[photo.length - 1].file_id;
+    isDocument = false;
+    fileExt = 'jpg';
+  } else if (ctx.message.document) {
+    const doc = ctx.message.document;
+    fileId = doc.file_id;
+    isDocument = true;
+    if (doc.file_name && doc.file_name.includes('.')) {
+      fileExt = doc.file_name.split('.').pop().toLowerCase();
+    } else if (doc.mime_type === 'application/pdf') {
+      fileExt = 'pdf';
+    } else if (doc.mime_type && doc.mime_type.startsWith('image/')) {
+      fileExt = doc.mime_type.split('/')[1] || 'jpg';
+    }
+  }
+
+  if (!fileId) {
+    const warning = lang === 'en'
+      ? '⚠️ Please send your payment receipt as a photo, image file, or PDF document.'
+      : '⚠️ እባክዎ የክፍያ ደረሰኝዎን በፎቶ (ስክሪንሾት)፣ በምስል ወይም በ PDF ሰነድ መልክ ይላኩ።';
+    return ctx.reply(warning);
+  }
 
   const uploadsDir = path.join(process.cwd(), 'uploads');
   fs.ensureDir(uploadsDir).catch(() => {});
-  const filePath = path.join(uploadsDir, `${Date.now()}_${from.id}.jpg`);
+  const filePath = path.join(uploadsDir, `${Date.now()}_${from.id}.${fileExt}`);
 
-  // Optional background image download with strict 7s timeout (never blocks order flow)
+  // Optional background image/document download with strict 7s timeout
   (async () => {
     try {
       const fileLink = await ctx.telegram.getFileLink(fileId);
@@ -569,13 +596,21 @@ async function handlePhotoReceipt(ctx) {
 
   ctx.session.pendingOrder = null;
 
-  // Notify admin
+  // Notify admin with photo or document accordingly
   try {
-    await ctx.telegram.sendPhoto(config.adminId, fileId, {
-      caption: msg.adminNewOrder(order, { username: from.username, firstName: from.first_name, lastName: from.last_name }),
-      parse_mode: 'HTML',
-      ...keyboards.adminApproval(orderId),
-    });
+    if (isDocument) {
+      await ctx.telegram.sendDocument(config.adminId, fileId, {
+        caption: msg.adminNewOrder(order, { username: from.username, firstName: from.first_name, lastName: from.last_name }),
+        parse_mode: 'HTML',
+        ...keyboards.adminApproval(orderId),
+      });
+    } else {
+      await ctx.telegram.sendPhoto(config.adminId, fileId, {
+        caption: msg.adminNewOrder(order, { username: from.username, firstName: from.first_name, lastName: from.last_name }),
+        parse_mode: 'HTML',
+        ...keyboards.adminApproval(orderId),
+      });
+    }
     console.log(`✅ Order notification sent to admin (${config.adminId}) for ${orderId}`);
   } catch (err) {
     console.error('Failed to notify admin with HTML:', err.message);
@@ -591,19 +626,28 @@ async function handlePhotoReceipt(ctx) {
         `📦 ብዛት: ${order.quantity} ሊንክ\n` +
         `💰 መጠን: ${order.amount} ብር\n` +
         `💳 ክፍያ: ${order.paymentMethod}\n\n` +
-        `📸 ደረሰኝ ስዕል ከላይ ተላኳል\n` +
+        `📄 ደረሰኝ ከላይ ተላኳል\n` +
         `⬇️ ምርጫ ያድርጉ:`;
 
-      await ctx.telegram.sendPhoto(config.adminId, fileId, {
-        caption: plainCaption,
-        ...keyboards.adminApproval(orderId),
-      });
+      if (isDocument) {
+        await ctx.telegram.sendDocument(config.adminId, fileId, {
+          caption: plainCaption,
+          ...keyboards.adminApproval(orderId),
+        });
+      } else {
+        await ctx.telegram.sendPhoto(config.adminId, fileId, {
+          caption: plainCaption,
+          ...keyboards.adminApproval(orderId),
+        });
+      }
       console.log(`✅ Fallback order notification sent to admin (${config.adminId}) for ${orderId}`);
     } catch (err2) {
       console.error('Fallback notification to admin also failed:', err2.message);
     }
   }
 }
+
+const handlePhotoReceipt = handleReceipt;
 
 // ─── Callback: "cancel" ────────────────────────────────────
 async function callbackCancel(ctx) {
@@ -657,6 +701,7 @@ module.exports = {
   handleMyOrders,
   handleHelp,
   handleContact,
+  handleReceipt,
   handlePhotoReceipt,
   handleCustomQtyInput,
   callbackBuy,
