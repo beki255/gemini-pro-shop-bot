@@ -59,6 +59,7 @@ bot.command('resend', adminHandlers.handleResend);
 bot.command('restock', adminHandlers.handleRestock);
 bot.command('broadcast', adminHandlers.handleBroadcast);
 bot.command('announce', adminHandlers.handleBroadcast);
+bot.command(['users', 'customers', 'members'], adminHandlers.handleUsers);
 
 // ─── Persistent Bottom Menu Text Handlers ─────────────────
 bot.hears(['🛒 ምርት ግዛ (Buy Now)', '🛒 ምርት ግዛ', 'Buy'], userHandlers.handleBuy);
@@ -119,6 +120,9 @@ bot.on('callback_query', async (ctx) => {
     await ctx.answerCbQuery();
     return adminHandlers.handleOrders(ctx);
   }
+  if (data === 'admin_users') return adminHandlers.callbackUsers(ctx);
+  if (data.startsWith('admin_users_page_')) return adminHandlers.callbackUsersPage(ctx);
+  if (data === 'noop') return ctx.answerCbQuery().catch(() => {});
   if (data.startsWith('approve_')) return adminHandlers.callbackApprove(ctx);
   if (data.startsWith('reject_')) return adminHandlers.callbackReject(ctx);
   if (data.startsWith('details_')) return adminHandlers.callbackDetails(ctx);

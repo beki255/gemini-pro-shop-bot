@@ -433,6 +433,155 @@ const handleOrders = adminOnly(async (ctx) => {
   });
 });
 
+// ─── /users — List registered users from database ─────────
+const handleUsers = adminOnly(async (ctx, pageOverride) => {
+  const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
+  const args = text.split(/\s+/);
+  const searchParam = args.length > 1 ? args[1] : null;
+
+  const adminUser = await User.findOne({ telegramId: ctx.from.id });
+  const lang = adminUser && adminUser.language ? adminUser.language : 'am';
+  const isEn = lang === 'en';
+
+  // If a specific user query is provided (/users <id or @username>)
+  if (searchParam && !pageOverride) {
+    let query = {};
+    if (/^\d+$/.test(searchParam)) {
+      query = { telegramId: parseInt(searchParam) };
+    } else {
+      const cleanUser = searchParam.replace(/^@/, '');
+      query = { username: new RegExp(`^${cleanUser}$`, 'i') };
+    }
+
+    const foundUser = await User.findOne(query);
+    if (!foundUser) {
+      return ctx.reply(
+        isEn
+          ? `❌ User "<b>${escapeHtml(searchParam)}</b>" was not found in the database.`
+          : `❌ ተጠቃሚ "<b>${escapeHtml(searchParam)}</b>" በዳታቤዝ ውስጥ አልተገኘም።`,
+        { parse_mode: 'HTML', ...keyboards.adminPanel(lang) }
+      );
+    }
+
+    // Fetch user's orders
+    const userOrders = await Order.find({ userId: foundUser.telegramId }).sort({ createdAt: -1 });
+    const approvedCount = userOrders.filter((o) => o.status === 'approved').length;
+    const totalSpent = userOrders
+      .filter((o) => o.status === 'approved')
+      .reduce((sum, o) => sum + (o.amount || 0), 0);
+
+    const fullName = `${foundUser.firstName || ''} ${foundUser.lastName || ''}`.trim() || (isEn ? 'No Name' : 'ስም የለም');
+    const username = foundUser.username ? `@${foundUser.username}` : (isEn ? 'None' : 'የለውም');
+    const userLang = foundUser.language === 'en' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
+    const regDate = foundUser.createdAt ? new Date(foundUser.createdAt).toLocaleString('am-ET') : 'ያልታወቀ';
+    const statusText = foundUser.isBlocked ? '🔴 የታገደ (Blocked)' : '🟢 ንቁ (Active)';
+
+    let detailText =
+      `👤 <b>የተጠቃሚ ዝርዝር መረጃ (User Details)</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>ስም:</b> <b>${escapeHtml(fullName)}</b>\n` +
+      `🔗 <b>ዩዘርኔም:</b> <b>${escapeHtml(username)}</b>\n` +
+      `🆔 <b>Telegram ID:</b> <code>${foundUser.telegramId}</code>\n` +
+      `🌐 <b>ቋንቋ:</b> ${userLang}\n` +
+      `📊 <b>ሁኔታ:</b> ${statusText}\n` +
+      `📅 <b>የተመዘገበበት:</b> ${regDate}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 <b>ጠቅላላ ትዕዛዞች:</b> ${userOrders.length} (${approvedCount} የጸደቁ)\n` +
+      `💰 <b>ጠቅላላ የወጣው ገንዘብ:</b> ${totalSpent} ብር\n\n`;
+
+    if (userOrders.length > 0) {
+      detailText += `📋 <b>የቅርብ ትዕዛዞች:</b>\n`;
+      userOrders.slice(0, 5).forEach((o) => {
+        const stEmoji = o.status === 'approved' ? '✅' : o.status === 'pending' ? '⏳' : '❌';
+        detailText += `• ${stEmoji} <code>${o.orderId}</code> — ${o.amount} ብር (${escapeHtml(o.paymentMethod || 'CBE')})\n`;
+      });
+    }
+
+    return ctx.reply(detailText, {
+      parse_mode: 'HTML',
+      ...keyboards.adminUsersPagination(1, 1, lang),
+    });
+  }
+
+  // Paginated user list
+  const page = pageOverride || 1;
+  const PAGE_SIZE = 8;
+  const totalUsers = await User.countDocuments();
+  const totalPages = Math.ceil(totalUsers / PAGE_SIZE) || 1;
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+
+  const users = await User.find()
+    .sort({ createdAt: -1 })
+    .skip((currentPage - 1) * PAGE_SIZE)
+    .limit(PAGE_SIZE);
+
+  if (users.length === 0) {
+    return ctx.reply(
+      isEn ? '📭 No registered users found in the database.' : '📭 በዳታቤዝ ውስጥ ምንም የተመዘገበ ተጠቃሚ አልተገኘም።',
+      { ...keyboards.adminPanel(lang) }
+    );
+  }
+
+  let textMsg =
+    `👥 <b>የተመዘገቡ ተጠቃሚዎች (Registered Users)</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `📊 <b>ጠቅላላ ደንበኞች:</b> <b>${totalUsers}</b>\n` +
+    `📄 <b>ገጽ:</b> <b>${currentPage} / ${totalPages}</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  users.forEach((u, i) => {
+    const num = (currentPage - 1) * PAGE_SIZE + i + 1;
+    const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'ስም የለም';
+    const username = u.username ? `@${u.username}` : 'የለውም';
+    const userLang = u.language === 'en' ? '🇬🇧 EN' : '🇪🇹 AM';
+    const orders = u.totalOrders || 0;
+    const status = u.isBlocked ? '🔴' : '🟢';
+    const regDate = u.createdAt ? new Date(u.createdAt).toISOString().slice(0, 10) : '';
+
+    textMsg +=
+      `<b>${num}.</b> ${status} <b>${escapeHtml(fullName)}</b>\n` +
+      `   🔗 <b>ዩዘርኔም:</b> ${escapeHtml(username)}\n` +
+      `   🆔 <b>ID:</b> <code>${u.telegramId}</code>\n` +
+      `   📦 <b>ትዕዛዞች:</b> ${orders} | 🌐 ${userLang} | 📅 ${regDate}\n\n`;
+  });
+
+  textMsg += `💡 <i>አንድን ተጠቃሚ በዝርዝር ለማየት:</i> <code>/users &lt;Telegram ID ወይም @username&gt;</code>`;
+
+  const keyboard = keyboards.adminUsersPagination(currentPage, totalPages, lang);
+
+  if (ctx.callbackQuery) {
+    try {
+      await ctx.editMessageText(textMsg, {
+        parse_mode: 'HTML',
+        ...keyboard,
+      });
+      return;
+    } catch (err) {
+      if (err.description && err.description.includes('message is not modified')) {
+        return;
+      }
+    }
+  }
+
+  return ctx.reply(textMsg, {
+    parse_mode: 'HTML',
+    ...keyboard,
+  });
+});
+
+// ─── Callback: admin_users (Page 1) ───────────────────────
+const callbackUsers = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  return handleUsers(ctx, 1);
+});
+
+// ─── Callback: admin_users_page_<page> ────────────────────
+const callbackUsersPage = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const page = parseInt(ctx.callbackQuery.data.replace('admin_users_page_', '')) || 1;
+  return handleUsers(ctx, page);
+});
+
 // ─── /stats — Dashboard statistics ───────────────────────
 const handleStats = adminOnly(async (ctx) => {
   const SoldStock = require('../models/SoldStock');
@@ -1478,5 +1627,8 @@ module.exports = {
   handleBroadcastMessage,
   callbackConfirmBroadcast,
   callbackCancelBroadcast,
+  handleUsers,
+  callbackUsers,
+  callbackUsersPage,
 };
 

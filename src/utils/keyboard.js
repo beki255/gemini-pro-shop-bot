@@ -348,21 +348,21 @@ const keyboards = {
           style: 'primary',
         },
         {
-          text: isEn ? '💰 Change Price' : '💰 ዋጋ ቀይር',
-          callback_data: 'admin_change_price',
+          text: isEn ? '👥 Users' : '👥 ተጠቃሚዎች',
+          callback_data: 'admin_users',
           style: 'primary',
         },
       ],
       [
         {
+          text: isEn ? '💰 Change Price' : '💰 ዋጋ ቀይር',
+          callback_data: 'admin_change_price',
+          style: 'primary',
+        },
+        {
           text: isEn ? '➕ Add Stock' : '➕ ስቶክ ጨምር',
           callback_data: 'admin_start_add_stock',
           style: 'success',
-        },
-        {
-          text: isEn ? '👀 View Store' : '👀 ሱቁን እይ',
-          callback_data: 'view_customer_store',
-          style: 'primary',
         },
       ],
       [
@@ -371,8 +371,57 @@ const keyboards = {
           callback_data: 'admin_broadcast',
           style: 'primary',
         },
+        {
+          text: isEn ? '👀 View Store' : '👀 ሱቁን እይ',
+          callback_data: 'view_customer_store',
+          style: 'primary',
+        },
       ],
     ]);
+  },
+
+  // ─── ADMIN USERS LIST PAGINATION ───────────────────────────
+  adminUsersPagination(page, totalPages, lang = 'am') {
+    const isEn = lang === 'en';
+    const rows = [];
+
+    if (totalPages > 1) {
+      const navRow = [];
+      if (page > 1) {
+        navRow.push({
+          text: '⬅️ ቀዳሚ',
+          callback_data: `admin_users_page_${page - 1}`,
+          style: 'primary',
+        });
+      }
+      navRow.push({
+        text: `📄 ${page}/${totalPages}`,
+        callback_data: 'noop',
+      });
+      if (page < totalPages) {
+        navRow.push({
+          text: 'ቀጣይ ➡️',
+          callback_data: `admin_users_page_${page + 1}`,
+          style: 'primary',
+        });
+      }
+      rows.push(navRow);
+    }
+
+    rows.push([
+      {
+        text: isEn ? '🔄 Refresh' : '🔄 አድስ',
+        callback_data: `admin_users_page_${page}`,
+        style: 'primary',
+      },
+      {
+        text: isEn ? '🔙 Admin Panel' : '🔙 ወደ ዋና ፓነል',
+        callback_data: 'admin_panel',
+        style: 'primary',
+      },
+    ]);
+
+    return Markup.inlineKeyboard(rows);
   },
 
   // ─── ADMIN STORE PREVIEW KEYBOARD (No customer buttons) ─────
