@@ -254,36 +254,52 @@ const msg = {
   },
 
   // ─── RECEIPT RECEIVED / PENDING VERIFICATION ────────────────
-  receiptReceived(orderId, lang = 'am', step = 0) {
+  receiptReceived(orderId, lang = 'am', tick = 0) {
     const isEn = lang === 'en';
 
-    // Animated progress stages
-    const stages = [
-      { pct: '30%', bar: '▓▓▓░░░░░░░', amStatus: 'ደረሰኝ ተቀብለናል (Received)', enStatus: 'Receipt Received' },
-      { pct: '70%', bar: '▓▓▓▓▓▓▓░░░', amStatus: 'አስተዳዳሪው በማረጋገጥ ላይ ነው (Reviewing)', enStatus: 'Admin Reviewing Payment' },
-      { pct: '95%', bar: '▓▓▓▓▓▓▓▓▓░', amStatus: 'በመጨረሻው ማረጋገጫ ላይ (Finalizing)', enStatus: 'Finalizing Verification' },
+    // Rotating circular spinner frames (cycles indefinitely like a spinning loader)
+    const spinners = ['◐', '◓', '◑', '◒'];
+    const spinner = spinners[tick % spinners.length];
+
+    // Moving radar/scanner wave bar
+    const scanBars = [
+      '▰▱▱▱▱▱▱▱',
+      '▱▰▱▱▱▱▱▱',
+      '▱▱▰▱▱▱▱▱',
+      '▱▱▱▰▱▱▱▱',
+      '▱▱▱▱▰▱▱▱',
+      '▱▱▱▱▱▰▱▱',
+      '▱▱▱▱▱▱▰▱',
+      '▱▱▱▱▱▱▱▰',
+      '▱▱▱▱▱▱▰▱',
+      '▱▱▱▱▱▰▱▱',
+      '▱▱▱▱▰▱▱▱',
+      '▱▱▱▰▱▱▱▱',
+      '▱▱▰▱▱▱▱▱',
+      '▱▰▱▱▱▱▱▱',
     ];
-    const cur = stages[Math.min(step, stages.length - 1)];
+    const bar = scanBars[tick % scanBars.length];
+    const dots = ['.', '..', '...', '....'][tick % 4];
 
     if (isEn) {
       return (
-        `⏳ <b>Verifying Payment...</b>\n` +
+        `${spinner} <b>Verifying Payment${dots}</b>\n` +
         `━━━━━━━━━━━━━━━━━━━\n` +
         `🔢 Order ID: <code>${orderId}</code>\n` +
-        `📊 Status: <b>🟡 ${cur.enStatus}</b>\n` +
-        `⚡ Progress: <code>[${cur.bar}] ${cur.pct}</code>\n\n` +
-        `⏳ <i>Our admin is currently reviewing your payment receipt. Once approved, your Gemini Pro activation link will be delivered right here automatically!</i>\n\n` +
+        `📊 Status: <b>🟡 Admin Reviewing Payment</b>\n` +
+        `⚡ Live Scanner: <code>[ ${bar} ]</code>\n\n` +
+        `${spinner} <i>Our admin is currently reviewing your payment receipt. Once approved, your Gemini Pro activation link will be delivered right here automatically!</i>\n\n` +
         `📲 <b>Please stay tuned — this usually takes just a few minutes.</b>`
       );
     }
 
     return (
-      `⏳ <b>ክፍያዎ በማረጋገጥ ላይ ነው...</b>\n` +
+      `${spinner} <b>ክፍያዎ በማረጋገጥ ላይ ነው${dots}</b>\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
       `🔢 የትዕዛዝ ቁጥር: <code>${orderId}</code>\n` +
-      `📊 ሁኔታ: <b>🟡 ${cur.amStatus}</b>\n` +
-      `⚡ ሂደት: <code>[${cur.bar}] ${cur.pct}</code>\n\n` +
-      `⏳ <i>አስተዳዳሪው የላኩትን ደረሰኝ በማረጋገጥ ላይ ነው። ልክ እንዳረጋገጠ የ Gemini Pro አክቲቬሽን ሊንኩ በራስ-ሰር እዚህ ይላክሎታል!</i>\n\n` +
+      `📊 ሁኔታ: <b>🟡 አስተዳዳሪው በማረጋገጥ ላይ ነው</b>\n` +
+      `⚡ ቀጥታ ቅኝት (Scanner): <code>[ ${bar} ]</code>\n\n` +
+      `${spinner} <i>አስተዳዳሪው የላኩትን ደረሰኝ በማረጋገጥ ላይ ነው። ልክ እንዳረጋገጠ የ Gemini Pro አክቲቬሽን ሊንኩ በራስ-ሰር እዚህ ይላክሎታል!</i>\n\n` +
       `📲 <b>እባክዎ በትዕግስት ይጠብቁ — በጥቂት ደቂቃዎች ውስጥ ይደርሳል!</b>`
     );
   },
@@ -312,7 +328,7 @@ const msg = {
 
       text +=
         `\n📋 <b>Activation Instructions:</b>\n` +
-        `• Connect VPN\n` +
+        `• <b>Connect VPN for only activation, after activation you can turn off</b>\n` +
         `• Click the provided activation link\n` +
         `• Sign in to the target Gmail account\n` +
         `• Select Activate Offer\n\n` +
@@ -340,7 +356,7 @@ const msg = {
 
     text +=
       `\n📋 <b>የአክቲቬሽን መመሪያ (Activation Instructions):</b>\n` +
-      `• Connect VPN (መጀመሪያ VPN ያገናኙ)\n` +
+      `• <b>Connect VPN for only activation, after activation you can turn off</b> (VPN የሚያስፈልገው ለአክቲቬሽን ብቻ ነው፤ አክቲቭ ካደረጉ በኋላ ማጥፋት ይችላሉ)\n` +
       `• Click the provided activation link (የተላከውን ሊንክ ይጫኑ)\n` +
       `• Sign in to the target Gmail account (በሚፈልጉት Gmail Account ይግቡ)\n` +
       `• Select Activate Offer ("Activate Offer" የሚለውን ይጫኑ)\n\n` +

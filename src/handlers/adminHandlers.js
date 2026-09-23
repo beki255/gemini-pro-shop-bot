@@ -12,11 +12,11 @@ function isAdmin(ctx) {
 }
 
 function adminOnly(handler) {
-  return async (ctx) => {
+  return async (ctx, ...args) => {
     if (!isAdmin(ctx)) {
       return ctx.reply('🚫 ይህ አዛዥ ለአስተዳዳሪ ብቻ ነው።');
     }
-    return handler(ctx);
+    return handler(ctx, ...args);
   };
 }
 
@@ -504,7 +504,12 @@ const handleUsers = adminOnly(async (ctx, pageOverride) => {
   }
 
   // Paginated user list
-  const page = pageOverride || 1;
+  let page = pageOverride;
+  if (!page && ctx.callbackQuery && ctx.callbackQuery.data && ctx.callbackQuery.data.startsWith('admin_users_page_')) {
+    page = parseInt(ctx.callbackQuery.data.replace('admin_users_page_', '')) || 1;
+  }
+  page = page || 1;
+
   const PAGE_SIZE = 8;
   const totalUsers = await User.countDocuments();
   const totalPages = Math.ceil(totalUsers / PAGE_SIZE) || 1;
@@ -553,6 +558,7 @@ const handleUsers = adminOnly(async (ctx, pageOverride) => {
     try {
       await ctx.editMessageText(textMsg, {
         parse_mode: 'HTML',
+        disable_web_page_preview: true,
         ...keyboard,
       });
       return;
@@ -560,11 +566,13 @@ const handleUsers = adminOnly(async (ctx, pageOverride) => {
       if (err.description && err.description.includes('message is not modified')) {
         return;
       }
+      console.error('Failed to editMessageText for admin users:', err.message);
     }
   }
 
   return ctx.reply(textMsg, {
     parse_mode: 'HTML',
+    disable_web_page_preview: true,
     ...keyboard,
   });
 });
@@ -828,7 +836,7 @@ async function callbackApprove(ctx) {
         plainMsg += `\n${i + 1}️⃣ ${lnk}\n`;
       });
       const supportUser = config.supportUsername || 'Mnbvcnvhd';
-      plainMsg += `\n📋 Activation Instructions:\n• Connect VPN\n• Click the provided activation link\n• Sign in to the target Gmail account\n• Select Activate Offer\n\n❓ Issues? Contact: @${supportUser}\n\n🙏 እኛን ስለመረጡ እናመሰግናለን!`;
+      plainMsg += `\n📋 Activation Instructions:\n• Connect VPN for only activation, after activation you can turn off\n• Click the provided activation link\n• Sign in to the target Gmail account\n• Select Activate Offer\n\n❓ Issues? Contact: @${supportUser}\n\n🙏 እኛን ስለመረጡ እናመሰግናለን!`;
 
       await ctx.telegram.sendMessage(order.userId, plainMsg, {
         ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),

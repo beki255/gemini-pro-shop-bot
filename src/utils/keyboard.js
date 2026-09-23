@@ -257,22 +257,20 @@ const keyboards = {
   },
 
   // ─── PENDING VERIFICATION KEYBOARD (Waiting for Admin Approval) ───
-  pendingVerification(orderId, lang = 'am') {
+  pendingVerification(orderId, lang = 'am', spinner = '◐') {
     const isEn = lang === 'en';
     const username = config.supportUsername || 'Mnbvcnvhd';
     return Markup.inlineKeyboard([
       [
         {
-          text: isEn ? '⏳ Verifying Payment...' : '⏳ ክፍያዎ በማረጋገጥ ላይ ነው...',
+          text: isEn ? `${spinner} Verifying Payment...` : `${spinner} ክፍያዎ በማረጋገጥ ላይ ነው...`,
           callback_data: `check_pending_${orderId}`,
-          style: 'primary',
         },
       ],
       [
         {
           text: isEn ? `💬 Contact Admin (@${username})` : `💬 አድሚኑን አግኝ (@${username})`,
           url: `https://t.me/${username}`,
-          style: 'success',
         },
       ],
     ]);
@@ -389,9 +387,8 @@ const keyboards = {
       const navRow = [];
       if (page > 1) {
         navRow.push({
-          text: '⬅️ ቀዳሚ',
+          text: isEn ? '⬅️ Prev' : '⬅️ ቀዳሚ',
           callback_data: `admin_users_page_${page - 1}`,
-          style: 'primary',
         });
       }
       navRow.push({
@@ -400,9 +397,8 @@ const keyboards = {
       });
       if (page < totalPages) {
         navRow.push({
-          text: 'ቀጣይ ➡️',
+          text: isEn ? 'Next ➡️' : 'ቀጣይ ➡️',
           callback_data: `admin_users_page_${page + 1}`,
-          style: 'primary',
         });
       }
       rows.push(navRow);
@@ -412,12 +408,10 @@ const keyboards = {
       {
         text: isEn ? '🔄 Refresh' : '🔄 አድስ',
         callback_data: `admin_users_page_${page}`,
-        style: 'primary',
       },
       {
         text: isEn ? '🔙 Admin Panel' : '🔙 ወደ ዋና ፓነል',
         callback_data: 'admin_panel',
-        style: 'primary',
       },
     ]);
 

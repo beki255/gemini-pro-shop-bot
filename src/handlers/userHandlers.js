@@ -555,42 +555,54 @@ async function handleReceipt(ctx) {
   try {
     const sentCustomerMsg = await ctx.reply(msg.receiptReceived(orderId, lang, 0), {
       parse_mode: 'HTML',
-      ...keyboards.pendingVerification(orderId, lang),
+      ...keyboards.pendingVerification(orderId, lang, '◐'),
     });
 
-    // Background animation: advance progress stages smoothly
+    // Continuous live background animation loop (spins continuously until admin approves/rejects)
     (async () => {
       try {
-        await new Promise((r) => setTimeout(r, 1800));
-        await ctx.telegram.editMessageText(
-          from.id,
-          sentCustomerMsg.message_id,
-          null,
-          msg.receiptReceived(orderId, lang, 1),
-          {
-            parse_mode: 'HTML',
-            ...keyboards.pendingVerification(orderId, lang),
-          }
-        );
+        let tick = 0;
+        const maxTicks = 150; // Up to 6+ minutes of continuous live animation
+        const spinnerIcons = ['◐', '◓', '◑', '◒'];
 
-        await new Promise((r) => setTimeout(r, 2200));
-        await ctx.telegram.editMessageText(
-          from.id,
-          sentCustomerMsg.message_id,
-          null,
-          msg.receiptReceived(orderId, lang, 2),
-          {
-            parse_mode: 'HTML',
-            ...keyboards.pendingVerification(orderId, lang),
+        while (tick < maxTicks) {
+          await new Promise((r) => setTimeout(r, 2500));
+          tick++;
+
+          // Check if order was approved/rejected in DB
+          const orderCheck = await Order.findOne({ orderId }).select('status').lean();
+          if (!orderCheck || orderCheck.status !== 'pending') {
+            break; // Stop animating as soon as admin acts
           }
-        );
-      } catch {}
+
+          const curSpinner = spinnerIcons[tick % spinnerIcons.length];
+
+          try {
+            await ctx.telegram.editMessageText(
+              from.id,
+              sentCustomerMsg.message_id,
+              null,
+              msg.receiptReceived(orderId, lang, tick),
+              {
+                parse_mode: 'HTML',
+                ...keyboards.pendingVerification(orderId, lang, curSpinner),
+              }
+            );
+          } catch (editErr) {
+            if (editErr.description && editErr.description.includes('message to edit not found')) {
+              break;
+            }
+          }
+        }
+      } catch (loopErr) {
+        console.error('Animation loop error:', loopErr.message);
+      }
     })();
   } catch (err) {
     console.error('Failed to send HTML receipt message:', err.message);
     await ctx.reply(
       `⏳ ክፍያዎ በማረጋገጥ ላይ ነው... (የትዕዛዝ ቁጥር: ${orderId})\nአስተዳዳሪው እንዳረጋገጠ የሊንኩ መረጃ ወዲያውኑ እዚህ ይላክልዎታል!`,
-      { ...keyboards.pendingVerification(orderId, lang) }
+      { ...keyboards.pendingVerification(orderId, lang, '◐') }
     );
   }
 
