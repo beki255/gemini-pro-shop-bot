@@ -553,56 +553,83 @@ async function handleReceipt(ctx) {
 
   // Notify customer in their language with animated pending verification
   try {
-    const sentCustomerMsg = await ctx.reply(msg.receiptReceived(orderId, lang, 0), {
+    const isEn = lang === 'en';
+    const buttonFrames = isEn
+      ? [
+          '◐ Verifying Payment .',
+          '◓ Verifying Payment ..',
+          '◑ Verifying Payment ...',
+          '◒ Verifying Payment',
+          '🔄 Verifying Payment .',
+          '⏳ Verifying Payment ..',
+          '⌛ Verifying Payment ...',
+          '⚙️ Verifying Payment',
+        ]
+      : [
+          '◐ ክፍያዎ በማረጋገጥ ላይ ነው .',
+          '◓ ክፍያዎ በማረጋገጥ ላይ ነው ..',
+          '◑ ክፍያዎ በማረጋገጥ ላይ ነው ...',
+          '◒ ክፍያዎ በማረጋገጥ ላይ ነው',
+          '🔄 ክፍያዎ በማረጋገጥ ላይ ነው .',
+          '⏳ ክፍያዎ በማረጋገጥ ላይ ነው ..',
+          '⌛ ክፍያዎ በማረጋገጥ ላይ ነው ...',
+          '⚙️ ክፍያዎ በማረጋገጥ ላይ ነው',
+        ];
+
+    const sentCustomerMsg = await ctx.reply(msg.receiptReceived(orderId, lang), {
       parse_mode: 'HTML',
-      ...keyboards.pendingVerification(orderId, lang, '◐'),
+      ...keyboards.pendingVerification(orderId, lang, buttonFrames[0]),
     });
 
-    // Continuous live background animation loop (spins continuously until admin approves/rejects)
+    // Fast live spinning animation ON THE BUTTON (snappy 1.0s interval)
     (async () => {
       try {
         let tick = 0;
-        const maxTicks = 150; // Up to 6+ minutes of continuous live animation
-        const spinnerIcons = ['◐', '◓', '◑', '◒'];
+        const maxTicks = 360; // Up to 6 minutes of continuous fast button animation
 
         while (tick < maxTicks) {
-          await new Promise((r) => setTimeout(r, 2500));
+          await new Promise((r) => setTimeout(r, 1000)); // Snappy 1.0s interval
           tick++;
 
-          // Check if order was approved/rejected in DB
-          const orderCheck = await Order.findOne({ orderId }).select('status').lean();
-          if (!orderCheck || orderCheck.status !== 'pending') {
-            break; // Stop animating as soon as admin acts
+          // Periodically check DB (every 2.0s) to detect approval or rejection
+          if (tick % 2 === 0) {
+            const orderCheck = await Order.findOne({ orderId }).select('status').lean();
+            if (!orderCheck || orderCheck.status !== 'pending') {
+              break; // Order was approved or rejected! Stop animating immediately
+            }
           }
 
-          const curSpinner = spinnerIcons[tick % spinnerIcons.length];
+          const currentLabel = buttonFrames[tick % buttonFrames.length];
+          const newKb = keyboards.pendingVerification(orderId, lang, currentLabel);
 
           try {
-            await ctx.telegram.editMessageText(
+            await ctx.telegram.editMessageReplyMarkup(
               from.id,
               sentCustomerMsg.message_id,
               null,
-              msg.receiptReceived(orderId, lang, tick),
-              {
-                parse_mode: 'HTML',
-                ...keyboards.pendingVerification(orderId, lang, curSpinner),
-              }
+              newKb.reply_markup
             );
           } catch (editErr) {
-            if (editErr.description && editErr.description.includes('message to edit not found')) {
+            if (editErr.response?.parameters?.retry_after) {
+              await new Promise((r) => setTimeout(r, (editErr.response.parameters.retry_after + 1) * 1000));
+            } else if (
+              editErr.description &&
+              (editErr.description.includes('message to edit not found') ||
+                editErr.description.includes('chat not found'))
+            ) {
               break;
             }
           }
         }
       } catch (loopErr) {
-        console.error('Animation loop error:', loopErr.message);
+        console.error('Button animation loop error:', loopErr.message);
       }
     })();
   } catch (err) {
     console.error('Failed to send HTML receipt message:', err.message);
     await ctx.reply(
       `⏳ ክፍያዎ በማረጋገጥ ላይ ነው... (የትዕዛዝ ቁጥር: ${orderId})\nአስተዳዳሪው እንዳረጋገጠ የሊንኩ መረጃ ወዲያውኑ እዚህ ይላክልዎታል!`,
-      { ...keyboards.pendingVerification(orderId, lang, '◐') }
+      { ...keyboards.pendingVerification(orderId, lang) }
     );
   }
 

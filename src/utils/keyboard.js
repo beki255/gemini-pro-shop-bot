@@ -257,13 +257,14 @@ const keyboards = {
   },
 
   // ─── PENDING VERIFICATION KEYBOARD (Waiting for Admin Approval) ───
-  pendingVerification(orderId, lang = 'am', spinner = '◐') {
+  pendingVerification(orderId, lang = 'am', buttonLabel = null) {
     const isEn = lang === 'en';
     const username = config.supportUsername || 'Mnbvcnvhd';
+    const label = buttonLabel || (isEn ? '◐ Verifying Payment...' : '◐ ክፍያዎ በማረጋገጥ ላይ ነው...');
     return Markup.inlineKeyboard([
       [
         {
-          text: isEn ? `${spinner} Verifying Payment...` : `${spinner} ክፍያዎ በማረጋገጥ ላይ ነው...`,
+          text: label,
           callback_data: `check_pending_${orderId}`,
         },
       ],

@@ -254,52 +254,28 @@ const msg = {
   },
 
   // ─── RECEIPT RECEIVED / PENDING VERIFICATION ────────────────
-  receiptReceived(orderId, lang = 'am', tick = 0) {
+  receiptReceived(orderId, lang = 'am') {
     const isEn = lang === 'en';
-
-    // Rotating circular spinner frames (cycles indefinitely like a spinning loader)
-    const spinners = ['◐', '◓', '◑', '◒'];
-    const spinner = spinners[tick % spinners.length];
-
-    // Moving radar/scanner wave bar
-    const scanBars = [
-      '▰▱▱▱▱▱▱▱',
-      '▱▰▱▱▱▱▱▱',
-      '▱▱▰▱▱▱▱▱',
-      '▱▱▱▰▱▱▱▱',
-      '▱▱▱▱▰▱▱▱',
-      '▱▱▱▱▱▰▱▱',
-      '▱▱▱▱▱▱▰▱',
-      '▱▱▱▱▱▱▱▰',
-      '▱▱▱▱▱▱▰▱',
-      '▱▱▱▱▱▰▱▱',
-      '▱▱▱▱▰▱▱▱',
-      '▱▱▱▰▱▱▱▱',
-      '▱▱▰▱▱▱▱▱',
-      '▱▰▱▱▱▱▱▱',
-    ];
-    const bar = scanBars[tick % scanBars.length];
-    const dots = ['.', '..', '...', '....'][tick % 4];
 
     if (isEn) {
       return (
-        `${spinner} <b>Verifying Payment${dots}</b>\n` +
+        `⏳ <b>Verifying Payment...</b>\n` +
         `━━━━━━━━━━━━━━━━━━━\n` +
         `🔢 Order ID: <code>${orderId}</code>\n` +
-        `📊 Status: <b>🟡 Admin Reviewing Payment</b>\n` +
-        `⚡ Live Scanner: <code>[ ${bar} ]</code>\n\n` +
-        `${spinner} <i>Our admin is currently reviewing your payment receipt. Once approved, your Gemini Pro activation link will be delivered right here automatically!</i>\n\n` +
+        `📊 Status: <b>🟡 Reviewing Receipt</b>\n` +
+        `⚡ Process: <code>[ ▰▰▰▰▰▱▱▱ ] 65%</code>\n\n` +
+        `⏳ <i>Our admin is currently reviewing your payment receipt. Once approved, your Gemini Pro activation link will be delivered right here automatically!</i>\n\n` +
         `📲 <b>Please stay tuned — this usually takes just a few minutes.</b>`
       );
     }
 
     return (
-      `${spinner} <b>ክፍያዎ በማረጋገጥ ላይ ነው${dots}</b>\n` +
+      `⏳ <b>ክፍያዎ በማረጋገጥ ላይ ነው...</b>\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
       `🔢 የትዕዛዝ ቁጥር: <code>${orderId}</code>\n` +
       `📊 ሁኔታ: <b>🟡 አስተዳዳሪው በማረጋገጥ ላይ ነው</b>\n` +
-      `⚡ ቀጥታ ቅኝት (Scanner): <code>[ ${bar} ]</code>\n\n` +
-      `${spinner} <i>አስተዳዳሪው የላኩትን ደረሰኝ በማረጋገጥ ላይ ነው። ልክ እንዳረጋገጠ የ Gemini Pro አክቲቬሽን ሊንኩ በራስ-ሰር እዚህ ይላክሎታል!</i>\n\n` +
+      `⚡ ሂደት: <code>[ ▰▰▰▰▰▱▱▱ ] 65%</code>\n\n` +
+      `⏳ <i>አስተዳዳሪው የላኩትን ደረሰኝ በማረጋገጥ ላይ ነው። ልክ እንዳረጋገጠ የ Gemini Pro አክቲቬሽን ሊንኩ በራስ-ሰር እዚህ ይላክሎታል!</i>\n\n` +
       `📲 <b>እባክዎ በትዕግስት ይጠብቁ — በጥቂት ደቂቃዎች ውስጥ ይደርሳል!</b>`
     );
   },
