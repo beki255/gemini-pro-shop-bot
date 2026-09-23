@@ -260,7 +260,7 @@ const keyboards = {
   pendingVerification(orderId, lang = 'am', buttonLabel = null) {
     const isEn = lang === 'en';
     const username = config.supportUsername || 'Mnbvcnvhd';
-    const label = buttonLabel || (isEn ? '🔄 Verifying Payment...' : '🔄 ክፍያዎ በማረጋገጥ ላይ ነው...');
+    const label = buttonLabel || (isEn ? '🕐 Verifying Payment...' : '🕐 ክፍያዎ በማረጋገጥ ላይ ነው...');
     return Markup.inlineKeyboard([
       [
         {

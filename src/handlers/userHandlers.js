@@ -551,36 +551,43 @@ async function handleReceipt(ctx) {
 
   await User.updateOne({ telegramId: from.id }, { $inc: { totalOrders: 1 } });
 
-  // Notify customer in their language with animated pending verification
+  // Notify customer in their language with animated shifting scanner and clockwise spinning animation
   try {
     const isEn = lang === 'en';
-    const buttonFrames = isEn
-      ? [
-          '🔄 Verifying Payment',
-          '🔄 Verifying Payment .',
-          '🔄 Verifying Payment ..',
-          '🔄 Verifying Payment ...',
-        ]
-      : [
-          '🔄 ክፍያዎ በማረጋገጥ ላይ ነው',
-          '🔄 ክፍያዎ በማረጋገጥ ላይ ነው .',
-          '🔄 ክፍያዎ በማረጋገጥ ላይ ነው ..',
-          '🔄 ክፍያዎ በማረጋገጥ ላይ ነው ...',
-        ];
+    const clocks = ['🕐', '🕑', '🕒', '🕓', '🕔', '🕕', '🕖', '🕗', '🕘', '🕙', '🕚', '🕛'];
+    const dots = ['', '.', '..', '...'];
+    const scannerBars = [
+      '[ ▰▰▱▱▱▱▱▱ ]',
+      '[ ▱▰▰▱▱▱▱▱ ]',
+      '[ ▱▱▰▰▱▱▱▱ ]',
+      '[ ▱▱▱▰▰▱▱▱ ]',
+      '[ ▱▱▱▱▰▰▱▱ ]',
+      '[ ▱▱▱▱▱▰▰▱ ]',
+      '[ ▱▱▱▱▱▱▰▰ ]',
+      '[ ▱▱▱▱▱▰▰▱ ]',
+      '[ ▱▱▱▱▰▰▱▱ ]',
+      '[ ▱▱▱▰▰▱▱▱ ]',
+      '[ ▱▱▰▰▱▱▱▱ ]',
+      '[ ▱▰▰▱▱▱▱▱ ]',
+    ];
 
-    const sentCustomerMsg = await ctx.reply(msg.receiptReceived(orderId, lang), {
-      parse_mode: 'HTML',
-      ...keyboards.pendingVerification(orderId, lang, buttonFrames[0]),
-    });
+    const initialLabel = isEn ? '🕐 Verifying Payment...' : '🕐 ክፍያዎ በማረጋገጥ ላይ ነው...';
+    const sentCustomerMsg = await ctx.reply(
+      msg.receiptReceived(orderId, lang, scannerBars[0], clocks[0]),
+      {
+        parse_mode: 'HTML',
+        ...keyboards.pendingVerification(orderId, lang, initialLabel),
+      }
+    );
 
-    // Fast live spinning animation ON THE BUTTON with single 🔄 icon
+    // Live continuous animation: moving bold box inside scanner + clockwise rotating emoji
     (async () => {
       try {
         let tick = 0;
-        const maxTicks = 360; // Up to 6 minutes of continuous fast button animation
+        const maxTicks = 300; // ~6 minutes of live continuous animation
 
         while (tick < maxTicks) {
-          await new Promise((r) => setTimeout(r, 1000)); // Snappy 1.0s interval
+          await new Promise((r) => setTimeout(r, 1200)); // Smooth 1.2s interval
           tick++;
 
           // Periodically trigger Telegram native animated indicator in chat header
@@ -588,7 +595,7 @@ async function handleReceipt(ctx) {
             ctx.sendChatAction('typing').catch(() => {});
           }
 
-          // Periodically check DB (every 2.0s) to detect approval or rejection
+          // Periodically check DB (every 2.4s) to detect approval or rejection
           if (tick % 2 === 0) {
             const orderCheck = await Order.findOne({ orderId }).select('status').lean();
             if (!orderCheck || orderCheck.status !== 'pending') {
@@ -596,15 +603,26 @@ async function handleReceipt(ctx) {
             }
           }
 
-          const currentLabel = buttonFrames[tick % buttonFrames.length];
+          const currentClock = clocks[tick % clocks.length];
+          const currentBar = scannerBars[tick % scannerBars.length];
+          const currentDot = dots[tick % dots.length];
+          const currentLabel = isEn
+            ? `${currentClock} Verifying Payment ${currentDot}`.trim()
+            : `${currentClock} ክፍያዎ በማረጋገጥ ላይ ነው ${currentDot}`.trim();
+
           const newKb = keyboards.pendingVerification(orderId, lang, currentLabel);
+          const updatedText = msg.receiptReceived(orderId, lang, currentBar, currentClock);
 
           try {
-            await ctx.telegram.editMessageReplyMarkup(
+            await ctx.telegram.editMessageText(
               from.id,
               sentCustomerMsg.message_id,
               null,
-              newKb.reply_markup
+              updatedText,
+              {
+                parse_mode: 'HTML',
+                ...newKb,
+              }
             );
           } catch (editErr) {
             if (editErr.response?.parameters?.retry_after) {
@@ -619,7 +637,7 @@ async function handleReceipt(ctx) {
           }
         }
       } catch (loopErr) {
-        console.error('Button animation loop error:', loopErr.message);
+        console.error('Receipt verification animation error:', loopErr.message);
       }
     })();
   } catch (err) {

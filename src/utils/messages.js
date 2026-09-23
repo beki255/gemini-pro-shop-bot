@@ -254,27 +254,29 @@ const msg = {
   },
 
   // ─── RECEIPT RECEIVED / PENDING VERIFICATION ────────────────
-  receiptReceived(orderId, lang = 'am') {
+  receiptReceived(orderId, lang = 'am', scannerBar = null, clockEmoji = '🕐') {
     const isEn = lang === 'en';
+    const bar = scannerBar || '[ ▰▰▱▱▱▱▱▱ ]';
+    const clk = clockEmoji || '🕐';
 
     if (isEn) {
       return (
-        `⏳ <b>Verifying Payment...</b>\n` +
+        `${clk} <b>Verifying Payment...</b>\n` +
         `━━━━━━━━━━━━━━━━━━━\n` +
         `🔢 Order ID: <code>${orderId}</code>\n` +
         `📊 Status: <b>🟡 Reviewing Receipt</b>\n` +
-        `⚡ Process: <code>[ ▰▰▰▰▰▱▱▱ ] 65%</code>\n\n` +
+        `⚡ Process: <code>${bar}</code>\n\n` +
         `⏳ <i>Our admin is currently reviewing your payment receipt. Once approved, your Gemini Pro activation link will be delivered right here automatically!</i>\n\n` +
         `📲 <b>Please stay tuned — this usually takes just a few minutes.</b>`
       );
     }
 
     return (
-      `⏳ <b>ክፍያዎ በማረጋገጥ ላይ ነው...</b>\n` +
+      `${clk} <b>ክፍያዎ በማረጋገጥ ላይ ነው...</b>\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
       `🔢 የትዕዛዝ ቁጥር: <code>${orderId}</code>\n` +
       `📊 ሁኔታ: <b>🟡 አስተዳዳሪው በማረጋገጥ ላይ ነው</b>\n` +
-      `⚡ ሂደት: <code>[ ▰▰▰▰▰▱▱▱ ] 65%</code>\n\n` +
+      `⚡ ሂደት: <code>${bar}</code>\n\n` +
       `⏳ <i>አስተዳዳሪው የላኩትን ደረሰኝ በማረጋገጥ ላይ ነው። ልክ እንዳረጋገጠ የ Gemini Pro አክቲቬሽን ሊንኩ በራስ-ሰር እዚህ ይላክሎታል!</i>\n\n` +
       `📲 <b>እባክዎ በትዕግስት ይጠብቁ — በጥቂት ደቂቃዎች ውስጥ ይደርሳል!</b>`
     );
