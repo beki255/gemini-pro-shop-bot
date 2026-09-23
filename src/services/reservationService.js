@@ -1,9 +1,9 @@
-// src/services/reservationService.js - 5-minute stock reservation & auto-expiry manager
+// src/services/reservationService.js - 30-minute stock reservation & auto-expiry manager
 const Stock = require('../models/Stock');
 const User = require('../models/User');
 const keyboards = require('../utils/keyboard');
 
-const EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+const EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 
 class ReservationService {
   /**
@@ -125,10 +125,10 @@ class ReservationService {
 
             const expiredText = isEn
               ? `⏰ *Your order has expired!*\n\n` +
-                `Because payment was not completed within *5 minutes*, your reservation has been cancelled and the item(s) were released for other customers.\n\n` +
+                `Because payment was not completed within *30 minutes*, your reservation has been cancelled and the item(s) were released for other customers.\n\n` +
                 `You can tap below to start a new order anytime:`
               : `⏰ *የትዕዛዝዎ ጊዜ አልቋል!*\n\n` +
-                `ክፍያው በ *5 ደቂቃ* ውስጥ ስላልተጠናቀቀ የተያዘው ስቶክ ተለቋል እና ትዕዛዝዎ ተሰርዟል።\n\n` +
+                `ክፍያው በ *30 ደቂቃ* ውስጥ ስላልተጠናቀቀ የተያዘው ስቶክ ተለቋል እና ትዕዛዝዎ ተሰርዟል።\n\n` +
                 `በድጋሚ ለማዘዝ ከታች ያሉትን አዝራሮች መጠቀም ይችላሉ፦`;
 
             const expiredKeyboard = {

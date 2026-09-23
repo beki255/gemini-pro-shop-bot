@@ -96,7 +96,9 @@ const msg = {
       `📜 <b>የግዢ ፖሊሲ (Terms & Warranty):</b>\n` +
       `<blockquote>⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
       `• ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
-      `• <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i></blockquote>\n\n` +
+      `• <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
+      `⏰ <b>የአክቲቬሽን ጊዜ ገደብ (1 ሰዓት):</b>\n` +
+      `• ሊንኩ እንደደረሰዎት በ 1 ሰዓት ውስጥ አክቲቭ መደረግ አለበት፤ ካለፈ ኃላፊነት አንወስድም።</blockquote>\n\n` +
       `🚀 <b>Delivery is automatic after payment confirmation.</b>\n` +
       `<i>(ከክፍያ ማረጋገጫ በኋላ ሊንኩ ወዲያውኑ በራስ-ሰር ይላካል)</i>\n\n` +
       `⚙️ <i>የአድሚን መቆጣጠሪያ፦ ዋጋ ለመቀየር ወይም ስቶክ ለመጨመር ከታች ያሉትን አዝራሮች ይጠቀሙ።</i>`
@@ -122,6 +124,9 @@ const msg = {
         `<blockquote>⚠️ <b>No Warranty Notice:</b>\n` +
         `• No warranty if any problem happens after it's activated.\n` +
         `• <i>(Rarely ever causes any issues)</i>\n` +
+        `⏰ <b>1-Hour Activation Window:</b>\n` +
+        `• You must activate the link within <b>1 hour</b> of delivery.\n` +
+        `• If the link expires after 1 hour, we are not responsible or liable.\n` +
         `• By purchasing, you accept these terms.</blockquote>\n\n` +
         `🚀 <b>Automatic delivery right after payment confirmation.</b>\n\n` +
         `🔢 <b>Choose the quantity you want to purchase below:</b>`
@@ -144,6 +149,9 @@ const msg = {
       `<blockquote>⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
       `• ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
       `• <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
+      `⏰ <b>የአክቲቬሽን ጊዜ ገደብ (1 ሰዓት):</b>\n` +
+      `• ሊንኩ እንደደረሰዎት በ <b>1 ሰዓት (within 1 hour)</b> ውስጥ አክቲቭ ማድረግ አለብዎት።\n` +
+      `• 1 ሰዓት አልፎ ሊንኩ ኤክስፓየር (expire) ቢያደርግ ኃላፊነት አንወስድም።\n` +
       `• በመግዛትዎ ይህንን ፖሊሲ ተቀብለዋል።</blockquote>\n\n` +
       `🚀 <b>ክፍያዎ እንደተረጋገጠ ሊንኩ ወዲያውኑ ይላካል!</b>\n\n` +
       `🔢 <b>የሚፈልጉትን ብዛት ከታች ይምረጡ፦</b>`
@@ -181,7 +189,7 @@ const msg = {
           `2️⃣ Transfer <b>${totalAmount} ETB</b> via CBE Birr / Mobile Banking\n` +
           `3️⃣ Take a clear screenshot of the completed receipt\n` +
           `4️⃣ Send the screenshot directly into this chat\n\n` +
-          `⏱️ <i>Reserved for 5 minutes. Deliveries are processed immediately upon verification!</i>`
+          `⏱️ <i>Reserved for 30 minutes. Deliveries are processed immediately upon verification!</i>`
         );
       } else if (method === 'Telebirr') {
         return (
@@ -200,7 +208,7 @@ const msg = {
           `2️⃣ Open Telebirr app → Send <b>${totalAmount} ETB</b>\n` +
           `3️⃣ Take a screenshot of the completed transaction\n` +
           `4️⃣ Send the screenshot directly into this chat\n\n` +
-          `⏱️ <i>Reserved for 5 minutes. Deliveries are processed immediately upon verification!</i>`
+          `⏱️ <i>Reserved for 30 minutes. Deliveries are processed immediately upon verification!</i>`
         );
       }
       return baseEn;
@@ -231,7 +239,7 @@ const msg = {
         `2️⃣ በ CBE Birr ወይም Mobile Banking <b>${totalAmount} ብር</b> ያስተላልፉ\n` +
         `3️⃣ የተላከበትን <b>የደረሰኝ Screenshot ፎቶ</b> ያንሱ\n` +
         `4️⃣ ፎቶውን እዚህ ቦቱ ላይ ይላኩ\n\n` +
-        `⏱️ <i>ማሳሰቢያ፦ ይህ ትዕዛዝ ለ 5 ደቂቃዎች ብቻ የተጠበቀ ነው። ደረሰኙ እንደደረሰን ወዲያው ይላካል!</i>`
+        `⏱️ <i>ማሳሰቢያ፦ ይህ ትዕዛዝ ለ 30 ደቂቃዎች ብቻ የተጠበቀ ነው። ደረሰኙ እንደደረሰን ወዲያው ይላካል!</i>`
       );
     } else if (method === 'Telebirr') {
       return (
@@ -250,7 +258,7 @@ const msg = {
         `2️⃣ በ Telebirr App Send Money በማድረግ <b>${totalAmount} ብር</b> ይላኩ\n` +
         `3️⃣ የተላከበትን <b>የደረሰኝ Screenshot ፎቶ</b> ያንሱ\n` +
         `4️⃣ ፎቶውን እዚህ ቦቱ ላይ ይላኩ\n\n` +
-        `⏱️ <i>ማሳሰቢያ፦ ይህ ትዕዛዝ ለ 5 ደቂቃዎች ብቻ የተጠበቀ ነው። ደረሰኙ እንደደረሰን ወዲያው ይላካል!</i>`
+        `⏱️ <i>ማሳሰቢያ፦ ይህ ትዕዛዝ ለ 30 ደቂቃዎች ብቻ የተጠበቀ ነው። ደረሰኙ እንደደረሰን ወዲያው ይላካል!</i>`
       );
     }
     return baseAm;
@@ -309,6 +317,7 @@ const msg = {
 
       text +=
         `\n📋 <b>Activation Instructions:</b>\n` +
+        `• ⏰ <b>Please activate within 1 hour of receiving this link</b>\n` +
         `• <b>Connect VPN for only activation, after activation you can turn off</b>\n` +
         `• Click the provided activation link\n` +
         `• Sign in to the target Gmail account\n` +
@@ -337,6 +346,7 @@ const msg = {
 
     text +=
       `\n📋 <b>የአክቲቬሽን መመሪያ (Activation Instructions):</b>\n` +
+      `• ⏰ <b>እባክዎ ሊንኩ እንደደረሰዎት በ 1 ሰዓት ውስጥ አክቲቭ ያድርጉ!</b>\n` +
       `• <b>Connect VPN for only activation, after activation you can turn off</b> (VPN የሚያስፈልገው ለአክቲቬሽን ብቻ ነው፤ አክቲቭ ካደረጉ በኋላ ማጥፋት ይችላሉ)\n` +
       `• Click the provided activation link (የተላከውን ሊንክ ይጫኑ)\n` +
       `• Sign in to the target Gmail account (በሚፈልጉት Gmail Account ይግቡ)\n` +

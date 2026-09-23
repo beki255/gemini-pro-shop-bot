@@ -524,7 +524,7 @@ async function handleReceipt(ctx) {
     const now = Date.now();
     const isExpired =
       reservedCount !== targetStockIds.length ||
-      (session.pendingOrder.reservedAt && now - session.pendingOrder.reservedAt > 15 * 60 * 1000);
+      (session.pendingOrder.reservedAt && now - session.pendingOrder.reservedAt > 30 * 60 * 1000);
 
     if (isExpired) {
       ctx.session.pendingOrder = null;
