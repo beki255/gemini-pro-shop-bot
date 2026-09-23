@@ -19,7 +19,8 @@ function adminOnly(handler) {
     if (!isAdmin(ctx)) {
       return ctx.reply('🚫 ይህ አዛዥ ለአስተዳዳሪ ብቻ ነው።');
     }
-    return handler(ctx, ...args);
+    const cleanArgs = args.filter((a) => typeof a !== 'function');
+    return handler(ctx, ...cleanArgs);
   };
 }
 
@@ -466,9 +467,17 @@ const handleOrders = adminOnly(async (ctx, filterOverride, pageOverride) => {
   const args = text.split(/\s+/);
   const paramFilter = args.length > 1 ? args[1].toLowerCase() : null;
 
+  const validFilterOverride = typeof filterOverride === 'string' ? filterOverride : null;
+  const validPageOverride =
+    typeof pageOverride === 'number'
+      ? pageOverride
+      : typeof pageOverride === 'string' && !isNaN(parseInt(pageOverride, 10))
+      ? parseInt(pageOverride, 10)
+      : null;
+
   // Detect filter from callbackQuery or argument
-  let filter = filterOverride || paramFilter || null;
-  let page = pageOverride || 1;
+  let filter = validFilterOverride || paramFilter || null;
+  let page = validPageOverride || 1;
 
   if (ctx.callbackQuery && ctx.callbackQuery.data) {
     if (ctx.callbackQuery.data.startsWith('admin_orders_filter_')) {
@@ -654,8 +663,15 @@ const handleUsers = adminOnly(async (ctx, pageOverride) => {
   const lang = adminUser && adminUser.language ? adminUser.language : 'am';
   const isEn = lang === 'en';
 
+  const validPageOverride =
+    typeof pageOverride === 'number'
+      ? pageOverride
+      : typeof pageOverride === 'string' && !isNaN(parseInt(pageOverride, 10))
+      ? parseInt(pageOverride, 10)
+      : null;
+
   // If a specific user query is provided (/users <id or @username>)
-  if (searchParam && !pageOverride) {
+  if (searchParam && !validPageOverride) {
     let query = {};
     if (/^\d+$/.test(searchParam)) {
       query = { telegramId: parseInt(searchParam) };
@@ -715,11 +731,11 @@ const handleUsers = adminOnly(async (ctx, pageOverride) => {
   }
 
   // Paginated user list
-  let page = pageOverride;
+  let page = validPageOverride;
   if (!page && ctx.callbackQuery && ctx.callbackQuery.data && ctx.callbackQuery.data.startsWith('admin_users_page_')) {
-    page = parseInt(ctx.callbackQuery.data.replace('admin_users_page_', '')) || 1;
+    page = parseInt(ctx.callbackQuery.data.replace('admin_users_page_', ''), 10) || 1;
   }
-  page = page || 1;
+  page = parseInt(page, 10) || 1;
 
   const PAGE_SIZE = 8;
   const totalUsers = await User.countDocuments();
