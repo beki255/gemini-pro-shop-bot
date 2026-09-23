@@ -92,18 +92,16 @@ const keyboards = {
       });
     }
 
-    const rows = [quickButtons];
-
-    const middleRow = [
-      { text: '10', callback_data: 'qty_10', style: 'primary' },
-      { text: '20', callback_data: 'qty_20', style: 'primary' },
-      {
-        text: isEn ? '✏️ Custom Quantity' : '✏️ ሌላ ብዛት አስገባ (Custom)',
-        callback_data: 'qty_custom',
-        style: 'primary',
-      },
+    const rows = [
+      quickButtons,
+      [
+        {
+          text: isEn ? '✏️ Custom Quantity' : '✏️ ሌላ ብዛት አስገባ (Custom)',
+          callback_data: 'qty_custom',
+          style: 'primary',
+        },
+      ],
     ];
-    rows.push(middleRow);
 
     rows.push([
       {

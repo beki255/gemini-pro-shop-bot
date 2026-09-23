@@ -94,12 +94,9 @@ const msg = {
       `✅ Antigravity & Jules AI Agent\n` +
       `✅ Deep Research & NotebookLM Plus\n\n` +
       `📜 <b>የግዢ ፖሊሲ (Terms & Warranty):</b>\n` +
-      `┌──────────────────────────┐\n` +
-      `│ ⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
-      `│ • ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ\n` +
-      `│   ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
-      `│ • <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
-      `└──────────────────────────┘\n\n` +
+      `<blockquote>⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
+      `• ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
+      `• <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i></blockquote>\n\n` +
       `🚀 <b>Delivery is automatic after payment confirmation.</b>\n` +
       `<i>(ከክፍያ ማረጋገጫ በኋላ ሊንኩ ወዲያውኑ በራስ-ሰር ይላካል)</i>\n\n` +
       `⚙️ <i>የአድሚን መቆጣጠሪያ፦ ዋጋ ለመቀየር ወይም ስቶክ ለመጨመር ከታች ያሉትን አዝራሮች ይጠቀሙ።</i>`
@@ -122,13 +119,10 @@ const msg = {
         `✅ Veo 3 Video · Imagen 4 Image\n` +
         `✅ Antigravity, Jules, Deep Research & NotebookLM\n\n` +
         `📜 <b>Terms & Policy (የግዢ ፖሊሲ):</b>\n` +
-        `┌──────────────────────────┐\n` +
-        `│ ⚠️ <b>No Warranty Notice:</b>\n` +
-        `│ • No warranty if any problem happens\n` +
-        `│   after it's activated.\n` +
-        `│ • <i>(Rarely ever causes any issues)</i>\n` +
-        `│ • By purchasing, you accept these terms.\n` +
-        `└──────────────────────────┘\n\n` +
+        `<blockquote>⚠️ <b>No Warranty Notice:</b>\n` +
+        `• No warranty if any problem happens after it's activated.\n` +
+        `• <i>(Rarely ever causes any issues)</i>\n` +
+        `• By purchasing, you accept these terms.</blockquote>\n\n` +
         `🚀 <b>Automatic delivery right after payment confirmation.</b>\n\n` +
         `🔢 <b>Choose the quantity you want to purchase below:</b>`
       );
@@ -147,13 +141,10 @@ const msg = {
       `✅ Veo 3 Video · Imagen 4 Image\n` +
       `✅ Antigravity፣ Jules፣ Deep Research እና NotebookLM\n\n` +
       `📜 <b>የግዢ ፖሊሲ እና ማስጠንቀቂያ (Terms & Policy):</b>\n` +
-      `┌──────────────────────────┐\n` +
-      `│ ⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
-      `│ • ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ\n` +
-      `│   ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
-      `│ • <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
-      `│ • በመግዛትዎ ይህንን ፖሊሲ ተቀብለዋል።\n` +
-      `└──────────────────────────┘\n\n` +
+      `<blockquote>⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
+      `• ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
+      `• <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
+      `• በመግዛትዎ ይህንን ፖሊሲ ተቀብለዋል።</blockquote>\n\n` +
       `🚀 <b>ክፍያዎ እንደተረጋገጠ ሊንኩ ወዲያውኑ ይላካል!</b>\n\n` +
       `🔢 <b>የሚፈልጉትን ብዛት ከታች ይምረጡ፦</b>`
     );
