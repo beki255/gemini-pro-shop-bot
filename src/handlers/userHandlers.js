@@ -146,6 +146,57 @@ async function handleContact(ctx) {
   });
 }
 
+// ─── Helper: Send Out of Stock notification with product image ───
+async function sendOutOfStockMessage(ctx, lang = 'am') {
+  const productPhotoPath = path.join(__dirname, '../../assets/gemini_product.png');
+  const caption = msg.noStock(lang);
+  const keyboard = keyboards.backToMain(lang);
+
+  // If this was an inline button callback query:
+  if (ctx.callbackQuery && ctx.callbackQuery.message) {
+    // If the message that was clicked is already a photo message (e.g. product screen)
+    if (ctx.callbackQuery.message.photo) {
+      try {
+        return await ctx.editMessageCaption(caption, {
+          parse_mode: 'HTML',
+          ...keyboard,
+        });
+      } catch (err) {
+        // If editing caption failed, proceed to delete and resend photo below
+      }
+    } else {
+      // If the message was text (e.g. main menu), delete it so we cleanly show the product photo
+      try {
+        await ctx.deleteMessage().catch(() => {});
+      } catch {
+        // ignore delete failure
+      }
+    }
+  }
+
+  // Send gemini_product.png with the Out of Stock caption
+  if (fs.existsSync(productPhotoPath)) {
+    try {
+      return await ctx.replyWithPhoto(
+        { source: productPhotoPath },
+        {
+          caption,
+          parse_mode: 'HTML',
+          ...keyboard,
+        }
+      );
+    } catch (err) {
+      console.error('Failed to send out of stock product photo:', err.message);
+    }
+  }
+
+  // Fallback to text reply if photo does not exist or sending fails
+  return ctx.reply(caption, {
+    parse_mode: 'HTML',
+    ...keyboard,
+  });
+}
+
 // ─── /buy Command ──────────────────────────────────────────
 async function handleBuy(ctx) {
   const user = await getOrSaveUser(ctx.from);
@@ -160,10 +211,7 @@ async function handleBuy(ctx) {
   // Check if store is accepting orders (Admin stock pause toggle)
   const settingsService = require('../services/settingsService');
   if (!settingsService.getIsAcceptingOrders()) {
-    return ctx.reply(msg.noStock(lang), {
-      parse_mode: 'HTML',
-      ...keyboards.backToMain(lang),
-    });
+    return sendOutOfStockMessage(ctx, lang);
   }
 
   // Check live available stock
@@ -233,24 +281,7 @@ async function callbackBuy(ctx) {
   const settingsService = require('../services/settingsService');
   if (!settingsService.getIsAcceptingOrders()) {
     const lang = await getUserLang(ctx.from.id);
-    try {
-      return await ctx.editMessageCaption(msg.noStock(lang), {
-        parse_mode: 'HTML',
-        ...keyboards.backToMain(lang),
-      });
-    } catch {
-      try {
-        return await ctx.editMessageText(msg.noStock(lang), {
-          parse_mode: 'HTML',
-          ...keyboards.backToMain(lang),
-        });
-      } catch {
-        return ctx.reply(msg.noStock(lang), {
-          parse_mode: 'HTML',
-          ...keyboards.backToMain(lang),
-        });
-      }
-    }
+    return sendOutOfStockMessage(ctx, lang);
   }
   await handleBuy(ctx);
 }
@@ -281,17 +312,7 @@ async function callbackRefreshQty(ctx) {
   if (!settingsService.getIsAcceptingOrders()) {
     const alertText = lang === 'en' ? '🔴 Out of stock' : '🔴 ስቶክ አልቋል';
     await ctx.answerCbQuery(alertText).catch(() => {});
-    try {
-      return await ctx.editMessageCaption(msg.noStock(lang), {
-        parse_mode: 'HTML',
-        ...keyboards.backToMain(lang),
-      });
-    } catch {
-      return ctx.editMessageText(msg.noStock(lang), {
-        parse_mode: 'HTML',
-        ...keyboards.backToMain(lang),
-      }).catch(() => {});
-    }
+    return sendOutOfStockMessage(ctx, lang);
   }
 
   const reservationService = require('../services/reservationService');
@@ -302,17 +323,7 @@ async function callbackRefreshQty(ctx) {
   await ctx.answerCbQuery(alertText);
 
   if (count === 0) {
-    try {
-      return await ctx.editMessageCaption(msg.noStock(lang), {
-        parse_mode: 'HTML',
-        ...keyboards.backToMain(lang),
-      });
-    } catch {
-      return ctx.editMessageText(msg.noStock(lang), {
-        parse_mode: 'HTML',
-        ...keyboards.backToMain(lang),
-      }).catch(() => {});
-    }
+    return sendOutOfStockMessage(ctx, lang);
   }
 
   try {
@@ -336,10 +347,7 @@ async function callbackSelectQty(ctx, qty) {
   const lang = await getUserLang(ctx.from.id);
   const settingsService = require('../services/settingsService');
   if (!settingsService.getIsAcceptingOrders()) {
-    return ctx.reply(msg.noStock(lang), {
-      parse_mode: 'HTML',
-      ...keyboards.backToMain(lang),
-    });
+    return sendOutOfStockMessage(ctx, lang);
   }
 
   const quantity = Math.max(1, parseInt(qty) || 1);
@@ -372,10 +380,7 @@ async function callbackCustomQty(ctx) {
   const lang = await getUserLang(ctx.from.id);
   const settingsService = require('../services/settingsService');
   if (!settingsService.getIsAcceptingOrders()) {
-    return ctx.reply(msg.noStock(lang), {
-      parse_mode: 'HTML',
-      ...keyboards.backToMain(lang),
-    });
+    return sendOutOfStockMessage(ctx, lang);
   }
 
   const unitPrice = config.productPrice || 250;
@@ -410,10 +415,7 @@ async function handleCustomQtyInput(ctx) {
   const settingsService = require('../services/settingsService');
   if (!settingsService.getIsAcceptingOrders()) {
     session.awaitingCustomQty = false;
-    await ctx.reply(msg.noStock(lang), {
-      parse_mode: 'HTML',
-      ...keyboards.backToMain(lang),
-    });
+    await sendOutOfStockMessage(ctx, lang);
     return true;
   }
 
@@ -457,10 +459,7 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
   const lang = await getUserLang(ctx.from.id);
   const settingsService = require('../services/settingsService');
   if (!settingsService.getIsAcceptingOrders()) {
-    return ctx.reply(msg.noStock(lang), {
-      parse_mode: 'HTML',
-      ...keyboards.backToMain(lang),
-    });
+    return sendOutOfStockMessage(ctx, lang);
   }
 
   const qty = Math.max(1, parseInt(quantity) || 1);
@@ -852,4 +851,5 @@ module.exports = {
   callbackMyOrders,
   callbackHelp,
   callbackContact,
+  sendOutOfStockMessage,
 };
