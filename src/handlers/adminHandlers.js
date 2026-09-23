@@ -6,6 +6,9 @@ const Order = require('../models/Order');
 const keyboards = require('../utils/keyboard');
 const msg = require('../utils/messages');
 
+// Atomic lock tracker to prevent double-tap race conditions on orders
+const processingOrders = new Set();
+
 // ─── Middleware: check if user is admin ──────────────────
 function isAdmin(ctx) {
   return ctx.from && ctx.from.id === config.adminId;
@@ -387,17 +390,27 @@ const handleBulkStockFile = adminOnly(async (ctx) => {
   if (!session.awaitingBulkStock) return;
 
   const doc = ctx.message.document;
-  if (!doc || !doc.file_name.endsWith('.txt')) {
-    return ctx.reply('⚠️ .txt ፋይል ብቻ ይቀበላል።');
+  if (!doc || !doc.file_name || !doc.file_name.toLowerCase().endsWith('.txt')) {
+    return ctx.reply('⚠️ እባክዎ .txt ፋይል ብቻ ይላኩ።');
+  }
+
+  if (doc.file_size && doc.file_size > 5 * 1024 * 1024) {
+    return ctx.reply('⚠️ የፋይሉ መጠን ከ 5MB መብለጥ የለበትም።');
   }
 
   ctx.session.awaitingBulkStock = false;
   await ctx.reply('⏳ ሊንኮቹን በማስገባት ላይ...');
 
-  const fileLink = await ctx.telegram.getFileLink(doc.file_id);
-  const axios = require('axios');
-  const resp = await axios.get(fileLink.href);
-  const lines = resp.data.split('\n').map((l) => l.trim()).filter(Boolean);
+  let lines = [];
+  try {
+    const fileLink = await ctx.telegram.getFileLink(doc.file_id);
+    const axios = require('axios');
+    const resp = await axios.get(fileLink.href, { timeout: 15000 });
+    const content = typeof resp.data === 'string' ? resp.data : String(resp.data);
+    lines = content.split('\n').map((l) => l.trim()).filter(Boolean);
+  } catch (downloadErr) {
+    return ctx.reply(`❌ ፋይሉን ማውረድ አልተቻለም: ${downloadErr.message}`);
+  }
 
   let added = 0;
   let skipped = 0;
@@ -843,14 +856,20 @@ const handleStats = adminOnly(async (ctx) => {
 // ─── Callback: approve_<orderId> ─────────────────────────
 async function callbackApprove(ctx) {
   if (!isAdmin(ctx)) return ctx.answerCbQuery('🚫 Admin only').catch(() => {});
-  await ctx.answerCbQuery('✅ በማጽደቅ ላይ...').catch(() => {});
-
   const orderId = ctx.callbackQuery.data.replace('approve_', '');
 
-  // Load order
-  const order = await Order.findOne({ orderId });
-  if (!order) return ctx.reply(`❌ ትዕዛዝ ${orderId} አልተገኘም።`);
-  if (order.status !== 'pending') {
+  if (processingOrders.has(orderId)) {
+    return ctx.answerCbQuery('⏳ በትዕዛዙ ላይ እየተሰራ ነው...').catch(() => {});
+  }
+  processingOrders.add(orderId);
+
+  try {
+    await ctx.answerCbQuery('✅ በማጽደቅ ላይ...').catch(() => {});
+
+    // Load order
+    const order = await Order.findOne({ orderId });
+    if (!order) return ctx.reply(`❌ ትዕዛዝ ${orderId} አልተገኘም።`);
+    if (order.status !== 'pending') {
     if (order.status === 'approved') {
       const links =
         order.deliveredLinks && order.deliveredLinks.length > 0
@@ -1058,6 +1077,9 @@ async function callbackApprove(ctx) {
       { parse_mode: 'HTML' }
     );
   } catch {}
+  } finally {
+    processingOrders.delete(orderId);
+  }
 }
 
 // ─── Callback: reject_<orderId> ──────────────────────────
@@ -1072,19 +1094,52 @@ async function callbackReject(ctx) {
     return ctx.reply(`⚠️ ትዕዛዝ ${orderId} አስቀድሞ ${order.status} ነው።`);
   }
 
-  // Ask admin for rejection reason
+  // Ask admin for rejection reason with quick one-tap buttons
   const expectedAmount = order.amount || (order.quantity || 1) * (config.productPrice || 250);
   await ctx.reply(
-    `❌ *ምክንያት ይጻፉ (Reason for rejection):*\n\n` +
-    `📦 *የትዕዛዝ መረጃ:* ${order.quantity || 1} ሊንክ (${expectedAmount} ብር)\n\n` +
-    `ምሳሌ: "ደረሰኝ ትክክል አይደለም", "ብር ያነሰ ነው", ወዘተ\n\n` +
-    `ወይም "skip" ብለው ያለ ምክንያት ያሰናብቱ`,
-    { parse_mode: 'Markdown' }
+    `❌ <b>የትዕዛዝ ውድቅ ማድረጊያ ምክንያት ይምረጡ ወይም በጽሑፍ ይላኩ፦</b>\n\n` +
+    `📦 <b>የትዕዛዝ መለያ:</b> <code>${orderId}</code>\n` +
+    `🔢 <b>ብዛት:</b> ${order.quantity || 1} ሊንክ (${expectedAmount} ብር)\n\n` +
+    `<i>ከታች ካሉት አዝራሮች አንዱን ይጫኑ ወይም የራስዎን ምክንያት በጽሑፍ ይላኩ:</i>`,
+    {
+      parse_mode: 'HTML',
+      ...keyboards.quickRejectKeyboard(orderId),
+    }
   );
 
-  // Store pending rejection in session
+  // Store pending rejection in session (for optional custom text input)
   ctx.session = ctx.session || {};
-  ctx.session.pendingRejection = { orderId, messageId: ctx.callbackQuery.message.message_id };
+  ctx.session.pendingRejection = { orderId, messageId: ctx.callbackQuery.message ? ctx.callbackQuery.message.message_id : null };
+}
+
+// ─── Callback: reject_quick_<orderId>_<type> ──────────────
+async function callbackQuickReject(ctx) {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('🚫 Admin only').catch(() => {});
+  await ctx.answerCbQuery().catch(() => {});
+
+  const data = ctx.callbackQuery.data.replace('reject_quick_', '');
+  const parts = data.split('_');
+  const orderId = parts[0];
+  const type = parts[1] || 'skip';
+
+  let reason = 'ደረሰኙ ትክክል አይደለም';
+  if (type === 'amount') reason = 'የተከፈለው ብር አልገባም ወይም ያነሰ ነው';
+  else if (type === 'invalid') reason = 'የተላከው የደረሰኝ ስክሪንሾት ትክክል አይደለም';
+  else if (type === 'skip') reason = 'ትዕዛዝዎ ተቀባይነት አላገኘም';
+
+  return processOrderRejection(ctx, orderId, reason);
+}
+
+// ─── Callback: cancel_rejection ───────────────────────────
+async function callbackCancelRejection(ctx) {
+  if (!isAdmin(ctx)) return ctx.answerCbQuery('🚫 Admin only').catch(() => {});
+  await ctx.answerCbQuery('✅ ተሰርዟል').catch(() => {});
+  if (ctx.session) {
+    ctx.session.pendingRejection = null;
+  }
+  try {
+    await ctx.deleteMessage().catch(() => {});
+  } catch {}
 }
 
 // ─── Text handler: rejection reason (admin) ──────────────
@@ -1094,10 +1149,24 @@ async function handleRejectionReason(ctx) {
   if (!session.pendingRejection) return;
 
   const { orderId } = session.pendingRejection;
-  const reason = ctx.message.text === 'skip' ? 'ደረሰኝ ትክክል አይደለም' : ctx.message.text;
+  const reason = ctx.message.text === 'skip' ? 'ደረሰኙ ትክክል አይደለም' : ctx.message.text.trim();
 
-  const order = await Order.findOne({ orderId });
-  if (!order) return;
+  return processOrderRejection(ctx, orderId, reason);
+}
+
+// ─── Core helper: Process Order Rejection ─────────────────
+async function processOrderRejection(ctx, orderId, reason) {
+  if (processingOrders.has(orderId)) {
+    return ctx.answerCbQuery('⏳ በትዕዛዙ ላይ እየተሰራ ነው...').catch(() => {});
+  }
+  processingOrders.add(orderId);
+
+  try {
+    const order = await Order.findOne({ orderId });
+    if (!order) return ctx.reply(`❌ ትዕዛዝ ${orderId} አልተገኘም።`);
+    if (order.status !== 'pending') {
+      return ctx.reply(`⚠️ ትዕዛዝ ${orderId} አስቀድሞ ${order.status} ሆኗል!`);
+    }
 
   // Release reserved stocks
   const stockIds =
@@ -1122,31 +1191,59 @@ async function handleRejectionReason(ctx) {
     );
   }
 
-  // Update order
+  // Update order in DB
   await Order.updateOne(
     { _id: order._id },
     { status: 'rejected', adminNote: reason, processedAt: new Date(), processedBy: ctx.from.id }
   );
 
-  // Notify customer in their preferred language with custom multiplied price
+  // Notify customer with two-tier fallback (HTML -> Plain text)
+  let userNotified = false;
+  let notifyError = null;
+
   try {
     const customer = await User.findOne({ telegramId: order.userId });
     const custLang = customer && customer.language ? customer.language : 'am';
-    await ctx.telegram.sendMessage(
-      order.userId,
-      msg.orderRejected(reason, orderId, custLang, order.amount, order.quantity),
-      {
-        parse_mode: 'Markdown',
-      }
-    );
+    const rejectHtml = msg.orderRejected(reason, orderId, custLang, order.amount, order.quantity);
+
+    try {
+      await ctx.telegram.sendMessage(order.userId, rejectHtml, {
+        parse_mode: 'HTML',
+        ...keyboards.backToMain(custLang),
+      });
+      userNotified = true;
+    } catch (htmlErr) {
+      console.warn('HTML reject message failed, retrying plain text:', htmlErr.message);
+      const plainText = rejectHtml.replace(/<[^>]*>/g, '');
+      await ctx.telegram.sendMessage(order.userId, plainText, {
+        ...keyboards.backToMain(custLang),
+      });
+      userNotified = true;
+    }
   } catch (err) {
     console.error('Failed to notify customer of rejection:', err.message);
+    notifyError = err.message;
   }
 
-  ctx.session.pendingRejection = null;
-  await ctx.reply(`✅ ትዕዛዝ \`${orderId}\` ተሰርዟል። ደንበኛው ተነግሯል።`, {
-    parse_mode: 'Markdown',
-  });
+  if (ctx.session) {
+    ctx.session.pendingRejection = null;
+  }
+
+  const statusText = userNotified
+    ? `✅ ትዕዛዝ <code>${orderId}</code> ተሰርዟል። ለደንበኛው ማስታወቂያ ደርሶታል።`
+    : `⚠️ ትዕዛዝ <code>${orderId}</code> ተሰርዟል። ሆኖም ለደንበኛው ማድረስ አልተቻለም (${notifyError && notifyError.includes('blocked') ? 'ደንበኛው ቦቱን አግዶታል/block አድርጓል' : (notifyError || 'ያልታወቀ ስህተት')})።`;
+
+  if (ctx.callbackQuery) {
+    try {
+      await ctx.editMessageText(statusText, { parse_mode: 'HTML' });
+      return;
+    } catch {}
+  }
+
+  return ctx.reply(statusText, { parse_mode: 'HTML' });
+  } finally {
+    processingOrders.delete(orderId);
+  }
 }
 
 // ─── Callback: View Order Receipt (admin_view_receipt_<orderId>_<filter>_<page>) ───
@@ -1480,7 +1577,13 @@ const handleResend = adminOnly(async (ctx) => {
 
 // ─── Execute Direct On-Demand Delivery to Customer ────────
 async function executeDirectDelivery(ctx, orderId) {
-  const session = ctx.session || {};
+  if (processingOrders.has(orderId)) {
+    return ctx.reply('⏳ በትዕዛዙ ላይ እየተሰራ ነው... እባክዎ ይጠብቁ።');
+  }
+  processingOrders.add(orderId);
+
+  try {
+    const session = ctx.session || {};
   const deliveryData = session.awaitingDirectDeliveryLink;
 
   const order = await Order.findOne({ orderId });
@@ -1584,6 +1687,9 @@ async function executeDirectDelivery(ctx, orderId) {
   });
 
   return true;
+  } finally {
+    processingOrders.delete(orderId);
+  }
 }
 
 // ─── Handle Direct Activation Link Input from Admin (Step by Step) ────────
@@ -1942,6 +2048,8 @@ module.exports = {
   handleRejectionReason,
   callbackApprove,
   callbackReject,
+  callbackQuickReject,
+  callbackCancelRejection,
   callbackDetails,
   callbackAdminStats,
   callbackAdminStock,

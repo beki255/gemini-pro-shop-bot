@@ -95,6 +95,15 @@ bot.on('callback_query', async (ctx) => {
   }
   if (data === 'proceed_payment') return userHandlers.callbackProceedPayment(ctx);
   if (data === 'cancel') return userHandlers.callbackCancel(ctx);
+  if (data.startsWith('copy_acc_')) {
+    const isCbe = data === 'copy_acc_cbe';
+    const acc = isCbe ? config.payment.cbe.account : config.payment.telebirr.account;
+    const name = isCbe ? config.payment.cbe.name : config.payment.telebirr.name;
+    const alertText = isCbe
+      ? `🏦 የኢትዮጵያ ንግድ ባንክ (CBE)\n━━━━━━━━━━━━━━\n📋 የሒሳብ ቁጥር:\n${acc}\n\n👤 ስም: ${name}\n\n(ከመልዕክቱ ላይ ቁጥሩን በመንካት ወዲያው መቅዳት ይችላሉ!)`
+      : `📱 ቴሌብር (Telebirr)\n━━━━━━━━━━━━━━\n📋 የስልክ ቁጥር:\n${acc}\n\n👤 ስም: ${name}\n\n(ከመልዕክቱ ላይ ቁጥሩን በመንካት ወዲያው መቅዳት ይችላሉ!)`;
+    return ctx.answerCbQuery(alertText, { show_alert: true }).catch(() => {});
+  }
   if (data === 'main_menu') return userHandlers.callbackMainMenu(ctx);
   if (data === 'my_orders') return userHandlers.callbackMyOrders(ctx);
   if (data.startsWith('my_orders_page_')) return userHandlers.callbackMyOrdersPage(ctx);
@@ -138,7 +147,9 @@ bot.on('callback_query', async (ctx) => {
   if (data.startsWith('admin_users_page_')) return adminHandlers.callbackUsersPage(ctx);
   if (data === 'noop') return ctx.answerCbQuery().catch(() => {});
   if (data.startsWith('approve_')) return adminHandlers.callbackApprove(ctx);
+  if (data.startsWith('reject_quick_')) return adminHandlers.callbackQuickReject(ctx);
   if (data.startsWith('reject_')) return adminHandlers.callbackReject(ctx);
+  if (data === 'cancel_rejection') return adminHandlers.callbackCancelRejection(ctx);
   if (data.startsWith('details_')) return adminHandlers.callbackDetails(ctx);
   if (data.startsWith('admin_view_receipt_')) return adminHandlers.callbackViewReceipt(ctx);
   if (data.startsWith('resend_link_')) return adminHandlers.callbackResendOrderLink(ctx);
@@ -155,6 +166,7 @@ bot.on('callback_query', async (ctx) => {
   if (data === 'confirm_broadcast') return adminHandlers.callbackConfirmBroadcast(ctx);
   if (data === 'cancel_broadcast') return adminHandlers.callbackCancelBroadcast(ctx);
   if (data === 'admin_add_help') {
+    if (ctx.from.id !== config.adminId) return ctx.answerCbQuery('🚫 Admin only').catch(() => {});
     await ctx.answerCbQuery();
     return ctx.reply(
       `➕ *ስቶክ መጨመሪያ መመሪያ:*\n\n` +
@@ -168,6 +180,7 @@ bot.on('callback_query', async (ctx) => {
     );
   }
   if (data === 'view_customer_store') {
+    if (ctx.from.id !== config.adminId) return ctx.answerCbQuery('🚫 Admin only').catch(() => {});
     await ctx.answerCbQuery();
     const path = require('path');
     const fs = require('fs-extra');
@@ -202,6 +215,7 @@ bot.on('callback_query', async (ctx) => {
   }
 
   if (data === 'admin_refresh_store_view') {
+    if (ctx.from.id !== config.adminId) return ctx.answerCbQuery('🚫 Admin only').catch(() => {});
     const msg = require('./utils/messages');
     const keyboards = require('./utils/keyboard');
     const config = require('./config');
@@ -287,7 +301,7 @@ bot.on('text', async (ctx) => {
 
   // Also support typing a number directly (e.g. 2, 3, 5) to select quantity
   const text = ctx.message.text ? ctx.message.text.trim() : '';
-  if (/^\d+$/.test(text)) {
+  if (/^\d+$/.test(text) && ctx.from.id !== config.adminId) {
     const num = parseInt(text);
     if (num > 0 && num <= 500) {
       session.awaitingCustomQty = true;

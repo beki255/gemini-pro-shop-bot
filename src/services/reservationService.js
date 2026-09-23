@@ -33,8 +33,8 @@ class ReservationService {
     }
 
     const ids = availableItems.map((item) => item._id);
-    await Stock.updateMany(
-      { _id: { $in: ids } },
+    const updateResult = await Stock.updateMany(
+      { _id: { $in: ids }, isSold: false, isReserved: false },
       {
         $set: {
           isReserved: true,
@@ -44,6 +44,22 @@ class ReservationService {
         },
       }
     );
+
+    // If concurrent requests raced and acquired some items, rollback and return null
+    if (updateResult.modifiedCount < qty) {
+      await Stock.updateMany(
+        { _id: { $in: ids }, reservedBy: userId, isSold: false, orderId: null },
+        {
+          $set: {
+            isReserved: false,
+            reservedAt: null,
+            reservedBy: null,
+            reservedMethod: null,
+          },
+        }
+      );
+      return null;
+    }
 
     return availableItems;
   }
@@ -124,11 +140,11 @@ class ReservationService {
             const isEn = lang === 'en';
 
             const expiredText = isEn
-              ? `⏰ *Your order has expired!*\n\n` +
-                `Because payment was not completed within *30 minutes*, your reservation has been cancelled and the item(s) were released for other customers.\n\n` +
+              ? `⏰ <b>Your order has expired!</b>\n\n` +
+                `Because payment was not completed within <b>30 minutes</b>, your reservation has been cancelled and the item(s) were released for other customers.\n\n` +
                 `You can tap below to start a new order anytime:`
-              : `⏰ *የትዕዛዝዎ ጊዜ አልቋል!*\n\n` +
-                `ክፍያው በ *30 ደቂቃ* ውስጥ ስላልተጠናቀቀ የተያዘው ስቶክ ተለቋል እና ትዕዛዝዎ ተሰርዟል።\n\n` +
+              : `⏰ <b>የትዕዛዝዎ ጊዜ አልቋል!</b>\n\n` +
+                `ክፍያው በ <b>30 ደቂቃ</b> ውስጥ ስላልተጠናቀቀ የተያዘው ስቶክ ተለቋል እና ትዕዛዝዎ ተሰርዟል።\n\n` +
                 `በድጋሚ ለማዘዝ ከታች ያሉትን አዝራሮች መጠቀም ይችላሉ፦`;
 
             const expiredKeyboard = {
@@ -151,7 +167,7 @@ class ReservationService {
             };
 
             await bot.telegram.sendMessage(userId, expiredText, {
-              parse_mode: 'Markdown',
+              parse_mode: 'HTML',
               ...expiredKeyboard,
             });
           } catch (err) {
@@ -168,7 +184,7 @@ class ReservationService {
    * Starts periodic expiry job (runs every 30 seconds)
    */
   startExpiryJob(bot) {
-    console.log('⏰ 5-minute stock reservation expiry monitor started');
+    console.log('⏰ 30-minute stock reservation expiry monitor started');
     // Run immediately on start
     this.expireStaleReservations(bot);
 

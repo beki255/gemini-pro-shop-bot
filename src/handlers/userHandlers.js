@@ -141,7 +141,7 @@ async function handleContact(ctx) {
     });
   }
   await ctx.reply(msg.contact(user.language), {
-    parse_mode: 'Markdown',
+    parse_mode: 'HTML',
     ...keyboards.contactSupport(user.language),
   });
 }
@@ -268,7 +268,7 @@ async function handleMyOrders(ctx, page = 1) {
   if (ctx.callbackQuery) {
     try {
       return await ctx.editMessageText(text, {
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
         ...kb,
       });
     } catch {
@@ -277,7 +277,7 @@ async function handleMyOrders(ctx, page = 1) {
   }
 
   return ctx.reply(text, {
-    parse_mode: 'Markdown',
+    parse_mode: 'HTML',
     ...kb,
   });
 }
@@ -295,7 +295,7 @@ async function handleHelp(ctx) {
   const reservationService = require('../services/reservationService');
   const stockCount = await reservationService.getAvailableStockCount();
   await ctx.reply(msg.help(lang), {
-    parse_mode: 'Markdown',
+    parse_mode: 'HTML',
     ...keyboards.mainMenu(lang, false, stockCount),
   });
 }
@@ -507,16 +507,28 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
     reservedAt: Date.now(),
   };
 
-  await ctx.reply(msg.paymentInstructions(method, lang, qty, totalAmount), {
-    parse_mode: 'HTML',
-    ...keyboards.paymentDetails(method, lang),
-  });
+  try {
+    await ctx.reply(msg.paymentInstructions(method, lang, qty, totalAmount), {
+      parse_mode: 'HTML',
+      ...keyboards.paymentDetails(method, lang),
+    });
+  } catch (err) {
+    console.error('Failed to send HTML payment instructions, falling back to plain:', err.message);
+    const plainText = msg.paymentInstructions(method, lang, qty, totalAmount).replace(/<[^>]*>/g, '');
+    await ctx.reply(plainText, {
+      ...keyboards.paymentDetails(method, lang),
+    });
+  }
 
   const photoPrompt = lang === 'en'
     ? '📸 <b>Send the transaction receipt screenshot below:</b>'
     : '📸 <b>የደረሰኙን Screenshot ፎቶ እዚህ ይላኩ:</b>';
 
-  await ctx.reply(photoPrompt, { parse_mode: 'HTML' });
+  try {
+    await ctx.reply(photoPrompt, { parse_mode: 'HTML' });
+  } catch {
+    await ctx.reply(photoPrompt.replace(/<[^>]*>/g, ''));
+  }
 }
 
 // ─── Receipt Handler: Receive Photo or Document/PDF Receipt ─────
@@ -587,6 +599,8 @@ async function handleReceipt(ctx) {
     } else if (doc.mime_type && doc.mime_type.startsWith('image/')) {
       fileExt = doc.mime_type.split('/')[1] || 'jpg';
     }
+    // Sanitize file extension to prevent directory traversal or unsafe names
+    fileExt = String(fileExt).replace(/[^a-z0-9]/gi, '').substring(0, 10).toLowerCase() || 'jpg';
   }
 
   if (!fileId) {

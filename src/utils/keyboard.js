@@ -153,28 +153,55 @@ const keyboards = {
     ]);
   },
 
-  // ─── PAYMENT DETAILS WITH ONE-TAP COPY BUTTON ──────────────
+  // ─── PAYMENT DETAILS KEYBOARD (Universal Safe Callback) ─────
   paymentDetails(method, lang = 'am') {
     const isEn = lang === 'en';
     const isCbe = method === 'CBE';
-    const account = isCbe ? config.payment.cbe.account : config.payment.telebirr.account;
     const copyLabel = isEn
-      ? (isCbe ? '📋 Copy CBE Account' : '📋 Copy Telebirr Number')
-      : (isCbe ? '📋 የ CBE ቁጥር ቅዳ' : '📋 የቴሌብር ስልክ ቅዳ');
+      ? (isCbe ? '📋 View / Copy CBE Account' : '📋 View / Copy Telebirr Number')
+      : (isCbe ? '📋 የ CBE ቁጥር ይመልከቱ / ይቅዱ' : '📋 የቴሌብር ስልክ ይመልከቱ / ይቅዱ');
 
     return Markup.inlineKeyboard([
       [
         {
           text: copyLabel,
-          copy_text: { text: account },
-          style: 'success',
+          callback_data: `copy_acc_${method.toLowerCase()}`,
         },
       ],
       [
         {
           text: isEn ? '❌ Cancel' : '❌ ሰርዝ',
           callback_data: 'cancel',
-          style: 'danger',
+        },
+      ],
+    ]);
+  },
+
+  // ─── QUICK REJECT KEYBOARD FOR ADMIN ────────────────────────
+  quickRejectKeyboard(orderId) {
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: '❌ ደረሰኝ ትክክል አይደለም',
+          callback_data: `reject_quick_${orderId}_invalid`,
+        },
+      ],
+      [
+        {
+          text: '❌ ብር አልገባም / ያነሰ ነው',
+          callback_data: `reject_quick_${orderId}_amount`,
+        },
+      ],
+      [
+        {
+          text: '❌ ያለ ምክንያት ውድቅ አድርግ',
+          callback_data: `reject_quick_${orderId}_skip`,
+        },
+      ],
+      [
+        {
+          text: '🔙 ተመለስ (ሰርዝ)',
+          callback_data: 'cancel_rejection',
         },
       ],
     ]);

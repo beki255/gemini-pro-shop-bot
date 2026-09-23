@@ -1,6 +1,11 @@
 // src/utils/messages.js - Multilingual Message Templates (Amharic & English)
 const config = require('../config');
 
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 const msg = {
   // ─── WELCOME / LANGUAGE SELECTION PROMPT ───────────────────
   chooseLanguage() {
@@ -364,6 +369,16 @@ const msg = {
     const finalQty = quantity && parseInt(quantity, 10) > 0 ? parseInt(quantity, 10) : 1;
     const finalAmount = amount && parseInt(amount, 10) > 0 ? parseInt(amount, 10) : finalQty * unitPrice;
 
+    const escapeHtml = (text) =>
+      String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    const safeReason = escapeHtml(reason || (isEn ? 'Receipt could not be verified' : 'ደረሰኙ ትክክል አይደለም'));
+    const safeOrderId = escapeHtml(orderId);
+    const safeSupport = escapeHtml(config.supportUsername || 'Mnbvcnvhd');
+
     const priceTextEn =
       finalQty > 1
         ? `${finalAmount} ETB (${finalQty} × ${unitPrice} ETB)`
@@ -376,29 +391,29 @@ const msg = {
 
     if (isEn) {
       return (
-        `❌ *Order Not Approved*\n\n` +
-        `🔢 Order ID: \`${orderId}\`\n` +
-        `📦 Quantity: *${finalQty} link(s)*\n` +
-        `💰 Expected Amount: *${priceTextEn}*\n\n` +
-        `📝 *Reason:* ${reason || 'Receipt could not be verified'}\n\n` +
-        `💡 *What can you do?*\n` +
+        `❌ <b>Order Not Approved</b>\n\n` +
+        `🔢 <b>Order ID:</b> <code>${safeOrderId}</code>\n` +
+        `📦 <b>Quantity:</b> <b>${finalQty} link(s)</b>\n` +
+        `💰 <b>Expected Amount:</b> <b>${priceTextEn}</b>\n\n` +
+        `📝 <b>Reason:</b> ${safeReason}\n\n` +
+        `💡 <b>What can you do?</b>\n` +
         `• Make sure you send a valid transaction screenshot\n` +
         `• Verify that you transferred the correct amount (${priceTextEn})\n` +
-        `• If you have questions, contact @${config.supportUsername || 'Mnbvcnvhd'}\n\n` +
+        `• If you have questions, contact: @${safeSupport}\n\n` +
         `You can tap /buy to try again.`
       );
     }
 
     return (
-      `❌ *ትዕዛዝዎ ተቀባይነት አላገኘም*\n\n` +
-      `🔢 የትዕዛዝ ቁጥር: \`${orderId}\`\n` +
-      `📦 የተመረጠው ብዛት: *${finalQty} ሊንክ*\n` +
-      `💰 የሚጠበቀው ጠቅላላ ክፍያ: *${priceTextAm}*\n\n` +
-      `📝 *ምክንያት:* ${reason || 'ደረሰኙ ትክክል አይደለም'}\n\n` +
-      `💡 *ምን ማድረግ ይቻላል?*\n` +
+      `❌ <b>ትዕዛዝዎ ተቀባይነት አላገኘም</b>\n\n` +
+      `🔢 <b>የትዕዛዝ ቁጥር:</b> <code>${safeOrderId}</code>\n` +
+      `📦 <b>የተመረጠው ብዛት:</b> <b>${finalQty} ሊንክ</b>\n` +
+      `💰 <b>የሚጠበቀው ጠቅላላ ክፍያ:</b> <b>${priceTextAm}</b>\n\n` +
+      `📝 <b>ምክንያት:</b> ${safeReason}\n\n` +
+      `💡 <b>ምን ማድረግ ይቻላል?</b>\n` +
       `• ትክክለኛ የደረሰኝ ስክሪንሾት ይላኩ\n` +
       `• ትክክለኛውን መጠን (${priceTextAm}) ማስተላለፍዎን ያረጋግጡ\n` +
-      `• ጥያቄ ካለዎት ያነጋግሩ: @${config.supportUsername || 'Mnbvcnvhd'}\n\n` +
+      `• ጥያቄ ካለዎት ያነጋግሩ: @${safeSupport}\n\n` +
       `/buy ብለው እንደገና መሞከር ይችላሉ።`
     );
   },
@@ -425,8 +440,8 @@ const msg = {
     const total = totalCount !== null ? totalCount : (orders ? orders.length : 0);
     if (!orders || orders.length === 0) {
       return lang === 'en'
-        ? `📦 *You have no orders yet.*\n\nTap /buy to get started!`
-        : `📦 *እስካሁን ምንም ትዕዛዝ የለዎትም።*\n\nለመግዛት /buy ብለው ይጀምሩ!`;
+        ? `📦 <b>You have no orders yet.</b>\n\nTap /buy to get started!`
+        : `📦 <b>እስካሁን ምንም ትዕዛዝ የለዎትም።</b>\n\nለመግዛት /buy ብለው ይጀምሩ!`;
     }
 
     const statusEmoji = { pending: '⏳', approved: '✅', rejected: '❌' };
@@ -440,8 +455,8 @@ const msg = {
       : '';
 
     let text = lang === 'en'
-      ? `📦 *Your Order History (${total} Orders Total)${pageInfo}*\n━━━━━━━━━━━━━━━━━━━━\n\n`
-      : `📦 *የትዕዛዝ ታሪክዎ (ጠቅላላ ${total} ትዕዛዞች)${pageInfo}*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+      ? `📦 <b>Your Order History (${total} Orders Total)${pageInfo}</b>\n━━━━━━━━━━━━━━━━━━━━\n\n`
+      : `📦 <b>የትዕዛዝ ታሪክዎ (ጠቅላላ ${total} ትዕዛዞች)${pageInfo}</b>\n━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     const PAGE_SIZE = 10;
     const startIndex = (page - 1) * PAGE_SIZE;
@@ -455,14 +470,14 @@ const msg = {
         ? (lang === 'en' ? ` (${order.quantity} links)` : ` (${order.quantity} ሊንክ)`)
         : '';
 
-      text += `*${itemNumber}.* ${emoji} \`${order.orderId}\`${quantityText}\n`;
-      text += `   💰 *${order.amount}* ${lang === 'en' ? 'ETB' : 'ብር'} | 📅 ${date} | *${st}*\n\n`;
+      text += `<b>${itemNumber}.</b> ${emoji} <code>${esc(order.orderId)}</code>${quantityText}\n`;
+      text += `   💰 <b>${order.amount}</b> ${lang === 'en' ? 'ETB' : 'ብር'} | 📅 ${date} | <b>${st}</b>\n\n`;
     });
 
     if (totalPages > 1) {
       text += lang === 'en'
-        ? `_Use the buttons below to switch pages._`
-        : `_ገጾቹን ለመቀያየር ከታች ያሉትን አዝራሮች ይጠቀሙ።_`;
+        ? `<i>Use the buttons below to switch pages.</i>`
+        : `<i>ገጾቹን ለመቀያየር ከታች ያሉትን አዝራሮች ይጠቀሙ።</i>`;
     }
 
     return text;
@@ -470,48 +485,50 @@ const msg = {
 
   // ─── HELP ──────────────────────────────────────────────────
   help(lang = 'am') {
+    const safeSupport = esc(config.supportUsername || 'Mnbvcnvhd');
     if (lang === 'en') {
       return (
-        `❓ *Help & FAQ*\n\n` +
-        `🛒 */buy* — Purchase a Gemini Pro 18 Months link\n` +
-        `📦 */myorders* — View your past orders & statuses\n` +
-        `🌐 */language* — Change language (English / አማርኛ)\n` +
-        `🏠 */start* — Back to main menu\n\n` +
-        `📞 *Direct Support:*\n` +
-        `Reach out to @${config.supportUsername || 'Mnbvcnvhd'}\n` +
+        `❓ <b>Help & FAQ</b>\n\n` +
+        `🛒 <b>/buy</b> — Purchase a Gemini Pro 18 Months link\n` +
+        `📦 <b>/myorders</b> — View your past orders & statuses\n` +
+        `🌐 <b>/language</b> — Change language (English / አማርኛ)\n` +
+        `🏠 <b>/start</b> — Back to main menu\n\n` +
+        `📞 <b>Direct Support:</b>\n` +
+        `Reach out to @${safeSupport}\n` +
         `⏰ Available 24/7 for assistance!`
       );
     }
 
     return (
-      `❓ *እርዳታ እና መረጃ*\n\n` +
-      `🛒 */buy* — የ Gemini Pro 18 ወራት ሊንክ ግዙ\n` +
-      `📦 */myorders* — ያለፉ ትዕዛዞችዎን ይመልከቱ\n` +
-      `🌐 */language* — ቋንቋ ይቀይሩ (አማርኛ / English)\n` +
-      `🏠 */start* — ወደ ዋና ማውጫ ይመለሱ\n\n` +
-      `📞 *ቀጥታ ድጋፍ:*\n` +
-      `ያነጋግሩን: @${config.supportUsername || 'Mnbvcnvhd'}\n` +
+      `❓ <b>እርዳታ እና መረጃ</b>\n\n` +
+      `🛒 <b>/buy</b> — የ Gemini Pro 18 ወራት ሊንክ ግዙ\n` +
+      `📦 <b>/myorders</b> — ያለፉ ትዕዛዞችዎን ይመልከቱ\n` +
+      `🌐 <b>/language</b> — ቋንቋ ይቀይሩ (አማርኛ / English)\n` +
+      `🏠 <b>/start</b> — ወደ ዋና ማውጫ ይመለሱ\n\n` +
+      `📞 <b>ቀጥታ ድጋፍ:</b>\n` +
+      `ያነጋግሩን: @${safeSupport}\n` +
       `⏰ 24/7 ፈጣን ምላሽ እንሰጣለን!`
     );
   },
 
   // ─── CONTACT ───────────────────────────────────────────────
   contact(lang = 'am') {
+    const safeSupport = esc(config.supportUsername || 'Mnbvcnvhd');
     if (lang === 'en') {
       return (
-        `📞 *Contact Support*\n\n` +
+        `📞 <b>Contact Support</b>\n\n` +
         `For questions, support, or order verification:\n\n` +
-        `👤 *Admin:* @${config.supportUsername || 'Mnbvcnvhd'}\n` +
-        `⏰ *Support Hours:* 24/7 Quick Response\n\n` +
+        `👤 <b>Admin:</b> @${safeSupport}\n` +
+        `⏰ <b>Support Hours:</b> 24/7 Quick Response\n\n` +
         `👇 Tap the button below to message directly:`
       );
     }
 
     return (
-      `📞 *የደንበኞች ድጋፍ*\n\n` +
+      `📞 <b>የደንበኞች ድጋፍ</b>\n\n` +
       `ለማንኛውም ጥያቄ፣ ድጋፍ ወይም የክፍያ ማረጋገጫ ጉዳይ በዚህ አድራሻ ያነጋግሩን፦\n\n` +
-      `👤 *አድሚን / ድጋፍ:* @${config.supportUsername || 'Mnbvcnvhd'}\n` +
-      `⏰ *የስራ ሰዓት:* 24/7 ፈጣን ምላሽ\n\n` +
+      `👤 <b>አድሚን / ድጋፍ:</b> @${safeSupport}\n` +
+      `⏰ <b>የስራ ሰዓት:</b> 24/7 ፈጣን ምላሽ\n\n` +
       `👇 በቀጥታ ለማነጋገር ከታች ያለውን አዝራር ይጫኑ:`
     );
   },
