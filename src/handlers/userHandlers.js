@@ -556,24 +556,16 @@ async function handleReceipt(ctx) {
     const isEn = lang === 'en';
     const buttonFrames = isEn
       ? [
-          '◐ Verifying Payment .',
-          '◓ Verifying Payment ..',
-          '◑ Verifying Payment ...',
-          '◒ Verifying Payment',
+          '🔄 Verifying Payment',
           '🔄 Verifying Payment .',
-          '⏳ Verifying Payment ..',
-          '⌛ Verifying Payment ...',
-          '⚙️ Verifying Payment',
+          '🔄 Verifying Payment ..',
+          '🔄 Verifying Payment ...',
         ]
       : [
-          '◐ ክፍያዎ በማረጋገጥ ላይ ነው .',
-          '◓ ክፍያዎ በማረጋገጥ ላይ ነው ..',
-          '◑ ክፍያዎ በማረጋገጥ ላይ ነው ...',
-          '◒ ክፍያዎ በማረጋገጥ ላይ ነው',
+          '🔄 ክፍያዎ በማረጋገጥ ላይ ነው',
           '🔄 ክፍያዎ በማረጋገጥ ላይ ነው .',
-          '⏳ ክፍያዎ በማረጋገጥ ላይ ነው ..',
-          '⌛ ክፍያዎ በማረጋገጥ ላይ ነው ...',
-          '⚙️ ክፍያዎ በማረጋገጥ ላይ ነው',
+          '🔄 ክፍያዎ በማረጋገጥ ላይ ነው ..',
+          '🔄 ክፍያዎ በማረጋገጥ ላይ ነው ...',
         ];
 
     const sentCustomerMsg = await ctx.reply(msg.receiptReceived(orderId, lang), {
@@ -581,7 +573,7 @@ async function handleReceipt(ctx) {
       ...keyboards.pendingVerification(orderId, lang, buttonFrames[0]),
     });
 
-    // Fast live spinning animation ON THE BUTTON (snappy 1.0s interval)
+    // Fast live spinning animation ON THE BUTTON with single 🔄 icon
     (async () => {
       try {
         let tick = 0;
@@ -590,6 +582,11 @@ async function handleReceipt(ctx) {
         while (tick < maxTicks) {
           await new Promise((r) => setTimeout(r, 1000)); // Snappy 1.0s interval
           tick++;
+
+          // Periodically trigger Telegram native animated indicator in chat header
+          if (tick % 4 === 1) {
+            ctx.sendChatAction('typing').catch(() => {});
+          }
 
           // Periodically check DB (every 2.0s) to detect approval or rejection
           if (tick % 2 === 0) {

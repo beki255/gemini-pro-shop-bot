@@ -343,15 +343,32 @@ const msg = {
   },
 
   // ─── ORDER REJECTED ────────────────────────────────────────
-  orderRejected(reason, orderId, lang = 'am') {
-    if (lang === 'en') {
+  orderRejected(reason, orderId, lang = 'am', amount = null, quantity = 1) {
+    const isEn = lang === 'en';
+    const unitPrice = config.productPrice || 250;
+    const finalQty = quantity && parseInt(quantity, 10) > 0 ? parseInt(quantity, 10) : 1;
+    const finalAmount = amount && parseInt(amount, 10) > 0 ? parseInt(amount, 10) : finalQty * unitPrice;
+
+    const priceTextEn =
+      finalQty > 1
+        ? `${finalAmount} ETB (${finalQty} × ${unitPrice} ETB)`
+        : `${finalAmount} ETB`;
+
+    const priceTextAm =
+      finalQty > 1
+        ? `${finalAmount} ብር (${finalQty} × ${unitPrice} ብር)`
+        : `${finalAmount} ብር`;
+
+    if (isEn) {
       return (
         `❌ *Order Not Approved*\n\n` +
-        `🔢 Order ID: \`${orderId}\`\n\n` +
+        `🔢 Order ID: \`${orderId}\`\n` +
+        `📦 Quantity: *${finalQty} link(s)*\n` +
+        `💰 Expected Amount: *${priceTextEn}*\n\n` +
         `📝 *Reason:* ${reason || 'Receipt could not be verified'}\n\n` +
         `💡 *What can you do?*\n` +
         `• Make sure you send a valid transaction screenshot\n` +
-        `• Verify that you transferred the correct amount (${config.productPrice} ETB)\n` +
+        `• Verify that you transferred the correct amount (${priceTextEn})\n` +
         `• If you have questions, contact @${config.supportUsername || 'Mnbvcnvhd'}\n\n` +
         `You can tap /buy to try again.`
       );
@@ -359,11 +376,13 @@ const msg = {
 
     return (
       `❌ *ትዕዛዝዎ ተቀባይነት አላገኘም*\n\n` +
-      `🔢 የትዕዛዝ ቁጥር: \`${orderId}\`\n\n` +
+      `🔢 የትዕዛዝ ቁጥር: \`${orderId}\`\n` +
+      `📦 የተመረጠው ብዛት: *${finalQty} ሊንክ*\n` +
+      `💰 የሚጠበቀው ጠቅላላ ክፍያ: *${priceTextAm}*\n\n` +
       `📝 *ምክንያት:* ${reason || 'ደረሰኙ ትክክል አይደለም'}\n\n` +
       `💡 *ምን ማድረግ ይቻላል?*\n` +
       `• ትክክለኛ የደረሰኝ ስክሪንሾት ይላኩ\n` +
-      `• ትክክለኛውን መጠን (${config.productPrice} ብር) ማስተላለፍዎን ያረጋግጡ\n` +
+      `• ትክክለኛውን መጠን (${priceTextAm}) ማስተላለፍዎን ያረጋግጡ\n` +
       `• ጥያቄ ካለዎት ያነጋግሩ: @${config.supportUsername || 'Mnbvcnvhd'}\n\n` +
       `/buy ብለው እንደገና መሞከር ይችላሉ።`
     );

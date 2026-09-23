@@ -260,7 +260,7 @@ const keyboards = {
   pendingVerification(orderId, lang = 'am', buttonLabel = null) {
     const isEn = lang === 'en';
     const username = config.supportUsername || 'Mnbvcnvhd';
-    const label = buttonLabel || (isEn ? '◐ Verifying Payment...' : '◐ ክፍያዎ በማረጋገጥ ላይ ነው...');
+    const label = buttonLabel || (isEn ? '🔄 Verifying Payment...' : '🔄 ክፍያዎ በማረጋገጥ ላይ ነው...');
     return Markup.inlineKeyboard([
       [
         {
@@ -413,6 +413,112 @@ const keyboards = {
       {
         text: isEn ? '🔙 Admin Panel' : '🔙 ወደ ዋና ፓነል',
         callback_data: 'admin_panel',
+      },
+    ]);
+
+    return Markup.inlineKeyboard(rows);
+  },
+
+  // ─── ADMIN ORDERS FILTER MENU ───────────────────────────────
+  adminOrdersMenu(counts = {}, lang = 'am') {
+    const isEn = lang === 'en';
+    const pending = counts.pending || 0;
+    const approved = counts.approved || 0;
+    const rejected = counts.rejected || 0;
+    const total = counts.total || 0;
+
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? `✅ Approved Orders (${approved})` : `✅ የተፈቀዱ ትዕዛዞች (${approved})`,
+          callback_data: 'admin_orders_filter_approved',
+        },
+      ],
+      [
+        {
+          text: isEn ? `⏳ Pending Orders (${pending})` : `⏳ ያልተፈቀዱ / በጥበቃ ላይ (${pending})`,
+          callback_data: 'admin_orders_filter_pending',
+        },
+      ],
+      [
+        {
+          text: isEn ? `❌ Rejected Orders (${rejected})` : `❌ ውድቅ የተደረጉ (${rejected})`,
+          callback_data: 'admin_orders_filter_rejected',
+        },
+      ],
+      [
+        {
+          text: isEn ? `📋 All Orders (${total})` : `📋 ሁሉም ትዕዛዞች (${total})`,
+          callback_data: 'admin_orders_filter_all',
+        },
+      ],
+      [
+        {
+          text: isEn ? '🔙 Back to Admin Panel' : '🔙 ወደ ዋና ፓነል',
+          callback_data: 'admin_panel',
+        },
+      ],
+    ]);
+  },
+
+  // ─── ADMIN ORDERS LIST PAGINATION & FILTER SWITCH ───────────
+  adminOrdersPagination(currentFilter = 'all', page = 1, totalPages = 1, lang = 'am') {
+    const isEn = lang === 'en';
+    const rows = [];
+
+    // Pagination row if multiple pages
+    if (totalPages > 1) {
+      const navRow = [];
+      if (page > 1) {
+        navRow.push({
+          text: isEn ? '⬅️ Prev' : '⬅️ ቀዳሚ',
+          callback_data: `admin_orders_page_${currentFilter}_${page - 1}`,
+        });
+      }
+      navRow.push({
+        text: `📄 ${page}/${totalPages}`,
+        callback_data: 'noop',
+      });
+      if (page < totalPages) {
+        navRow.push({
+          text: isEn ? 'Next ➡️' : 'ቀጣይ ➡️',
+          callback_data: `admin_orders_page_${currentFilter}_${page + 1}`,
+        });
+      }
+      rows.push(navRow);
+    }
+
+    // Quick filter switch row
+    rows.push([
+      {
+        text: currentFilter === 'approved' ? '🔘 ✅ የተፈቀዱ' : '✅ የተፈቀዱ',
+        callback_data: 'admin_orders_filter_approved',
+      },
+      {
+        text: currentFilter === 'pending' ? '🔘 ⏳ ያልተፈቀዱ' : '⏳ ያልተፈቀዱ',
+        callback_data: 'admin_orders_filter_pending',
+      },
+    ]);
+    rows.push([
+      {
+        text: currentFilter === 'rejected' ? '🔘 ❌ ውድቅ' : '❌ ውድቅ',
+        callback_data: 'admin_orders_filter_rejected',
+      },
+      {
+        text: currentFilter === 'all' ? '🔘 📋 ሁሉም' : '📋 ሁሉም',
+        callback_data: 'admin_orders_filter_all',
+      },
+    ]);
+
+    // Back to orders menu and admin panel
+    rows.push([
+      {
+        text: isEn ? '🔄 Refresh' : '🔄 አድስ',
+        callback_data: `admin_orders_page_${currentFilter}_${page}`,
+      },
+      {
+        text: isEn ? '🔙 Orders Menu' : '🔙 የትዕዛዝ ማውጫ',
+        callback_data: 'admin_orders',
       },
     ]);
 

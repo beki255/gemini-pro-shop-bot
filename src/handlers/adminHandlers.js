@@ -385,17 +385,124 @@ const handleStock = adminOnly(async (ctx) => {
 });
 
 // ─── /orders — List recent orders ─────────────────────────
-const handleOrders = adminOnly(async (ctx) => {
-  const text = ctx.message && ctx.message.text ? ctx.message.text : '';
-  const args = text.split(' ');
-  const filter = args[1]; // e.g. "pending" / "approved" / "rejected"
-  const query = filter ? { status: filter } : {};
+// ─── /orders — List and filter orders (Approved, Pending, Rejected, All) ───
+const handleOrders = adminOnly(async (ctx, filterOverride, pageOverride) => {
+  const adminUser = await User.findOne({ telegramId: ctx.from.id });
+  const lang = adminUser && adminUser.language ? adminUser.language : 'am';
+  const isEn = lang === 'en';
 
-  const orders = await Order.find(query).sort({ createdAt: -1 }).limit(15);
+  const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
+  const args = text.split(/\s+/);
+  const paramFilter = args.length > 1 ? args[1].toLowerCase() : null;
+
+  // Detect filter from callbackQuery or argument
+  let filter = filterOverride || paramFilter || null;
+  let page = pageOverride || 1;
+
+  if (ctx.callbackQuery && ctx.callbackQuery.data) {
+    if (ctx.callbackQuery.data.startsWith('admin_orders_filter_')) {
+      filter = ctx.callbackQuery.data.replace('admin_orders_filter_', '');
+      page = 1;
+    } else if (ctx.callbackQuery.data.startsWith('admin_orders_page_')) {
+      const parts = ctx.callbackQuery.data.replace('admin_orders_page_', '').split('_');
+      filter = parts[0] || 'all';
+      page = parseInt(parts[1], 10) || 1;
+    }
+  }
+
+  // If no filter is chosen, display the interactive Orders Category Selection Menu!
+  if (!filter) {
+    const [total, pending, approved, rejected] = await Promise.all([
+      Order.countDocuments(),
+      Order.countDocuments({ status: 'pending' }),
+      Order.countDocuments({ status: 'approved' }),
+      Order.countDocuments({ status: 'rejected' }),
+    ]);
+
+    const counts = { total, pending, approved, rejected };
+
+    const menuText = isEn
+      ? `📋 <b>Orders Management</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📊 <b>Total Orders:</b> <code>${total}</code>\n` +
+        `✅ <b>Approved (Delivered):</b> <code>${approved}</code>\n` +
+        `⏳ <b>Pending (Waiting):</b> <code>${pending}</code>\n` +
+        `❌ <b>Rejected:</b> <code>${rejected}</code>\n\n` +
+        `👉 <b>Please select which orders to view:</b>`
+      : `📋 <b>የትዕዛዞች መቆጣጠሪያ</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📊 <b>ጠቅላላ ትዕዛዞች:</b> <code>${total}</code>\n` +
+        `✅ <b>የተፈቀዱ (የደረሱ):</b> <code>${approved}</code>\n` +
+        `⏳ <b>ያልተፈቀዱ / በጥበቃ ላይ:</b> <code>${pending}</code>\n` +
+        `❌ <b>ውድቅ የተደረጉ:</b> <code>${rejected}</code>\n\n` +
+        `👉 <b>እባክዎ ማየት የሚፈልጉትን የትዕዛዝ አይነት ይምረጡ፡</b>`;
+
+    const kb = keyboards.adminOrdersMenu(counts, lang);
+
+    if (ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(menuText, { parse_mode: 'HTML', ...kb });
+      } catch (e) {
+        if (!e.description?.includes('message is not modified')) {
+          return await ctx.reply(menuText, { parse_mode: 'HTML', ...kb });
+        }
+        return;
+      }
+    }
+    return await ctx.reply(menuText, { parse_mode: 'HTML', ...kb });
+  }
+
+  // Filter has been chosen: 'approved', 'pending', 'rejected', or 'all'
+  let query = {};
+  let titleAm = 'ሁሉም ትዕዛዞች';
+  let titleEn = 'All Orders';
+  let headerEmoji = '📋';
+
+  if (filter === 'approved') {
+    query = { status: 'approved' };
+    titleAm = '✅ የተፈቀዱ ትዕዛዞች (Approved)';
+    titleEn = '✅ Approved Orders';
+    headerEmoji = '✅';
+  } else if (filter === 'pending') {
+    query = { status: 'pending' };
+    titleAm = '⏳ ያልተፈቀዱ / በጥበቃ ላይ ያሉ ትዕዛዞች (Pending)';
+    titleEn = '⏳ Pending Orders';
+    headerEmoji = '⏳';
+  } else if (filter === 'rejected') {
+    query = { status: 'rejected' };
+    titleAm = '❌ ውድቅ የተደረጉ ትዕዛዞች (Rejected)';
+    titleEn = '❌ Rejected Orders';
+    headerEmoji = '❌';
+  } else {
+    filter = 'all';
+    query = {};
+    titleAm = '📋 ሁሉም ትዕዛዞች (All Orders)';
+    titleEn = '📋 All Orders';
+    headerEmoji = '📋';
+  }
+
+  const limit = 6; // 6 orders per page for clean mobile layout
+  const totalCount = await Order.countDocuments(query);
+  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const skip = (currentPage - 1) * limit;
+
+  const orders = await Order.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit);
+
   if (orders.length === 0) {
-    return ctx.reply('📭 ምንም ትዕዛዝ አልተገኘም።', {
-      ...keyboards.adminPanel('am'),
-    });
+    const emptyText = isEn
+      ? `${headerEmoji} <b>No orders found under "${titleEn}".</b>`
+      : `${headerEmoji} <b>በ «${titleAm}» ስር ምንም ትዕዛዝ አልተገኘም።</b>`;
+
+    const kb = keyboards.adminOrdersPagination(filter, 1, 1, lang);
+    if (ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(emptyText, { parse_mode: 'HTML', ...kb });
+      } catch (e) {
+        return await ctx.reply(emptyText, { parse_mode: 'HTML', ...kb });
+      }
+    }
+    return await ctx.reply(emptyText, { parse_mode: 'HTML', ...kb });
   }
 
   // Pre-fetch users for all orders to guarantee complete profile info
@@ -407,29 +514,61 @@ const handleOrders = adminOnly(async (ctx) => {
   const statusEmoji = { pending: '⏳', approved: '✅', rejected: '❌' };
   const statusAm = { pending: 'በጥበቃ ላይ', approved: 'ተፈቅዷል', rejected: 'ውድቅ ተደርጓል' };
 
-  let replyText = `📋 <b>የቅርብ ጊዜ ትዕዛዞች (${orders.length})</b>\n━━━━━━━━━━━━━━━━━━━━\n\n`;
-  orders.forEach((o) => {
+  let replyText =
+    `${headerEmoji} <b>${isEn ? titleEn : titleAm} (${totalCount})</b>\n` +
+    `📄 <b>ገጽ:</b> ${currentPage}/${totalPages}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  orders.forEach((o, idx) => {
     const u = userMap.get(o.userId);
     const firstName = o.userInfo?.firstName || u?.firstName || '';
     const lastName = o.userInfo?.lastName || u?.lastName || '';
     const rawFullName = `${firstName} ${lastName}`.trim();
-    const fullName = rawFullName || 'ስም የለም';
+    const fullName = rawFullName || (isEn ? 'No Name' : 'ስም የለም');
     const rawUsername = o.userInfo?.username || u?.username || null;
-    const username = rawUsername ? `@${rawUsername}` : 'የለውም';
+    const username = rawUsername ? `@${rawUsername}` : (isEn ? 'None' : 'የለውም');
+    const userLink = rawUsername
+      ? `<a href="https://t.me/${rawUsername}">${escapeHtml(fullName)}</a>`
+      : `<a href="tg://user?id=${o.userId}">${escapeHtml(fullName)}</a>`;
     const qty = o.quantity || 1;
     const dateStr = new Date(o.createdAt).toLocaleString('am-ET');
 
-    replyText += `${statusEmoji[o.status]} <b>ትዕዛዝ:</b> <code>${escapeHtml(o.orderId)}</code> (${statusAm[o.status] || o.status})\n`;
-    replyText += `   👤 <b>ስም:</b> ${escapeHtml(fullName)}\n`;
-    replyText += `   🔗 <b>ዩዘርኔም:</b> ${escapeHtml(username)}\n`;
+    replyText += `<b>${skip + idx + 1}.</b> ${statusEmoji[o.status] || '📦'} <b>የትዕዛዝ ቁጥር:</b> <code>${escapeHtml(o.orderId)}</code> (${statusAm[o.status] || o.status})\n`;
+    replyText += `   👤 <b>ደንበኛ:</b> ${userLink} (${escapeHtml(username)})\n`;
     replyText += `   🆔 <b>Telegram ID:</b> <code>${o.userId}</code>\n`;
-    replyText += `   📦 <b>ብዛት:</b> ${qty} ሊንክ | 💰 <b>መጠን:</b> ${o.amount} ብር (${escapeHtml(o.paymentMethod)})\n`;
-    replyText += `   📅 <b>ቀን:</b> ${dateStr}\n\n`;
+    replyText += `   📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b> | 💰 <b>ክፍያ:</b> <b>${o.amount} ብር</b> (${escapeHtml(o.paymentMethod || 'CBE')})\n`;
+    replyText += `   📅 <b>ቀን:</b> ${dateStr}\n`;
+    if (o.status === 'rejected' && o.adminNote) {
+      replyText += `   📝 <b>የተሰረዘበት ምክንያት:</b> <i>${escapeHtml(o.adminNote)}</i>\n`;
+    }
+    replyText += `\n`;
   });
+
+  const kb = keyboards.adminOrdersPagination(filter, currentPage, totalPages, lang);
+
+  if (ctx.callbackQuery) {
+    try {
+      return await ctx.editMessageText(replyText, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...kb,
+      });
+    } catch (e) {
+      if (!e.description?.includes('message is not modified')) {
+        return await ctx.reply(replyText, {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          ...kb,
+        });
+      }
+      return;
+    }
+  }
 
   await ctx.reply(replyText, {
     parse_mode: 'HTML',
-    ...keyboards.adminPanel('am'),
+    disable_web_page_preview: true,
+    ...kb,
   });
 });
 
@@ -875,8 +1014,10 @@ async function callbackReject(ctx) {
   }
 
   // Ask admin for rejection reason
+  const expectedAmount = order.amount || (order.quantity || 1) * (config.productPrice || 250);
   await ctx.reply(
     `❌ *ምክንያት ይጻፉ (Reason for rejection):*\n\n` +
+    `📦 *የትዕዛዝ መረጃ:* ${order.quantity || 1} ሊንክ (${expectedAmount} ብር)\n\n` +
     `ምሳሌ: "ደረሰኝ ትክክል አይደለም", "ብር ያነሰ ነው", ወዘተ\n\n` +
     `ወይም "skip" ብለው ያለ ምክንያት ያሰናብቱ`,
     { parse_mode: 'Markdown' }
@@ -928,13 +1069,17 @@ async function handleRejectionReason(ctx) {
     { status: 'rejected', adminNote: reason, processedAt: new Date(), processedBy: ctx.from.id }
   );
 
-  // Notify customer in their preferred language
+  // Notify customer in their preferred language with custom multiplied price
   try {
     const customer = await User.findOne({ telegramId: order.userId });
     const custLang = customer && customer.language ? customer.language : 'am';
-    await ctx.telegram.sendMessage(order.userId, msg.orderRejected(reason, orderId, custLang), {
-      parse_mode: 'Markdown',
-    });
+    await ctx.telegram.sendMessage(
+      order.userId,
+      msg.orderRejected(reason, orderId, custLang, order.amount, order.quantity),
+      {
+        parse_mode: 'Markdown',
+      }
+    );
   } catch (err) {
     console.error('Failed to notify customer of rejection:', err.message);
   }
