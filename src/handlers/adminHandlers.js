@@ -539,7 +539,7 @@ const handleOrders = adminOnly(async (ctx, filterOverride, pageOverride) => {
     headerEmoji = '📋';
   }
 
-  const limit = 6; // 6 orders per page for clean mobile layout
+  const limit = 5; // 5 orders per page for clean mobile layout
   const totalCount = await Order.countDocuments(query);
   const totalPages = Math.max(1, Math.ceil(totalCount / limit));
   const currentPage = Math.min(Math.max(1, page), totalPages);
@@ -583,6 +583,7 @@ const handleOrders = adminOnly(async (ctx, filterOverride, pageOverride) => {
     const lastName = o.userInfo?.lastName || u?.lastName || '';
     const rawFullName = `${firstName} ${lastName}`.trim();
     const fullName = rawFullName || (isEn ? 'No Name' : 'ስም የለም');
+    o.customerName = firstName || fullName;
     const rawUsername = o.userInfo?.username || u?.username || null;
     const username = rawUsername ? `@${rawUsername}` : (isEn ? 'None' : 'የለውም');
     const userLink = rawUsername

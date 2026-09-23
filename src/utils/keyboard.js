@@ -466,21 +466,24 @@ const keyboards = {
     const isEn = lang === 'en';
     const rows = [];
 
-    // Receipt buttons for orders on this page
+    // Receipt buttons for orders on this page (each with customer name clearly visible)
     if (orders && orders.length > 0) {
-      const receiptButtons = [];
       orders.forEach((o, index) => {
-        const itemNumber = (page - 1) * 6 + index + 1;
-        receiptButtons.push({
-          text: `👁️ #${itemNumber} ${o.orderId}`,
-          callback_data: `admin_view_receipt_${o.orderId}_${currentFilter}_${page}`,
-          style: 'primary',
-        });
-      });
+        const itemNumber = (page - 1) * 5 + index + 1;
+        const name = o.customerName || o.userInfo?.firstName || '';
+        const namePart = name ? `የ ${name}` : '';
+        const btnText = isEn
+          ? `👁️ #${itemNumber} ${name ? `${name}'s Receipt` : 'Receipt'} (${o.orderId})`
+          : `👁️ #${itemNumber} ${namePart ? `${namePart} ደረሰኝ` : 'ደረሰኝ'} (${o.orderId})`;
 
-      for (let i = 0; i < receiptButtons.length; i += 2) {
-        rows.push(receiptButtons.slice(i, i + 2));
-      }
+        rows.push([
+          {
+            text: btnText,
+            callback_data: `admin_view_receipt_${o.orderId}_${currentFilter}_${page}`,
+            style: 'primary',
+          },
+        ]);
+      });
     }
 
     // Pagination row if multiple pages
