@@ -92,9 +92,14 @@ const msg = {
       `✅ Veo 3 – AI Video Generation 🎥\n` +
       `✅ Imagen 4 – AI Image Generation 🎨\n` +
       `✅ Antigravity & Jules AI Agent\n` +
-      `✅ Deep Research\n` +
-      `✅ NotebookLM Plus\n` +
-      `⚠️ No warranty if any problem happens after it's activated\n\n` +
+      `✅ Deep Research & NotebookLM Plus\n\n` +
+      `📜 <b>የግዢ ፖሊሲ (Terms & Warranty):</b>\n` +
+      `┌──────────────────────────┐\n` +
+      `│ ⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
+      `│ • ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ\n` +
+      `│   ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
+      `│ • <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
+      `└──────────────────────────┘\n\n` +
       `🚀 <b>Delivery is automatic after payment confirmation.</b>\n` +
       `<i>(ከክፍያ ማረጋገጫ በኋላ ሊንኩ ወዲያውኑ በራስ-ሰር ይላካል)</i>\n\n` +
       `⚙️ <i>የአድሚን መቆጣጠሪያ፦ ዋጋ ለመቀየር ወይም ስቶክ ለመጨመር ከታች ያሉትን አዝራሮች ይጠቀሙ።</i>`
@@ -109,18 +114,22 @@ const msg = {
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `📌 <b>Product:</b> Google Gemini Advanced (18 Months)\n` +
         `💰 <b>Price:</b> ${config.productPrice} ETB / item\n` +
-        `📦 <b>Available Stock:</b> 🟢 In Stock (Instant Delivery)\n\n` +
-        `✨ <b>Features:</b>\n` +
-        `✅ 18-month AI Pro plan\n` +
-        `✅ 5 TB cloud storage\n` +
-        `✅ Supports up to five users\n` +
-        `✅ Veo 3 – AI Video Generation 🎥\n` +
-        `✅ Imagen 4 – AI Image Generation 🎨\n` +
-        `✅ Antigravity & Jules AI Agent\n` +
-        `✅ Deep Research\n` +
-        `✅ NotebookLM Plus\n` +
-        `⚠️ No warranty if any problem happens after it's activated (but it rarely ever causes any problems)\n\n` +
-        `🚀 <b>Delivery is automatic after payment confirmation.</b>\n\n` +
+        `📦 <b>Status:</b> 🟢 In Stock (Instant Delivery)\n\n` +
+        `✨ <b>Key Features:</b>\n` +
+        `✅ 18-Month AI Pro Plan\n` +
+        `✅ 5 TB Cloud Storage\n` +
+        `✅ Up to 5 User Accounts\n` +
+        `✅ Veo 3 Video · Imagen 4 Image\n` +
+        `✅ Antigravity, Jules, Deep Research & NotebookLM\n\n` +
+        `📜 <b>Terms & Policy (የግዢ ፖሊሲ):</b>\n` +
+        `┌──────────────────────────┐\n` +
+        `│ ⚠️ <b>No Warranty Notice:</b>\n` +
+        `│ • No warranty if any problem happens\n` +
+        `│   after it's activated.\n` +
+        `│ • <i>(Rarely ever causes any issues)</i>\n` +
+        `│ • By purchasing, you accept these terms.\n` +
+        `└──────────────────────────┘\n\n` +
+        `🚀 <b>Automatic delivery right after payment confirmation.</b>\n\n` +
         `🔢 <b>Choose the quantity you want to purchase below:</b>`
       );
     }
@@ -130,19 +139,22 @@ const msg = {
       `━━━━━━━━━━━━━━━━━━━━━\n` +
       `📌 <b>ምርት:</b> Google Gemini Advanced (18 ወራት)\n` +
       `💰 <b>ዋጋ:</b> ${config.productPrice} ብር / በአንድ ሊንክ\n` +
-      `📦 <b>በስቶክ የሚገኝ:</b> 🟢 በስቶክ ይገኛል (ፈጣን አቅርቦት)\n\n` +
-      `✨ <b>Features (ጥቅሞች):</b>\n` +
-      `✅ 18-month AI Pro plan\n` +
-      `✅ 5 TB cloud storage\n` +
-      `✅ Supports up to five users\n` +
-      `✅ Veo 3 – AI Video Generation 🎥\n` +
-      `✅ Imagen 4 – AI Image Generation 🎨\n` +
-      `✅ Antigravity & Jules AI Agent\n` +
-      `✅ Deep Research\n` +
-      `✅ NotebookLM Plus\n` +
-      `⚠️ No warranty if any problem happens after it's activated (but it rarely ever causes any problems)\n\n` +
-      `🚀 <b>Delivery is automatic after payment confirmation.</b>\n` +
-      `<i>(ከክፍያ ማረጋገጫ በኋላ ሊንኩ ወዲያውኑ በራስ-ሰር ይላካል)</i>\n\n` +
+      `📦 <b>ሁኔታ:</b> 🟢 በስቶክ ይገኛል (ፈጣን አቅርቦት)\n\n` +
+      `✨ <b>ዋና ዋና ጥቅሞች (Features):</b>\n` +
+      `✅ የ 18 ወራት AI Pro Plan\n` +
+      `✅ 5 TB Cloud Storage\n` +
+      `✅ እስከ 5 ሰው መጋራት የሚያስችል\n` +
+      `✅ Veo 3 Video · Imagen 4 Image\n` +
+      `✅ Antigravity፣ Jules፣ Deep Research እና NotebookLM\n\n` +
+      `📜 <b>የግዢ ፖሊሲ እና ማስጠንቀቂያ (Terms & Policy):</b>\n` +
+      `┌──────────────────────────┐\n` +
+      `│ ⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
+      `│ • ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ\n` +
+      `│   ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
+      `│ • <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
+      `│ • በመግዛትዎ ይህንን ፖሊሲ ተቀብለዋል።\n` +
+      `└──────────────────────────┘\n\n` +
+      `🚀 <b>ክፍያዎ እንደተረጋገጠ ሊንኩ ወዲያውኑ ይላካል!</b>\n\n` +
       `🔢 <b>የሚፈልጉትን ብዛት ከታች ይምረጡ፦</b>`
     );
   },

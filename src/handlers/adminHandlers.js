@@ -1266,7 +1266,7 @@ const handleResend = adminOnly(async (ctx) => {
   const orderId = parts[1];
 
   if (!orderId) {
-    return ctx.reply('⚠️ የትዕዛዝ ቁጥር ያስገቡ፦ `/resend ORD-0001`', { parse_mode: 'Markdown' });
+    return ctx.reply('⚠️ የትዕዛዝ ቁጥር ያስገቡ፦ `/resend ORD-XXXX`', { parse_mode: 'Markdown' });
   }
 
   const order = await Order.findOne({ orderId: orderId.toUpperCase() });

@@ -27,13 +27,8 @@ const keyboards = {
           style: 'primary',
         },
       ],
-      // Prominent Green Stock Status & Buy Now (Side-by-side, 100% visible on all mobile screens)
+      // Full-width Buy Now button
       [
-        {
-          text: isEn ? '🟢 In Stock' : '🟢 በስቶክ አለ',
-          callback_data: 'buy',
-          style: 'success',
-        },
         {
           text: isEn ? '🛍️ Buy Now' : '🛍️ አሁን ግዛ',
           callback_data: 'buy',
