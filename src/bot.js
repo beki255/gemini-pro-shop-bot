@@ -97,6 +97,7 @@ bot.on('callback_query', async (ctx) => {
   if (data === 'cancel') return userHandlers.callbackCancel(ctx);
   if (data === 'main_menu') return userHandlers.callbackMainMenu(ctx);
   if (data === 'my_orders') return userHandlers.callbackMyOrders(ctx);
+  if (data.startsWith('my_orders_page_')) return userHandlers.callbackMyOrdersPage(ctx);
   if (data === 'help') return userHandlers.callbackHelp(ctx);
   if (data === 'contact') return userHandlers.callbackContact(ctx);
   if (data === 'set_lang_am') return userHandlers.callbackSetLanguage(ctx, 'am');

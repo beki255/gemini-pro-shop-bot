@@ -241,7 +241,7 @@ async function handleBuy(ctx) {
 }
 
 // ─── /myorders Command ─────────────────────────────────────
-async function handleMyOrders(ctx) {
+async function handleMyOrders(ctx, page = 1) {
   const user = await getOrSaveUser(ctx.from);
   if (!user.language) {
     return ctx.reply(msg.chooseLanguage(), {
@@ -250,10 +250,35 @@ async function handleMyOrders(ctx) {
     });
   }
   const lang = user.language;
-  const orders = await Order.find({ userId: ctx.from.id }).sort({ createdAt: -1 }).limit(10);
-  await ctx.reply(msg.myOrders(orders, lang), {
+
+  const PAGE_SIZE = 10;
+  const currentPage = Math.max(1, parseInt(page, 10) || 1);
+  const totalOrders = await Order.countDocuments({ userId: ctx.from.id });
+  const totalPages = Math.ceil(totalOrders / PAGE_SIZE) || 1;
+  const safePage = Math.min(currentPage, totalPages);
+
+  const orders = await Order.find({ userId: ctx.from.id })
+    .sort({ createdAt: -1 })
+    .skip((safePage - 1) * PAGE_SIZE)
+    .limit(PAGE_SIZE);
+
+  const text = msg.myOrders(orders, lang, safePage, totalPages, totalOrders);
+  const kb = keyboards.userOrdersPagination(safePage, totalPages, lang);
+
+  if (ctx.callbackQuery) {
+    try {
+      return await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        ...kb,
+      });
+    } catch {
+      // If edit fails, fallback to reply
+    }
+  }
+
+  return ctx.reply(text, {
     parse_mode: 'Markdown',
-    ...keyboards.backToMain(lang),
+    ...kb,
   });
 }
 
@@ -810,8 +835,17 @@ async function callbackMainMenu(ctx) {
 
 // ─── Callback: "my_orders" ─────────────────────────────────
 async function callbackMyOrders(ctx) {
-  await ctx.answerCbQuery();
-  await handleMyOrders(ctx);
+  await ctx.answerCbQuery().catch(() => {});
+  return handleMyOrders(ctx, 1);
+}
+
+// ─── Callback: "my_orders_page_X" ──────────────────────────
+async function callbackMyOrdersPage(ctx) {
+  await ctx.answerCbQuery().catch(() => {});
+  const data = ctx.callbackQuery ? ctx.callbackQuery.data : '';
+  const pageStr = data.replace('my_orders_page_', '');
+  const page = parseInt(pageStr, 10) || 1;
+  return handleMyOrders(ctx, page);
 }
 
 // ─── Callback: "help" ──────────────────────────────────────
@@ -849,6 +883,7 @@ module.exports = {
   callbackCancel,
   callbackMainMenu,
   callbackMyOrders,
+  callbackMyOrdersPage,
   callbackHelp,
   callbackContact,
   sendOutOfStockMessage,

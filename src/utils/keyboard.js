@@ -244,6 +244,45 @@ const keyboards = {
     ]);
   },
 
+  // ─── USER ORDERS PAGINATION ────────────────────────────────
+  userOrdersPagination(page = 1, totalPages = 1, lang = 'am') {
+    const isEn = lang === 'en';
+    const rows = [];
+
+    // Pagination row if multiple pages
+    if (totalPages > 1) {
+      const navRow = [];
+      if (page > 1) {
+        navRow.push({
+          text: isEn ? '⬅️ Prev' : '⬅️ ቀዳሚ',
+          callback_data: `my_orders_page_${page - 1}`,
+        });
+      }
+      navRow.push({
+        text: `📄 ${page}/${totalPages}`,
+        callback_data: 'noop',
+      });
+      if (page < totalPages) {
+        navRow.push({
+          text: isEn ? 'Next ➡️' : 'ቀጣይ ➡️',
+          callback_data: `my_orders_page_${page + 1}`,
+        });
+      }
+      rows.push(navRow);
+    }
+
+    // Back to main menu button
+    rows.push([
+      {
+        text: isEn ? '🏠 Main Menu' : '🏠 ዋና ማውጫ',
+        callback_data: 'main_menu',
+        style: 'primary',
+      },
+    ]);
+
+    return Markup.inlineKeyboard(rows);
+  },
+
   // ─── PENDING VERIFICATION KEYBOARD (Waiting for Admin Approval) ───
   pendingVerification(orderId, lang = 'am', buttonLabel = null) {
     const isEn = lang === 'en';

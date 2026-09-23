@@ -421,7 +421,8 @@ const msg = {
   },
 
   // ─── MY ORDERS ─────────────────────────────────────────────
-  myOrders(orders, lang = 'am') {
+  myOrders(orders, lang = 'am', page = 1, totalPages = 1, totalCount = null) {
+    const total = totalCount !== null ? totalCount : (orders ? orders.length : 0);
     if (!orders || orders.length === 0) {
       return lang === 'en'
         ? `📦 *You have no orders yet.*\n\nTap /buy to get started!`
@@ -434,16 +435,36 @@ const msg = {
       am: { pending: 'በጥበቃ ላይ', approved: 'ተፈቅዷል', rejected: 'ውድቅ ተደርጓል' },
     };
 
-    let text = lang === 'en'
-      ? `📦 *Your Order History (${orders.length})*\n\n`
-      : `📦 *የትዕዛዝ ታሪክዎ (${orders.length})*\n\n`;
+    const pageInfo = totalPages > 1
+      ? (lang === 'en' ? ` — Page ${page}/${totalPages}` : ` — ገጽ ${page}/${totalPages}`)
+      : '';
 
-    orders.slice(0, 10).forEach((order, i) => {
+    let text = lang === 'en'
+      ? `📦 *Your Order History (${total} Orders Total)${pageInfo}*\n━━━━━━━━━━━━━━━━━━━━\n\n`
+      : `📦 *የትዕዛዝ ታሪክዎ (ጠቅላላ ${total} ትዕዛዞች)${pageInfo}*\n━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    const PAGE_SIZE = 10;
+    const startIndex = (page - 1) * PAGE_SIZE;
+
+    orders.forEach((order, i) => {
+      const itemNumber = startIndex + i + 1;
       const date = new Date(order.createdAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'am-ET');
       const st = statusText[lang] ? statusText[lang][order.status] : order.status;
-      text += `${i + 1}. ${statusEmoji[order.status]} \`${order.orderId}\`\n`;
-      text += `   💰 ${order.amount} ${lang === 'en' ? 'ETB' : 'ብር'} | 📅 ${date} | ${st}\n\n`;
+      const emoji = statusEmoji[order.status] || '📦';
+      const quantityText = order.quantity && order.quantity > 1
+        ? (lang === 'en' ? ` (${order.quantity} links)` : ` (${order.quantity} ሊንክ)`)
+        : '';
+
+      text += `*${itemNumber}.* ${emoji} \`${order.orderId}\`${quantityText}\n`;
+      text += `   💰 *${order.amount}* ${lang === 'en' ? 'ETB' : 'ብር'} | 📅 ${date} | *${st}*\n\n`;
     });
+
+    if (totalPages > 1) {
+      text += lang === 'en'
+        ? `_Use the buttons below to switch pages._`
+        : `_ገጾቹን ለመቀያየር ከታች ያሉትን አዝራሮች ይጠቀሙ።_`;
+    }
+
     return text;
   },
 
