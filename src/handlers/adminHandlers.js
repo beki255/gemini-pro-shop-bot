@@ -64,13 +64,71 @@ async function getCustomerDetails(userId, cachedUserInfo) {
 const handleAdmin = adminOnly(async (ctx) => {
   const user = await User.findOne({ telegramId: ctx.from.id });
   const lang = user && user.language ? user.language : 'am';
-  await ctx.reply(
-    lang === 'en' ? '🔧 *Admin Panel*\n\nPlease select an option:' : '🔧 *የአስተዳዳሪ ፓነል (Admin Panel)*\n\nእባክዎ ምርጫ ያድርጉ:',
-    {
-      parse_mode: 'Markdown',
+  const isEn = lang === 'en';
+  const settingsService = require('../services/settingsService');
+  const isOpen = settingsService.getIsAcceptingOrders();
+
+  const statusBadge = isOpen
+    ? (isEn ? '🟢 <b>OPEN</b> (Accepting Orders)' : '🟢 <b>ክፍት ነው</b> (ትዕዛዝ ይቀበላል)')
+    : (isEn ? '🔴 <b>PAUSED / OUT OF STOCK</b> (No Orders Accepted)' : '🔴 <b>ስቶክ አልቋል / ቆሟል</b> (ትዕዛዝ አይቀበልም)');
+
+  const panelMsg = isEn
+    ? `🔧 <b>Admin Control Panel</b>\n━━━━━━━━━━━━━━━━━━━━━\n🏪 <b>Store Status:</b> ${statusBadge}\n\n<i>Use the button below to toggle accepting customer orders:</i>`
+    : `🔧 <b>የአስተዳዳሪ መቆጣጠሪያ ፓነል</b>\n━━━━━━━━━━━━━━━━━━━━━\n🏪 <b>የሱቁ ሁኔታ:</b> ${statusBadge}\n\n<i>ስቶክ ሲያልቅ ወይም ደንበኞች እንዳይከፍሉ ከታች ያለውን አዝራር ይጫኑ፦</i>`;
+
+  if (ctx.callbackQuery) {
+    try {
+      await ctx.editMessageText(panelMsg, {
+        parse_mode: 'HTML',
+        ...keyboards.adminPanel(lang),
+      });
+      return;
+    } catch {}
+  }
+
+  await ctx.reply(panelMsg, {
+    parse_mode: 'HTML',
+    ...keyboards.adminPanel(lang),
+  });
+});
+
+// ─── Callback: Toggle store status (Open vs Out of Stock) ─
+const callbackToggleStoreStatus = adminOnly(async (ctx) => {
+  const settingsService = require('../services/settingsService');
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  const newStatus = await settingsService.toggleAcceptingOrders();
+
+  const alertMsg = newStatus
+    ? (isEn
+        ? '🟢 Store Opened!\nCustomers can now browse and place orders.'
+        : '🟢 ሱቁ ክፍት ተደርጓል!\nደንበኞች እንደገና ማዘዝና መክፈል ይችላሉ።')
+    : (isEn
+        ? '🔴 Store Paused (Out of Stock)!\nCustomers clicking "Buy Now" will see out-of-stock message. No payments will be accepted.'
+        : '🔴 ስቶክ አልቋል (ትዕዛዝ ቆሟል)!\nደንበኞች "ምርት ግዛ" ሲሉ የስቶክ ማለቂያ መልዕክት ይደርሳቸዋል፤ ምንም ክፍያ አይቀበልም።');
+
+  await ctx.answerCbQuery(alertMsg, { show_alert: true }).catch(() => {});
+
+  const statusBadge = newStatus
+    ? (isEn ? '🟢 <b>OPEN</b> (Accepting Orders)' : '🟢 <b>ክፍት ነው</b> (ትዕዛዝ ይቀበላል)')
+    : (isEn ? '🔴 <b>PAUSED / OUT OF STOCK</b> (No Orders Accepted)' : '🔴 <b>ስቶክ አልቋል / ቆሟል</b> (ትዕዛዝ አይቀበልም)');
+
+  const panelMsg = isEn
+    ? `🔧 <b>Admin Control Panel</b>\n━━━━━━━━━━━━━━━━━━━━━\n🏪 <b>Store Status:</b> ${statusBadge}\n\n<i>Use the button below to toggle accepting customer orders:</i>`
+    : `🔧 <b>የአስተዳዳሪ መቆጣጠሪያ ፓነል</b>\n━━━━━━━━━━━━━━━━━━━━━\n🏪 <b>የሱቁ ሁኔታ:</b> ${statusBadge}\n\n<i>ስቶክ ሲያልቅ ወይም ደንበኞች እንዳይከፍሉ ከታች ያለውን አዝራር ይጫኑ፦</i>`;
+
+  try {
+    await ctx.editMessageText(panelMsg, {
+      parse_mode: 'HTML',
       ...keyboards.adminPanel(lang),
-    }
-  );
+    });
+  } catch {
+    try {
+      await ctx.editMessageReplyMarkup(keyboards.adminPanel(lang).reply_markup);
+    } catch {}
+  }
 });
 
 // ─── /addstock <link> — Add single link or start interactive flow ──
@@ -494,7 +552,7 @@ const handleOrders = adminOnly(async (ctx, filterOverride, pageOverride) => {
       ? `${headerEmoji} <b>No orders found under "${titleEn}".</b>`
       : `${headerEmoji} <b>በ «${titleAm}» ስር ምንም ትዕዛዝ አልተገኘም።</b>`;
 
-    const kb = keyboards.adminOrdersPagination(filter, 1, 1, lang);
+    const kb = keyboards.adminOrdersPagination(filter, 1, 1, lang, []);
     if (ctx.callbackQuery) {
       try {
         return await ctx.editMessageText(emptyText, { parse_mode: 'HTML', ...kb });
@@ -544,7 +602,7 @@ const handleOrders = adminOnly(async (ctx, filterOverride, pageOverride) => {
     replyText += `\n`;
   });
 
-  const kb = keyboards.adminOrdersPagination(filter, currentPage, totalPages, lang);
+  const kb = keyboards.adminOrdersPagination(filter, currentPage, totalPages, lang, orders);
 
   if (ctx.callbackQuery) {
     try {
@@ -1090,34 +1148,150 @@ async function handleRejectionReason(ctx) {
   });
 }
 
+// ─── Callback: View Order Receipt (admin_view_receipt_<orderId>_<filter>_<page>) ───
+const callbackViewReceipt = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery('🖼️ ደረሰኝ በማምጣት ላይ...').catch(() => {});
+  const data = ctx.callbackQuery.data.replace('admin_view_receipt_', '');
+  const parts = data.split('_');
+  const orderId = parts[0];
+  const returnFilter = parts[1] || 'all';
+  const returnPage = parseInt(parts[2], 10) || 1;
+
+  const order = await Order.findOne({ orderId });
+  if (!order) {
+    return ctx.reply(`❌ ትዕዛዝ ${orderId} አልተገኘም።`);
+  }
+
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  const cust = await getCustomerDetails(order.userId, order.userInfo);
+  const statusBadge =
+    order.status === 'approved'
+      ? (isEn ? '✅ <b>Approved (ተፈቅዷል)</b>' : '✅ <b>ተፈቅዷል</b>')
+      : (order.status === 'rejected'
+          ? (isEn ? '❌ <b>Rejected (ውድቅ ተደርጓል)</b>' : '❌ <b>ውድቅ ተደርጓል</b>')
+          : (isEn ? '⏳ <b>Pending Review (በጥበቃ ላይ)</b>' : '⏳ <b>በጥበቃ ላይ</b>'));
+
+  const dateStr = new Date(order.createdAt).toLocaleString('am-ET');
+  const unitPrice = config.productPrice || 250;
+  const qty = order.quantity || 1;
+
+  let caption =
+    `🧾 <b>${isEn ? 'Payment Receipt & Order Details' : 'የትዕዛዝ ደረሰኝ እና ሙሉ መረጃ'}</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `🔢 <b>የትዕዛዝ ቁጥር:</b> <code>${escapeHtml(order.orderId)}</code>\n` +
+    `📊 <b>ሁኔታ:</b> ${statusBadge}\n` +
+    `👤 <b>ደንበኛ:</b> ${cust.safeFullName}\n` +
+    `🔗 <b>ዩዘርኔም:</b> ${cust.safeUsername}\n` +
+    `🆔 <b>Telegram ID:</b> <code>${order.userId}</code>\n` +
+    `📦 <b>የተመረጠ ብዛት:</b> <b>${qty} ሊንክ</b>\n` +
+    `💰 <b>የተከፈለ ክፍያ:</b> <b>${order.amount} ብር</b> (${qty} × ${unitPrice} ብር)\n` +
+    `💳 <b>የክፍያ መንገድ:</b> <b>${escapeHtml(order.paymentMethod || 'CBE')}</b>\n` +
+    `📅 <b>የታዘዘበት ቀን:</b> ${dateStr}\n`;
+
+  if (order.status === 'rejected' && order.adminNote) {
+    caption += `📝 <b>ውድቅ የተደረገበት ምክንያት:</b> <i>${escapeHtml(order.adminNote)}</i>\n`;
+  }
+  if (order.status === 'approved' && order.deliveredLinks && order.deliveredLinks.length > 0) {
+    caption += `🎁 <b>የተላከ ሊንክ:</b> ${order.deliveredLinks.length} ሊንክ ተልኳል\n`;
+  }
+
+  const kb = keyboards.adminOrderReceiptView(order, returnFilter, returnPage, lang);
+
+  // Try sending receipt photo or document if file_id exists
+  if (order.receiptFileId) {
+    try {
+      return await ctx.replyWithPhoto(order.receiptFileId, {
+        caption,
+        parse_mode: 'HTML',
+        ...kb,
+      });
+    } catch (photoErr) {
+      try {
+        return await ctx.replyWithDocument(order.receiptFileId, {
+          caption,
+          parse_mode: 'HTML',
+          ...kb,
+        });
+      } catch (docErr) {
+        console.error('Failed to send receipt by fileId:', docErr.message);
+      }
+    }
+  }
+
+  // Fallback to local file if exists
+  if (order.receiptPath) {
+    try {
+      const fs = require('fs-extra');
+      if (fs.existsSync(order.receiptPath)) {
+        return await ctx.replyWithPhoto(
+          { source: order.receiptPath },
+          {
+            caption,
+            parse_mode: 'HTML',
+            ...kb,
+          }
+        );
+      }
+    } catch (fsErr) {
+      console.error('Failed to send receipt from local path:', fsErr.message);
+    }
+  }
+
+  // If no image file found, reply with rich text details
+  caption += `\n⚠️ <i>ለዚህ ትዕዛዝ በቴሌግራም የተያያዘ የደረሰኝ ምስል አልተገኘም።</i>`;
+  return ctx.reply(caption, {
+    parse_mode: 'HTML',
+    ...kb,
+  });
+});
+
 // ─── Callback: details_<orderId> ─────────────────────────
 async function callbackDetails(ctx) {
   if (!isAdmin(ctx)) return ctx.answerCbQuery('🚫 Admin only');
-  await ctx.answerCbQuery();
-
   const orderId = ctx.callbackQuery.data.replace('details_', '');
-  const order = await Order.findOne({ orderId });
-  if (!order) return ctx.reply('❌ ትዕዛዝ አልተገኘም።');
-
-  const cust = await getCustomerDetails(order.userId, order.userInfo);
-
-  const text =
-    `🔍 <b>ትዕዛዝ ዝርዝር (Order Details)</b>\n\n` +
-    `🔢 ትዕዛዝ: <code>${escapeHtml(order.orderId)}</code>\n` +
-    `👤 ስም: <b>${cust.safeFullName}</b>\n` +
-    `🔗 ዩዘርኔም: <b>${cust.safeUsername}</b>\n` +
-    `🆔 Telegram ID: <code>${order.userId}</code>\n` +
-    `📦 ብዛት: <b>${order.quantity || 1} ሊንክ</b>\n` +
-    `💰 መጠን: <b>${order.amount} ብር</b>\n` +
-    `💳 ክፍያ: <b>${escapeHtml(order.paymentMethod)}</b>\n` +
-    `📊 ሁኔታ: <b>${escapeHtml(order.status)}</b>\n` +
-    `📅 ቀን: ${new Date(order.createdAt).toLocaleString('am-ET')}`;
-
-  await ctx.reply(text, {
-    parse_mode: 'HTML',
-    ...keyboards.adminPanel('am'),
-  });
+  ctx.callbackQuery.data = `admin_view_receipt_${orderId}_all_1`;
+  return callbackViewReceipt(ctx);
 }
+
+// ─── Callback: resend_link_<orderId> ─────────────────────
+const callbackResendOrderLink = adminOnly(async (ctx) => {
+  const orderId = ctx.callbackQuery.data.replace('resend_link_', '');
+  await ctx.answerCbQuery('🔄 በመላክ ላይ...').catch(() => {});
+
+  const order = await Order.findOne({ orderId });
+  if (!order) return ctx.reply(`❌ ትዕዛዝ ${orderId} አልተገኘም።`);
+
+  const links =
+    order.deliveredLinks && order.deliveredLinks.length > 0
+      ? order.deliveredLinks
+      : order.deliveredLink
+      ? [order.deliveredLink]
+      : [];
+
+  if (links.length === 0) {
+    return ctx.reply(`⚠️ ለትዕዛዝ ${orderId} የተላከ ሊንክ አልተገኘም።`);
+  }
+
+  try {
+    const customer = await User.findOne({ telegramId: order.userId });
+    const custLang = customer && customer.language ? customer.language : 'am';
+    await ctx.telegram.sendMessage(
+      order.userId,
+      msg.orderApproved(links, order.orderId, custLang),
+      {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...keyboards.deliveredLinksKeyboard(links, custLang),
+      }
+    );
+    return ctx.reply(`✅ ሊንኩ ዳግም ወደ ደንበኛው (${order.userId}) በተሳካ ሁኔታ ተልኳል!`);
+  } catch (err) {
+    return ctx.reply(`❌ ወደ ደንበኛው መላክ አልተቻለም: ${err.message}`);
+  }
+});
 
 // ─── Admin panel callbacks ────────────────────────────────
 async function callbackAdminStats(ctx) {
@@ -1783,5 +1957,8 @@ module.exports = {
   handleUsers,
   callbackUsers,
   callbackUsersPage,
+  callbackToggleStoreStatus,
+  callbackViewReceipt,
+  callbackResendOrderLink,
 };
 

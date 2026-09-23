@@ -105,11 +105,6 @@ const keyboards = {
 
     rows.push([
       {
-        text: isEn ? '🔄 Refresh' : '🔄 አድስ',
-        callback_data: 'refresh_qty',
-        style: 'primary',
-      },
-      {
         text: isEn ? '❌ Cancel' : '❌ ሰርዝ',
         callback_data: 'cancel',
         style: 'danger',
@@ -283,8 +278,8 @@ const keyboards = {
             ? `🚀 Open Link ${idx + 1} in Browser`
             : `🚀 ሊንክ ${idx + 1} በ Browser ክፈት`
           : isEn
-          ? `🚀 Open Link in Browser (Activate)`
-          : `🚀 ሊንኩን በ Browser ክፈት (አግብር)`;
+            ? `🚀 Open Link in Browser (Activate)`
+            : `🚀 ሊንኩን በ Browser ክፈት (አግብር)`;
       buttons.push([
         {
           text: label,
@@ -320,7 +315,19 @@ const keyboards = {
   // ─── ADMIN PANEL (Primary Blue) ────────────────────────────
   adminPanel(lang = 'am') {
     const isEn = lang === 'en';
+    const settingsService = require('../services/settingsService');
+    const isAcceptingOrders = settingsService.getIsAcceptingOrders();
+
+    const statusBtn = {
+      text: isAcceptingOrders
+        ? (isEn ? '🟢 Store Status: OPEN (Accepting Orders)' : '🟢 ሱቁ ክፍት ነው (ትዕዛዝ ይቀበላል)')
+        : (isEn ? '🔴 Store Status: PAUSED (Out of Stock)' : '🔴 ስቶክ አልቋል (ትዕዛዝ ቆሟል)'),
+      callback_data: 'admin_toggle_store_status',
+      style: isAcceptingOrders ? 'success' : 'danger',
+    };
+
     return Markup.inlineKeyboard([
+      [statusBtn],
       [
         {
           text: isEn ? '📊 Statistics' : '📊 ስታቲስቲክስ',
@@ -455,9 +462,26 @@ const keyboards = {
   },
 
   // ─── ADMIN ORDERS LIST PAGINATION & FILTER SWITCH ───────────
-  adminOrdersPagination(currentFilter = 'all', page = 1, totalPages = 1, lang = 'am') {
+  adminOrdersPagination(currentFilter = 'all', page = 1, totalPages = 1, lang = 'am', orders = []) {
     const isEn = lang === 'en';
     const rows = [];
+
+    // Receipt buttons for orders on this page
+    if (orders && orders.length > 0) {
+      const receiptButtons = [];
+      orders.forEach((o, index) => {
+        const itemNumber = (page - 1) * 6 + index + 1;
+        receiptButtons.push({
+          text: `👁️ #${itemNumber} ${o.orderId}`,
+          callback_data: `admin_view_receipt_${o.orderId}_${currentFilter}_${page}`,
+          style: 'primary',
+        });
+      });
+
+      for (let i = 0; i < receiptButtons.length; i += 2) {
+        rows.push(receiptButtons.slice(i, i + 2));
+      }
+    }
 
     // Pagination row if multiple pages
     if (totalPages > 1) {
@@ -512,6 +536,55 @@ const keyboards = {
       {
         text: isEn ? '🔙 Orders Menu' : '🔙 የትዕዛዝ ማውጫ',
         callback_data: 'admin_orders',
+      },
+    ]);
+    rows.push([
+      {
+        text: isEn ? '🏠 Admin Panel' : '🏠 ዋና ፓነል',
+        callback_data: 'admin_panel',
+      },
+    ]);
+
+    return Markup.inlineKeyboard(rows);
+  },
+
+  // ─── ADMIN ORDER RECEIPT VIEW KEYBOARD ─────────────────────
+  adminOrderReceiptView(order, returnFilter = 'all', returnPage = 1, lang = 'am') {
+    const isEn = lang === 'en';
+    const rows = [];
+
+    if (order.status === 'pending') {
+      rows.push([
+        {
+          text: isEn ? '✅ Approve Order' : '✅ አጽድቅ (Approve)',
+          callback_data: `approve_${order.orderId}`,
+          style: 'success',
+        },
+        {
+          text: isEn ? '❌ Reject Order' : '❌ አትቀበል (Reject)',
+          callback_data: `reject_${order.orderId}`,
+          style: 'danger',
+        },
+      ]);
+    } else if (order.status === 'approved') {
+      rows.push([
+        {
+          text: isEn ? '🔄 Resend Links to Buyer' : '🔄 ሊንኮቹን ዳግም ላክ',
+          callback_data: `resend_link_${order.orderId}`,
+          style: 'primary',
+        },
+      ]);
+    }
+
+    rows.push([
+      {
+        text: isEn ? '🔙 Back to Orders' : '🔙 ወደ ትዕዛዞች ዝርዝር',
+        callback_data: `admin_orders_page_${returnFilter}_${returnPage}`,
+        style: 'primary',
+      },
+      {
+        text: isEn ? '🏠 Admin Panel' : '🏠 ዋና ፓነል',
+        callback_data: 'admin_panel',
       },
     ]);
 

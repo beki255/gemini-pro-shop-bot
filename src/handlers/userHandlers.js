@@ -157,6 +157,15 @@ async function handleBuy(ctx) {
   }
   const lang = user.language;
 
+  // Check if store is accepting orders (Admin stock pause toggle)
+  const settingsService = require('../services/settingsService');
+  if (!settingsService.getIsAcceptingOrders()) {
+    return ctx.reply(msg.noStock(lang), {
+      parse_mode: 'HTML',
+      ...keyboards.backToMain(lang),
+    });
+  }
+
   // Check live available stock
   const reservationService = require('../services/reservationService');
   const available = await reservationService.getAvailableStockCount();
@@ -221,6 +230,28 @@ async function handleHelp(ctx) {
 // ─── Callback: "buy" button ────────────────────────────────
 async function callbackBuy(ctx) {
   await ctx.answerCbQuery();
+  const settingsService = require('../services/settingsService');
+  if (!settingsService.getIsAcceptingOrders()) {
+    const lang = await getUserLang(ctx.from.id);
+    try {
+      return await ctx.editMessageCaption(msg.noStock(lang), {
+        parse_mode: 'HTML',
+        ...keyboards.backToMain(lang),
+      });
+    } catch {
+      try {
+        return await ctx.editMessageText(msg.noStock(lang), {
+          parse_mode: 'HTML',
+          ...keyboards.backToMain(lang),
+        });
+      } catch {
+        return ctx.reply(msg.noStock(lang), {
+          parse_mode: 'HTML',
+          ...keyboards.backToMain(lang),
+        });
+      }
+    }
+  }
   await handleBuy(ctx);
 }
 
@@ -246,6 +277,23 @@ async function callbackRefreshMenu(ctx) {
 // ─── Callback: "refresh_qty" ───────────────────────────────
 async function callbackRefreshQty(ctx) {
   const lang = await getUserLang(ctx.from.id);
+  const settingsService = require('../services/settingsService');
+  if (!settingsService.getIsAcceptingOrders()) {
+    const alertText = lang === 'en' ? '🔴 Out of stock' : '🔴 ስቶክ አልቋል';
+    await ctx.answerCbQuery(alertText).catch(() => {});
+    try {
+      return await ctx.editMessageCaption(msg.noStock(lang), {
+        parse_mode: 'HTML',
+        ...keyboards.backToMain(lang),
+      });
+    } catch {
+      return ctx.editMessageText(msg.noStock(lang), {
+        parse_mode: 'HTML',
+        ...keyboards.backToMain(lang),
+      }).catch(() => {});
+    }
+  }
+
   const reservationService = require('../services/reservationService');
   const count = await reservationService.getAvailableStockCount();
   const alertText = lang === 'en'
@@ -285,8 +333,16 @@ async function callbackSelectQty(ctx, qty) {
   if (ctx.callbackQuery) {
     await ctx.answerCbQuery().catch(() => {});
   }
-  const quantity = Math.max(1, parseInt(qty) || 1);
   const lang = await getUserLang(ctx.from.id);
+  const settingsService = require('../services/settingsService');
+  if (!settingsService.getIsAcceptingOrders()) {
+    return ctx.reply(msg.noStock(lang), {
+      parse_mode: 'HTML',
+      ...keyboards.backToMain(lang),
+    });
+  }
+
+  const quantity = Math.max(1, parseInt(qty) || 1);
   const unitPrice = config.productPrice || 250;
   const total = quantity * unitPrice;
 
@@ -314,6 +370,14 @@ async function callbackSelectQty(ctx, qty) {
 async function callbackCustomQty(ctx) {
   await ctx.answerCbQuery();
   const lang = await getUserLang(ctx.from.id);
+  const settingsService = require('../services/settingsService');
+  if (!settingsService.getIsAcceptingOrders()) {
+    return ctx.reply(msg.noStock(lang), {
+      parse_mode: 'HTML',
+      ...keyboards.backToMain(lang),
+    });
+  }
+
   const unitPrice = config.productPrice || 250;
 
   ctx.session = ctx.session || {};
@@ -343,6 +407,16 @@ async function handleCustomQtyInput(ctx) {
   if (!session.awaitingCustomQty) return false;
 
   const lang = await getUserLang(ctx.from.id);
+  const settingsService = require('../services/settingsService');
+  if (!settingsService.getIsAcceptingOrders()) {
+    session.awaitingCustomQty = false;
+    await ctx.reply(msg.noStock(lang), {
+      parse_mode: 'HTML',
+      ...keyboards.backToMain(lang),
+    });
+    return true;
+  }
+
   const input = ctx.message.text ? ctx.message.text.trim() : '';
   const qty = parseInt(input);
 
@@ -381,6 +455,14 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
     await ctx.answerCbQuery().catch(() => {});
   }
   const lang = await getUserLang(ctx.from.id);
+  const settingsService = require('../services/settingsService');
+  if (!settingsService.getIsAcceptingOrders()) {
+    return ctx.reply(msg.noStock(lang), {
+      parse_mode: 'HTML',
+      ...keyboards.backToMain(lang),
+    });
+  }
+
   const qty = Math.max(1, parseInt(quantity) || 1);
 
   // Attempt to reserve stock if available in DB (supports on-demand when 0)

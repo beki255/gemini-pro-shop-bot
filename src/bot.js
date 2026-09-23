@@ -116,6 +116,7 @@ bot.on('callback_query', async (ctx) => {
 
   // Admin callbacks
   if (data === 'open_admin' || data === 'admin_panel') return adminHandlers.handleAdmin(ctx);
+  if (data === 'admin_toggle_store_status') return adminHandlers.callbackToggleStoreStatus(ctx);
   if (data === 'admin_orders') {
     await ctx.answerCbQuery().catch(() => {});
     return adminHandlers.handleOrders(ctx);
@@ -138,6 +139,8 @@ bot.on('callback_query', async (ctx) => {
   if (data.startsWith('approve_')) return adminHandlers.callbackApprove(ctx);
   if (data.startsWith('reject_')) return adminHandlers.callbackReject(ctx);
   if (data.startsWith('details_')) return adminHandlers.callbackDetails(ctx);
+  if (data.startsWith('admin_view_receipt_')) return adminHandlers.callbackViewReceipt(ctx);
+  if (data.startsWith('resend_link_')) return adminHandlers.callbackResendOrderLink(ctx);
   if (data === 'admin_stats') return adminHandlers.callbackAdminStats(ctx);
   if (data === 'admin_stock') return adminHandlers.callbackAdminStock(ctx);
   if (data === 'admin_change_price') return adminHandlers.callbackChangePrice(ctx);
