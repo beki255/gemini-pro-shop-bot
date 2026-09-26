@@ -420,6 +420,13 @@ const keyboards = {
       ],
       [
         {
+          text: isEn ? '💳 Active Checkouts' : '💳 በክፍያ ላይ ያሉ (Checkouts)',
+          callback_data: 'admin_checkouts',
+          style: 'primary',
+        },
+      ],
+      [
+        {
           text: isEn ? '💰 Change Price' : '💰 ዋጋ ቀይር',
           callback_data: 'admin_change_price',
           style: 'primary',
@@ -819,6 +826,118 @@ const keyboards = {
         },
       ],
     ]);
+  },
+
+  // ─── ADMIN CHECKOUTS FILTER MENU ───────────────────────────
+  adminCheckoutsMenu(counts = {}, lang = 'am') {
+    const isEn = lang === 'en';
+    const awaiting = counts.awaiting || 0;
+    const completed = counts.completed || 0;
+    const cancelled = counts.cancelled || 0;
+    const total = counts.total || 0;
+
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? `⏳ Awaiting Receipt (${awaiting})` : `⏳ ደረሰኝ በመጠበቅ ላይ (${awaiting})`,
+          callback_data: 'admin_checkouts_filter_awaiting',
+          style: 'primary',
+        },
+      ],
+      [
+        {
+          text: isEn ? `✅ Completed / Uploaded (${completed})` : `✅ ደረሰኝ የላኩ / የተጠናቀቁ (${completed})`,
+          callback_data: 'admin_checkouts_filter_completed',
+          style: 'primary',
+        },
+      ],
+      [
+        {
+          text: isEn ? `❌ Cancelled / Expired (${cancelled})` : `❌ የተሰረዙ / ያለፈባቸው (${cancelled})`,
+          callback_data: 'admin_checkouts_filter_cancelled',
+          style: 'primary',
+        },
+      ],
+      [
+        {
+          text: isEn ? `📋 All Checkouts (${total})` : `📋 ሁሉም የክፍያ ሙከራዎች (${total})`,
+          callback_data: 'admin_checkouts_filter_all',
+          style: 'primary',
+        },
+      ],
+      [
+        {
+          text: isEn ? '🔙 Back to Admin Panel' : '🔙 ወደ ዋና ፓነል',
+          callback_data: 'admin_panel',
+          style: 'primary',
+        },
+      ],
+    ]);
+  },
+
+  // ─── ADMIN CHECKOUTS PAGINATION WITH DIRECT DM BUTTONS ──────
+  adminCheckoutsPagination(currentFilter = 'awaiting', page = 1, totalPages = 1, lang = 'am', attempts = []) {
+    const isEn = lang === 'en';
+    const rows = [];
+
+    // Quick direct DM buttons for customers on this page
+    if (attempts && attempts.length > 0) {
+      attempts.forEach((att, idx) => {
+        const itemNumber = (page - 1) * 5 + idx + 1;
+        const name = att.customerName || att.userInfo?.firstName || `User ${att.userId}`;
+        const rawUsername = att.userInfo?.username;
+        const dmUrl = rawUsername
+          ? `https://t.me/${rawUsername}`
+          : `tg://user?id=${att.userId}`;
+
+        rows.push([
+          {
+            text: `💬 #${itemNumber} DM ${name.substring(0, 14)} (${att.paymentMethod} · ${att.amount} ETB)`,
+            url: dmUrl,
+          },
+        ]);
+      });
+    }
+
+    // Pagination row if multiple pages
+    if (totalPages > 1) {
+      const navRow = [];
+      if (page > 1) {
+        navRow.push({
+          text: isEn ? '⬅️ Prev' : '⬅️ ቀዳሚ',
+          callback_data: `admin_checkouts_page_${currentFilter}_${page - 1}`,
+        });
+      }
+      navRow.push({
+        text: `📄 ${page}/${totalPages}`,
+        callback_data: 'noop',
+      });
+      if (page < totalPages) {
+        navRow.push({
+          text: isEn ? 'Next ➡️' : 'ቀጣይ ➡️',
+          callback_data: `admin_checkouts_page_${currentFilter}_${page + 1}`,
+        });
+      }
+      rows.push(navRow);
+    }
+
+    // Navigation and menu controls
+    rows.push([
+      {
+        text: isEn ? '🔄 Refresh' : '🔄 አድስ',
+        callback_data: `admin_checkouts_page_${currentFilter}_${page}`,
+      },
+      {
+        text: isEn ? '📂 Categories' : '📂 ምድቦች',
+        callback_data: 'admin_checkouts',
+      },
+      {
+        text: isEn ? '🔙 Admin Panel' : '🔙 ዋና ፓነል',
+        callback_data: 'admin_panel',
+      },
+    ]);
+
+    return Markup.inlineKeyboard(rows);
   },
 };
 

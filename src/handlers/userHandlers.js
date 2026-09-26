@@ -5,6 +5,7 @@ const config = require('../config');
 const User = require('../models/User');
 const Stock = require('../models/Stock');
 const Order = require('../models/Order');
+const CheckoutAttempt = require('../models/CheckoutAttempt');
 const keyboards = require('../utils/keyboard');
 const msg = require('../utils/messages');
 
@@ -507,6 +508,95 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
     reservedAt: Date.now(),
   };
 
+  // Record checkout attempt in database (supersede any prior active attempt for this user)
+  try {
+    await CheckoutAttempt.updateMany(
+      { userId: ctx.from.id, status: 'awaiting_receipt' },
+      { $set: { status: 'cancelled', cancelledAt: new Date() } }
+    );
+
+    await CheckoutAttempt.create({
+      userId: ctx.from.id,
+      userInfo: {
+        username: ctx.from.username || null,
+        firstName: ctx.from.first_name || '',
+        lastName: ctx.from.last_name || '',
+      },
+      quantity: qty,
+      amount: totalAmount,
+      paymentMethod: method,
+      stockIds,
+      status: 'awaiting_receipt',
+    });
+  } catch (errAttempt) {
+    console.error('Error saving CheckoutAttempt:', errAttempt.message);
+  }
+
+  // Real-time Telegram notification to admin so admin can DM customer if payment delays
+  if (config.adminId) {
+    (async () => {
+      try {
+        const escape = (s) =>
+          s
+            ? String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+            : '';
+
+        const rawFullName = `${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim();
+        const fullName = rawFullName || (lang === 'en' ? 'Customer' : 'ደንበኛ');
+        const rawUsername = ctx.from.username || null;
+        const usernameText = rawUsername ? `@${rawUsername}` : (lang === 'en' ? 'None' : 'የለውም');
+        const dmUrl = rawUsername
+          ? `https://t.me/${rawUsername}`
+          : `tg://user?id=${ctx.from.id}`;
+        const userLink = `<a href="${dmUrl}">${escape(fullName)}</a>`;
+
+        const alertMsg =
+          `🔔 <b>በክፍያ ሂደት ላይ ያለ ደንበኛ (Checkout Started)</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `👤 <b>ደንበኛ:</b> ${userLink} (${escape(usernameText)})\n` +
+          `🆔 <b>Telegram ID:</b> <code>${ctx.from.id}</code>\n` +
+          `💳 <b>የክፍያ መንገድ:</b> <b>${escape(method)}</b>\n` +
+          `📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b>\n` +
+          `💰 <b>የሚከፍለው:</b> <b>${totalAmount} ብር</b>\n` +
+          `⏰ <b>ሰዓት:</b> ${new Date().toLocaleTimeString('am-ET')}\n\n` +
+          `⏳ <i>ደንበኛው የክፍያ ስክሪንሾት እስኪያያይዝ እየተጠበቀ ነው። ክፍያ ወደ ሂሳብዎ ከገባና ደንበኛው ደረሰኝ ካዘገየ ከታች ያለውን ቁልፍ በመንካት ቀጥታ በ inbox ማናገር ይችላሉ!</i>`;
+
+        const alertKeyboard = {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: `💬 ለደንበኛው ጻፍ (DM ${fullName.substring(0, 16)})`,
+                  url: dmUrl,
+                },
+              ],
+              [
+                {
+                  text: '💳 በክፍያ ላይ ያሉትን እይ (Checkouts)',
+                  callback_data: 'admin_checkouts_filter_awaiting',
+                },
+              ],
+            ],
+          },
+        };
+
+        await ctx.telegram.sendMessage(config.adminId, alertMsg, {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          ...alertKeyboard,
+        });
+        console.log(`🔔 Admin alerted for checkout attempt by user ${ctx.from.id}`);
+      } catch (notifyErr) {
+        console.error('Failed to notify admin of checkout start:', notifyErr.message);
+      }
+    })();
+  }
+
   try {
     await ctx.reply(msg.paymentInstructions(method, lang, qty, totalAmount), {
       parse_mode: 'HTML',
@@ -564,6 +654,12 @@ async function handleReceipt(ctx) {
 
     if (isExpired) {
       ctx.session.pendingOrder = null;
+      try {
+        await CheckoutAttempt.updateMany(
+          { userId: from.id, status: 'awaiting_receipt' },
+          { $set: { status: 'expired', expiredAt: new Date() } }
+        );
+      } catch {}
       const reservationService = require('../services/reservationService');
       const stockCount = await reservationService.getAvailableStockCount();
       const expiredWarning =
@@ -670,6 +766,23 @@ async function handleReceipt(ctx) {
   await Stock.updateMany({ _id: { $in: targetStockIds } }, { orderId: order._id });
 
   await User.updateOne({ telegramId: from.id }, { $inc: { totalOrders: 1 } });
+
+  // Update checkout attempt to completed
+  try {
+    await CheckoutAttempt.findOneAndUpdate(
+      { userId: from.id, status: 'awaiting_receipt' },
+      {
+        $set: {
+          status: 'completed',
+          orderId,
+          completedAt: new Date(),
+        },
+      },
+      { sort: { createdAt: -1 } }
+    );
+  } catch (errAttempt) {
+    console.error('Failed to update CheckoutAttempt to completed:', errAttempt.message);
+  }
 
   // Notify customer in their language with animated shifting scanner and clockwise spinning animation
   try {
@@ -830,6 +943,21 @@ async function callbackCancel(ctx) {
 
   const reservationService = require('../services/reservationService');
   await reservationService.releaseReservation(ctx.from.id);
+
+  // Mark active checkout attempt as cancelled
+  try {
+    await CheckoutAttempt.updateMany(
+      { userId: ctx.from.id, status: 'awaiting_receipt' },
+      {
+        $set: {
+          status: 'cancelled',
+          cancelledAt: new Date(),
+        },
+      }
+    );
+  } catch (errAttempt) {
+    console.error('Failed to update CheckoutAttempt to cancelled:', errAttempt.message);
+  }
 
   if (ctx.session) {
     ctx.session.pendingOrder = null;

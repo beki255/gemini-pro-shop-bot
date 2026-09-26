@@ -569,6 +569,11 @@ const msg = {
         `✅ Approved Orders: ${stats.approvedOrders}\n` +
         `⏳ Pending Orders: ${stats.pendingOrders}\n` +
         `❌ Rejected Orders: ${stats.rejectedOrders}\n\n` +
+        `💳 *Checkout Attempts:*\n` +
+        `⏳ Awaiting Receipt: ${stats.awaitingCheckouts || 0}\n` +
+        `✅ Completed / Ordered: ${stats.completedCheckouts || 0}\n` +
+        `❌ Cancelled / Expired: ${stats.cancelledCheckouts || 0}\n` +
+        `📋 Total Checkouts: ${stats.totalCheckouts || 0}\n\n` +
         `📦 *Stock Inventory:*\n` +
         `✅ Available: ${stats.availableStock}\n` +
         `🔴 Sold: ${stats.soldStock}\n` +
@@ -584,6 +589,11 @@ const msg = {
       `✅ የተፈቀዱ: ${stats.approvedOrders}\n` +
       `⏳ በጥበቃ ላይ: ${stats.pendingOrders}\n` +
       `❌ ያልተፈቀዱ: ${stats.rejectedOrders}\n\n` +
+      `💳 *የክፍያ ሂደት ሙከራዎች (Checkouts):*\n` +
+      `⏳ ደረሰኝ በመጠበቅ ላይ: ${stats.awaitingCheckouts || 0}\n` +
+      `✅ ደረሰኝ የላኩ (ትዕዛዝ የፈጠሩ): ${stats.completedCheckouts || 0}\n` +
+      `❌ የተሰረዙ / ያለፈባቸው: ${stats.cancelledCheckouts || 0}\n` +
+      `📋 ጠቅላላ የክፍያ ሙከራዎች: ${stats.totalCheckouts || 0}\n\n` +
       `📦 *ስቶክ:*\n` +
       `✅ የሚገኝ: ${stats.availableStock}\n` +
       `🔴 የተሸጠ: ${stats.soldStock}\n` +

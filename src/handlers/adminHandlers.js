@@ -3,6 +3,7 @@ const config = require('../config');
 const User = require('../models/User');
 const Stock = require('../models/Stock');
 const Order = require('../models/Order');
+const CheckoutAttempt = require('../models/CheckoutAttempt');
 const keyboards = require('../utils/keyboard');
 const msg = require('../utils/messages');
 
@@ -653,6 +654,225 @@ const handleOrders = adminOnly(async (ctx, filterOverride, pageOverride) => {
   });
 });
 
+// ─── /checkouts — List and manage checkout attempts (Awaiting receipt, Completed, Cancelled/Expired, All) ───
+const handleCheckouts = adminOnly(async (ctx, filterOverride, pageOverride) => {
+  const adminUser = await User.findOne({ telegramId: ctx.from.id });
+  const lang = adminUser && adminUser.language ? adminUser.language : 'am';
+  const isEn = lang === 'en';
+
+  const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
+  const args = text.split(/\s+/);
+  const paramFilter = args.length > 1 ? args[1].toLowerCase() : null;
+
+  const validFilterOverride = typeof filterOverride === 'string' ? filterOverride : null;
+  const validPageOverride =
+    typeof pageOverride === 'number'
+      ? pageOverride
+      : typeof pageOverride === 'string' && !isNaN(parseInt(pageOverride, 10))
+      ? parseInt(pageOverride, 10)
+      : null;
+
+  let filter = validFilterOverride || paramFilter || null;
+  let page = validPageOverride || 1;
+
+  if (ctx.callbackQuery && ctx.callbackQuery.data) {
+    if (ctx.callbackQuery.data.startsWith('admin_checkouts_filter_')) {
+      filter = ctx.callbackQuery.data.replace('admin_checkouts_filter_', '');
+      page = 1;
+    } else if (ctx.callbackQuery.data.startsWith('admin_checkouts_page_')) {
+      const parts = ctx.callbackQuery.data.replace('admin_checkouts_page_', '').split('_');
+      filter = parts[0] || 'awaiting';
+      page = parseInt(parts[1], 10) || 1;
+    }
+  }
+
+  // If no filter is chosen, display interactive Checkouts Category Selection Menu!
+  if (!filter) {
+    const [total, awaiting, completed, cancelled] = await Promise.all([
+      CheckoutAttempt.countDocuments(),
+      CheckoutAttempt.countDocuments({ status: 'awaiting_receipt' }),
+      CheckoutAttempt.countDocuments({ status: 'completed' }),
+      CheckoutAttempt.countDocuments({ status: { $in: ['cancelled', 'expired'] } }),
+    ]);
+
+    const counts = { total, awaiting, completed, cancelled };
+
+    const menuText = isEn
+      ? `💳 <b>Checkout & Payment Attempts</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📊 <b>Total Attempts:</b> <code>${total}</code>\n` +
+        `⏳ <b>Awaiting Receipt:</b> <code>${awaiting}</code>\n` +
+        `✅ <b>Completed / Ordered:</b> <code>${completed}</code>\n` +
+        `❌ <b>Cancelled / Expired:</b> <code>${cancelled}</code>\n\n` +
+        `👉 <b>Please select which attempts to view:</b>`
+      : `💳 <b>የክፍያ ሂደት ሙከራዎች (Checkouts)</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📊 <b>ጠቅላላ ሙከራዎች:</b> <code>${total}</code>\n` +
+        `⏳ <b>ደረሰኝ በመጠበቅ ላይ:</b> <code>${awaiting}</code>\n` +
+        `✅ <b>ደረሰኝ የላኩ (ትዕዛዝ የፈጠሩ):</b> <code>${completed}</code>\n` +
+        `❌ <b>የተሰረዙ / ያለፈባቸው:</b> <code>${cancelled}</code>\n\n` +
+        `👉 <b>እባክዎ ማየት የሚፈልጉትን የክፍያ ሙከራ አይነት ይምረጡ፡</b>`;
+
+    const kb = keyboards.adminCheckoutsMenu(counts, lang);
+
+    if (ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(menuText, { parse_mode: 'HTML', ...kb });
+      } catch (e) {
+        if (!e.description?.includes('message is not modified')) {
+          return await ctx.reply(menuText, { parse_mode: 'HTML', ...kb });
+        }
+        return;
+      }
+    }
+    return await ctx.reply(menuText, { parse_mode: 'HTML', ...kb });
+  }
+
+  // Filter chosen: 'awaiting', 'completed', 'cancelled', or 'all'
+  let query = {};
+  let titleAm = 'ሁሉም የክፍያ ሙከራዎች';
+  let titleEn = 'All Checkout Attempts';
+  let headerEmoji = '📋';
+
+  if (filter === 'awaiting') {
+    query = { status: 'awaiting_receipt' };
+    titleAm = '⏳ ደረሰኝ በመጠበቅ ላይ ያሉ (Awaiting Receipt)';
+    titleEn = '⏳ Awaiting Receipt';
+    headerEmoji = '⏳';
+  } else if (filter === 'completed') {
+    query = { status: 'completed' };
+    titleAm = '✅ ደረሰኝ የላኩ / የተጠናቀቁ (Completed)';
+    titleEn = '✅ Completed Checkouts';
+    headerEmoji = '✅';
+  } else if (filter === 'cancelled') {
+    query = { status: { $in: ['cancelled', 'expired'] } };
+    titleAm = '❌ የተሰረዙ እና ጊዜያቸው ያለፈባቸው (Cancelled / Expired)';
+    titleEn = '❌ Cancelled / Expired';
+    headerEmoji = '❌';
+  } else {
+    filter = 'all';
+    query = {};
+    titleAm = '📋 ሁሉም የክፍያ ሙከራዎች (All Checkouts)';
+    titleEn = '📋 All Checkouts';
+    headerEmoji = '📋';
+  }
+
+  const limit = 5;
+  const totalCount = await CheckoutAttempt.countDocuments(query);
+  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const skip = (currentPage - 1) * limit;
+
+  const attempts = await CheckoutAttempt.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit);
+
+  if (attempts.length === 0) {
+    const emptyText = isEn
+      ? `${headerEmoji} <b>No checkout attempts found under "${titleEn}".</b>`
+      : `${headerEmoji} <b>በ «${titleAm}» ስር ምንም የክፍያ ሙከራ አልተገኘም።</b>`;
+
+    const kb = keyboards.adminCheckoutsPagination(filter, 1, 1, lang, []);
+    if (ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(emptyText, { parse_mode: 'HTML', ...kb });
+      } catch (e) {
+        return await ctx.reply(emptyText, { parse_mode: 'HTML', ...kb });
+      }
+    }
+    return await ctx.reply(emptyText, { parse_mode: 'HTML', ...kb });
+  }
+
+  // Pre-fetch fresh user records
+  const userIds = attempts.map((a) => a.userId);
+  const users = await User.find({ telegramId: { $in: userIds } });
+  const userMap = new Map();
+  users.forEach((u) => userMap.set(u.telegramId, u));
+
+  const statusEmoji = {
+    awaiting_receipt: '⏳',
+    completed: '✅',
+    cancelled: '❌',
+    expired: '⏱️',
+  };
+  const statusAm = {
+    awaiting_receipt: 'ደረሰኝ በመጠበቅ ላይ',
+    completed: 'ደረሰኝ ልኳል (ትዕዛዝ ተፈጥሯል)',
+    cancelled: 'በደንበኛው ተሰርዟል',
+    expired: '30 ደቂቃ አልፎበታል',
+  };
+  const statusEn = {
+    awaiting_receipt: 'Awaiting Receipt',
+    completed: 'Completed (Ordered)',
+    cancelled: 'Cancelled by User',
+    expired: 'Expired (30m limit)',
+  };
+
+  let replyText =
+    `${headerEmoji} <b>${isEn ? titleEn : titleAm} (${totalCount})</b>\n` +
+    `📄 <b>${isEn ? 'Page' : 'ገጽ'}:</b> ${currentPage}/${totalPages}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  attempts.forEach((att, idx) => {
+    const u = userMap.get(att.userId);
+    const firstName = att.userInfo?.firstName || u?.firstName || '';
+    const lastName = att.userInfo?.lastName || u?.lastName || '';
+    const rawFullName = `${firstName} ${lastName}`.trim();
+    const fullName = rawFullName || (isEn ? 'No Name' : 'ስም የለም');
+    att.customerName = firstName || fullName;
+    const rawUsername = att.userInfo?.username || u?.username || null;
+    const username = rawUsername ? `@${rawUsername}` : (isEn ? 'None' : 'የለውም');
+    const dmUrl = rawUsername
+      ? `https://t.me/${rawUsername}`
+      : `tg://user?id=${att.userId}`;
+    const userLink = `<a href="${dmUrl}">${escapeHtml(fullName)}</a>`;
+    const qty = att.quantity || 1;
+    const dateStr = new Date(att.createdAt).toLocaleString('am-ET');
+
+    const stBadge = isEn ? (statusEn[att.status] || att.status) : (statusAm[att.status] || att.status);
+
+    replyText += `<b>${skip + idx + 1}.</b> ${statusEmoji[att.status] || '💳'} <b>ሁኔታ:</b> <b>${stBadge}</b>\n`;
+    replyText += `   👤 <b>ደንበኛ:</b> ${userLink} (${escapeHtml(username)})\n`;
+    replyText += `   🆔 <b>Telegram ID:</b> <code>${att.userId}</code>\n`;
+    replyText += `   📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b> | 💰 <b>ክፍያ:</b> <b>${att.amount} ብር</b> (${escapeHtml(att.paymentMethod || 'CBE')})\n`;
+    replyText += `   📅 <b>የተጀመረበት:</b> ${dateStr}\n`;
+
+    if (att.orderId) {
+      replyText += `   🔢 <b>የትዕዛዝ ቁጥር:</b> <code>${escapeHtml(att.orderId)}</code>\n`;
+    }
+    if (att.status === 'awaiting_receipt') {
+      const minutesAgo = Math.floor((Date.now() - new Date(att.createdAt).getTime()) / 60000);
+      replyText += `   ⏰ <b>የቆየው:</b> ከ ${minutesAgo} ደቂቃ በፊት\n`;
+    }
+    replyText += `\n`;
+  });
+
+  const kb = keyboards.adminCheckoutsPagination(filter, currentPage, totalPages, lang, attempts);
+
+  if (ctx.callbackQuery) {
+    try {
+      return await ctx.editMessageText(replyText, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...kb,
+      });
+    } catch (e) {
+      if (!e.description?.includes('message is not modified')) {
+        return await ctx.reply(replyText, {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          ...kb,
+        });
+      }
+      return;
+    }
+  }
+
+  await ctx.reply(replyText, {
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    ...kb,
+  });
+});
+
 // ─── /users — List registered users from database ─────────
 const handleUsers = adminOnly(async (ctx, pageOverride) => {
   const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
@@ -828,6 +1048,10 @@ const handleStats = adminOnly(async (ctx) => {
     rejectedOrders,
     availableStock,
     soldStock,
+    totalCheckouts,
+    awaitingCheckouts,
+    completedCheckouts,
+    cancelledCheckouts,
   ] = await Promise.all([
     User.countDocuments(),
     Order.countDocuments(),
@@ -836,6 +1060,10 @@ const handleStats = adminOnly(async (ctx) => {
     Order.countDocuments({ status: 'rejected' }),
     Stock.countDocuments({ isReserved: false }),
     SoldStock.countDocuments(),
+    CheckoutAttempt.countDocuments(),
+    CheckoutAttempt.countDocuments({ status: 'awaiting_receipt' }),
+    CheckoutAttempt.countDocuments({ status: 'completed' }),
+    CheckoutAttempt.countDocuments({ status: { $in: ['cancelled', 'expired'] } }),
   ]);
 
   const totalStock = availableStock + (await Stock.countDocuments({ isReserved: true }));
@@ -862,6 +1090,10 @@ const handleStats = adminOnly(async (ctx) => {
         availableStock,
         soldStock,
         totalRevenue,
+        totalCheckouts,
+        awaitingCheckouts,
+        completedCheckouts,
+        cancelledCheckouts,
       },
       lang
     ),
@@ -2057,6 +2289,7 @@ module.exports = {
   handleBulkStockFile,
   handleStock,
   handleOrders,
+  handleCheckouts,
   handleStats,
   handleSetPrice,
   handlePriceInput,

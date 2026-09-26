@@ -52,6 +52,7 @@ bot.command('addstock', adminHandlers.handleAddStock);
 bot.command('addstockbulk', adminHandlers.handleAddStockBulk);
 bot.command('stock', adminHandlers.handleStock);
 bot.command(['orders', 'order'], adminHandlers.handleOrders);
+bot.command(['checkouts', 'checkout'], adminHandlers.handleCheckouts);
 bot.command('stats', adminHandlers.handleStats);
 bot.command('setprice', adminHandlers.handleSetPrice);
 bot.command('price', adminHandlers.handleSetPrice);
@@ -142,6 +143,22 @@ bot.on('callback_query', async (ctx) => {
     const filter = parts[0] || 'all';
     const page = parseInt(parts[1], 10) || 1;
     return adminHandlers.handleOrders(ctx, filter, page);
+  }
+  if (data === 'admin_checkouts') {
+    await ctx.answerCbQuery().catch(() => {});
+    return adminHandlers.handleCheckouts(ctx);
+  }
+  if (data.startsWith('admin_checkouts_filter_')) {
+    await ctx.answerCbQuery().catch(() => {});
+    const filter = data.replace('admin_checkouts_filter_', '');
+    return adminHandlers.handleCheckouts(ctx, filter, 1);
+  }
+  if (data.startsWith('admin_checkouts_page_')) {
+    await ctx.answerCbQuery().catch(() => {});
+    const parts = data.replace('admin_checkouts_page_', '').split('_');
+    const filter = parts[0] || 'awaiting';
+    const page = parseInt(parts[1], 10) || 1;
+    return adminHandlers.handleCheckouts(ctx, filter, page);
   }
   if (data === 'admin_users') return adminHandlers.callbackUsers(ctx);
   if (data.startsWith('admin_users_page_')) return adminHandlers.callbackUsersPage(ctx);

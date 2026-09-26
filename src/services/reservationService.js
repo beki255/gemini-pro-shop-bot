@@ -114,6 +114,25 @@ class ReservationService {
         }
       }
 
+      // Expire stale checkout attempts older than 30 minutes
+      try {
+        const CheckoutAttempt = require('../models/CheckoutAttempt');
+        await CheckoutAttempt.updateMany(
+          {
+            status: 'awaiting_receipt',
+            createdAt: { $lt: cutoff },
+          },
+          {
+            $set: {
+              status: 'expired',
+              expiredAt: new Date(),
+            },
+          }
+        );
+      } catch (errAtt) {
+        console.error('Error expiring stale checkout attempts:', errAtt.message);
+      }
+
       if (expiredStocks.length === 0) return;
 
       // Group by user so we send 1 notification per user
