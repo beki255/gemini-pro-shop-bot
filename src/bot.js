@@ -341,6 +341,21 @@ bot.catch((err, ctx) => {
   }
 });
 
+// Prevent unexpected crashes from killing the bot process
+process.on('unhandledRejection', (reason, promise) => {
+  const errMsg = reason?.message || String(reason);
+  console.error('⚠️ Unhandled Rejection:', errMsg);
+  // If 409 conflict happens (e.g. Render deploy overlap or duplicate instance), restart container
+  if (errMsg.includes('409') || errMsg.includes('Conflict')) {
+    console.error('🔴 409 Conflict detected! Another instance was polling. Restarting process for clean recovery in 3s...');
+    setTimeout(() => process.exit(1), 3000);
+  }
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ Uncaught Exception:', err?.message || err);
+});
+
 // ─── Start Bot + Web Server ───────────────────────────────
 async function main() {
   // Connect to MongoDB
@@ -353,10 +368,40 @@ async function main() {
   // Start Express server for Render health checks
   const app = express();
   app.get('/', (req, res) => res.send('🤖 Gemini Pro Shop Bot is running!'));
-  app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+  app.get('/health', async (req, res) => {
+    try {
+      const me = await bot.telegram.getMe();
+      const mongoose = require('mongoose');
+      const dbConnected = mongoose.connection.readyState === 1;
+      res.json({
+        status: dbConnected ? 'ok' : 'degraded',
+        bot: me.username,
+        database: dbConnected ? 'connected' : 'disconnected',
+        uptime: Math.round(process.uptime()),
+        timestamp: new Date(),
+      });
+    } catch (err) {
+      res.status(500).json({ status: 'error', message: err.message, timestamp: new Date() });
+    }
+  });
   app.listen(config.port, () => {
     console.log(`🌐 Web server running on port ${config.port}`);
   });
+
+  // Keep-alive self-pinger for Render Free Tier (pings every 8 minutes to prevent 15-min spin-down)
+  const serviceUrl = process.env.RENDER_EXTERNAL_URL || process.env.SERVICE_URL;
+  if (serviceUrl) {
+    console.log(`⏱️ Keep-alive self-pinger active for: ${serviceUrl}`);
+    setInterval(async () => {
+      try {
+        const axios = require('axios');
+        await axios.get(`${serviceUrl}/health`, { timeout: 15000 });
+        console.log(`💓 Keep-alive ping sent to ${serviceUrl}/health`);
+      } catch (err) {
+        console.error('Keep-alive ping notice:', err.message);
+      }
+    }, 8 * 60 * 1000); // Every 8 minutes
+  }
 
   // Initialize clean, language-specific Telegram Menu commands
   const { initGlobalMenuCommands } = require('./utils/menuCommands');
@@ -377,6 +422,7 @@ async function main() {
 
   bot.launch({ dropPendingUpdates: true }).catch((err) => {
     console.error('Fatal bot launch error:', err.message);
+    process.exit(1);
   });
 }
 
