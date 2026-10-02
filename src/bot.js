@@ -160,6 +160,12 @@ bot.on('callback_query', async (ctx) => {
     const page = parseInt(parts[1], 10) || 1;
     return adminHandlers.handleCheckouts(ctx, filter, page);
   }
+  if (data.startsWith('admin_remind_checkout_')) {
+    return adminHandlers.callbackRemindCheckout(ctx);
+  }
+  if (data === 'prompt_send_receipt') {
+    return ctx.answerCbQuery('📸 እባክዎ የከፈሉበትን ደረሰኝ (Screenshot ፎቶ) በቀጥታ ወደዚህ ቻት ይላኩ!', { show_alert: true }).catch(() => {});
+  }
   if (data === 'admin_users') return adminHandlers.callbackUsers(ctx);
   if (data.startsWith('admin_users_page_')) return adminHandlers.callbackUsersPage(ctx);
   if (data === 'noop') return ctx.answerCbQuery().catch(() => {});

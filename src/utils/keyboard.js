@@ -1,6 +1,27 @@
-// src/utils/keyboard.js - Multilingual Inline Keyboard Builders with Button Colors
 const { Markup } = require('telegraf');
 const config = require('../config');
+
+/**
+ * Safely sanitizes button text to guarantee 100% valid UTF-8:
+ * - Prevents surrogate pair splitting (which causes Telegram 400 Bad Request)
+ * - Removes any lone or orphaned surrogates (\uD800 - \uDFFF)
+ * - Removes non-printable / control codes
+ * - Slices by full Unicode code points
+ */
+function sanitizeButtonText(text, maxLength = 60) {
+  if (!text) return '';
+  let str = String(text);
+  if (typeof str.toWellFormed === 'function') {
+    str = str.toWellFormed();
+  }
+  str = str.replace(/[\uD800-\uDFFF]/g, '');
+  str = str.replace(/[\x00-\x1F\x7F]/g, '');
+  const codePoints = Array.from(str);
+  if (codePoints.length > maxLength) {
+    str = codePoints.slice(0, maxLength).join('');
+  }
+  return str.trim();
+}
 
 const keyboards = {
   // ─── LANGUAGE SELECTION KEYBOARD (Primary Blue) ─────────────
@@ -544,10 +565,14 @@ const keyboards = {
       orders.forEach((o, index) => {
         const itemNumber = (page - 1) * 5 + index + 1;
         const name = o.customerName || o.userInfo?.firstName || '';
-        const namePart = name ? `የ ${name}` : '';
-        const btnText = isEn
-          ? `👁️ #${itemNumber} ${name ? `${name}'s Receipt` : 'Receipt'} (${o.orderId})`
-          : `👁️ #${itemNumber} ${namePart ? `${namePart} ደረሰኝ` : 'ደረሰኝ'} (${o.orderId})`;
+        const safeName = sanitizeButtonText(name, 14);
+        const namePart = safeName ? `የ ${safeName}` : '';
+        const btnText = sanitizeButtonText(
+          isEn
+            ? `👁️ #${itemNumber} ${safeName ? `${safeName}'s Receipt` : 'Receipt'} (${o.orderId})`
+            : `👁️ #${itemNumber} ${namePart ? `${namePart} ደረሰኝ` : 'ደረሰኝ'} (${o.orderId})`,
+          60
+        );
 
         rows.push([
           {
@@ -880,22 +905,52 @@ const keyboards = {
     const isEn = lang === 'en';
     const rows = [];
 
-    // Quick direct DM buttons for customers on this page
+    // Quick direct DM & Bot Reminder buttons for customers on this page
     if (attempts && attempts.length > 0) {
       attempts.forEach((att, idx) => {
         const itemNumber = (page - 1) * 5 + idx + 1;
-        const name = att.customerName || att.userInfo?.firstName || `User ${att.userId}`;
+        const name = att.customerName || att.userInfo?.firstName || `User ${att.userId || ''}`;
         const rawUsername = att.userInfo?.username;
-        const dmUrl = rawUsername
-          ? `https://t.me/${rawUsername}`
-          : `tg://user?id=${att.userId}`;
+        const cleanUsername = rawUsername ? String(rawUsername).replace(/^@+/, '').trim() : '';
+        const dmUrl = cleanUsername
+          ? `https://t.me/${cleanUsername}`
+          : (att.userId ? `tg://user?id=${att.userId}` : null);
 
-        rows.push([
-          {
-            text: `💬 #${itemNumber} DM ${name.substring(0, 14)} (${att.paymentMethod} · ${att.amount} ETB)`,
-            url: dmUrl,
-          },
-        ]);
+        const safeName = sanitizeButtonText(name, 12) || (isEn ? 'Customer' : 'ደንበኛ');
+        const safeMethod = sanitizeButtonText(att.paymentMethod || 'CBE', 10);
+        const safeAmount = Number(att.amount) || 0;
+
+        // If checkout is still active (awaiting receipt), provide quick bot reminder button!
+        if (att.status === 'awaiting_receipt') {
+          const remindText = sanitizeButtonText(
+            isEn ? `🔔 #${itemNumber} Send Bot Reminder to ${safeName}` : `🔔 #${itemNumber} ለ${safeName} በቦቱ ማሳሰቢያ ላክ`,
+            55
+          );
+          rows.push([
+            {
+              text: remindText,
+              callback_data: `admin_remind_checkout_${att._id}`,
+            },
+          ]);
+        }
+
+        const btnText = sanitizeButtonText(`💬 #${itemNumber} DM ${safeName} (${safeMethod} · ${safeAmount} ETB)`, 55);
+
+        if (dmUrl) {
+          rows.push([
+            {
+              text: btnText,
+              url: dmUrl,
+            },
+          ]);
+        } else {
+          rows.push([
+            {
+              text: btnText,
+              callback_data: 'noop',
+            },
+          ]);
+        }
       });
     }
 

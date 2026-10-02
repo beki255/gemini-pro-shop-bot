@@ -1,5 +1,6 @@
 // src/handlers/adminHandlers.js - Admin commands and approval/rejection callbacks
 const config = require('../config');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Stock = require('../models/Stock');
 const Order = require('../models/Order');
@@ -28,7 +29,12 @@ function adminOnly(handler) {
 // ─── HTML safe escape helper ─────────────────────────────
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
-  return String(str)
+  let s = String(str);
+  if (typeof s.toWellFormed === 'function') {
+    s = s.toWellFormed();
+  }
+  return s
+    .replace(/[\uD800-\uDFFF]/g, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
@@ -819,28 +825,34 @@ const handleCheckouts = adminOnly(async (ctx, filterOverride, pageOverride) => {
     const fullName = rawFullName || (isEn ? 'No Name' : 'ስም የለም');
     att.customerName = firstName || fullName;
     const rawUsername = att.userInfo?.username || u?.username || null;
-    const username = rawUsername ? `@${rawUsername}` : (isEn ? 'None' : 'የለውም');
-    const dmUrl = rawUsername
-      ? `https://t.me/${rawUsername}`
-      : `tg://user?id=${att.userId}`;
-    const userLink = `<a href="${dmUrl}">${escapeHtml(fullName)}</a>`;
+    const cleanUsername = rawUsername ? String(rawUsername).replace(/^@+/, '').trim() : '';
+    const username = cleanUsername ? `@${cleanUsername}` : (isEn ? 'None' : 'የለውም');
+    const dmUrl = cleanUsername
+      ? `https://t.me/${cleanUsername}`
+      : (att.userId ? `tg://user?id=${att.userId}` : null);
+    const userLink = dmUrl
+      ? `<a href="${dmUrl}">${escapeHtml(fullName)}</a>`
+      : `<b>${escapeHtml(fullName)}</b>`;
     const qty = att.quantity || 1;
-    const dateStr = new Date(att.createdAt).toLocaleString('am-ET');
+    const dateStr = att.createdAt ? new Date(att.createdAt).toLocaleString('am-ET') : 'ቀን የለም';
 
     const stBadge = isEn ? (statusEn[att.status] || att.status) : (statusAm[att.status] || att.status);
 
     replyText += `<b>${skip + idx + 1}.</b> ${statusEmoji[att.status] || '💳'} <b>ሁኔታ:</b> <b>${stBadge}</b>\n`;
     replyText += `   👤 <b>ደንበኛ:</b> ${userLink} (${escapeHtml(username)})\n`;
-    replyText += `   🆔 <b>Telegram ID:</b> <code>${att.userId}</code>\n`;
-    replyText += `   📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b> | 💰 <b>ክፍያ:</b> <b>${att.amount} ብር</b> (${escapeHtml(att.paymentMethod || 'CBE')})\n`;
+    replyText += `   🆔 <b>Telegram ID:</b> <code>${att.userId || 'N/A'}</code>\n`;
+    replyText += `   📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b> | 💰 <b>ክፍያ:</b> <b>${att.amount || 0} ብር</b> (${escapeHtml(att.paymentMethod || 'CBE')})\n`;
     replyText += `   📅 <b>የተጀመረበት:</b> ${dateStr}\n`;
 
     if (att.orderId) {
       replyText += `   🔢 <b>የትዕዛዝ ቁጥር:</b> <code>${escapeHtml(att.orderId)}</code>\n`;
     }
-    if (att.status === 'awaiting_receipt') {
+    if (att.status === 'awaiting_receipt' && att.createdAt) {
       const minutesAgo = Math.floor((Date.now() - new Date(att.createdAt).getTime()) / 60000);
       replyText += `   ⏰ <b>የቆየው:</b> ከ ${minutesAgo} ደቂቃ በፊት\n`;
+      if (att.lastReminderAt) {
+        replyText += `   🔔 <b>ማሳሰቢያ:</b> ተልኳል (${new Date(att.lastReminderAt).toLocaleTimeString('am-ET')})\n`;
+      }
     }
     replyText += `\n`;
   });
@@ -855,22 +867,102 @@ const handleCheckouts = adminOnly(async (ctx, filterOverride, pageOverride) => {
         ...kb,
       });
     } catch (e) {
-      if (!e.description?.includes('message is not modified')) {
+      if (e.description?.includes('message is not modified')) {
+        return;
+      }
+      try {
         return await ctx.reply(replyText, {
           parse_mode: 'HTML',
           disable_web_page_preview: true,
           ...kb,
         });
+      } catch (err2) {
+        console.error('Failed to reply checkouts with HTML/kb:', err2.message);
+        return await ctx.reply(replyText.replace(/<[^>]*>/g, '')).catch(() => {});
       }
-      return;
     }
   }
 
-  await ctx.reply(replyText, {
-    parse_mode: 'HTML',
-    disable_web_page_preview: true,
-    ...kb,
-  });
+  try {
+    await ctx.reply(replyText, {
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...kb,
+    });
+  } catch (errMain) {
+    console.error('Failed to send checkouts message:', errMain.message);
+    await ctx.reply(replyText.replace(/<[^>]*>/g, '')).catch(() => {});
+  }
+});
+
+// ─── Callback: "admin_remind_checkout_<id>" — Send active order reminder directly to customer via bot ───
+const callbackRemindCheckout = adminOnly(async (ctx) => {
+  const targetId = ctx.callbackQuery.data.replace('admin_remind_checkout_', '').trim();
+
+  let attempt = null;
+  if (mongoose.Types.ObjectId.isValid(targetId)) {
+    attempt = await CheckoutAttempt.findById(targetId);
+  }
+  if (!attempt && !isNaN(Number(targetId))) {
+    attempt = await CheckoutAttempt.findOne({ userId: Number(targetId), status: 'awaiting_receipt' }).sort({ createdAt: -1 });
+  }
+
+  if (!attempt) {
+    return ctx.answerCbQuery('⚠️ የክፍያ ሙከራው በዳታቤዝ ውስጥ አልተገኘም።', { show_alert: true });
+  }
+
+  if (attempt.status !== 'awaiting_receipt') {
+    return ctx.answerCbQuery('⚠️ ይህ ትዕዛዝ አሁን ላይ በአክቲቭ ሁኔታ ላይ አይደለም (ተጠናቋል ወይም ተሰርዟል)።', { show_alert: true });
+  }
+
+  const reminderText =
+    `⚠️ <b>ውድ ደንበኛችን፤</b>\n\n` +
+    `እባክዎን ደንበኛችን፣ ሲስተማችን እንደሚያሳየው በአክቲቭ ትዕዛዝ (active order) ላይ ለብዙ ደቂቃዎች ቆይተዋል፤ አሁንም አክቲቭ እንደሆኑ ያሳያል። ስለዚህ እባክዎ ወይ 'Cancel Order' በማለት ትዕዛዝዎን ይሰርዙ፣ ወይም ክፍያውን ከፍለው ትዕዛዝዎን ያጠናቁና አገልግሎቱ ወዲያውኑ ይላክልዎታ።\n\n` +
+    `—————————————————————\n` +
+    `Dear customer, our system shows that you've been on an active order for quite a few minutes. Please either cancel the order, or complete the payment so we can deliver it to you right away.`;
+
+  const customerKeyboard = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: '📸 ደረሰኝ (Screenshot) ላክ',
+            callback_data: 'prompt_send_receipt',
+          },
+          {
+            text: '❌ ትዕዛዝ ሰርዝ (Cancel Order)',
+            callback_data: 'cancel',
+          },
+        ],
+        [
+          {
+            text: `💬 አድሚኑን አግኝ (@${config.supportUsername || 'Mnbvcnvhd'})`,
+            url: `https://t.me/${String(config.supportUsername || 'Mnbvcnvhd').replace(/^@+/, '')}`,
+          },
+        ],
+      ],
+    },
+  };
+
+  try {
+    await ctx.telegram.sendMessage(attempt.userId, reminderText, {
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...customerKeyboard,
+    });
+
+    attempt.lastReminderAt = new Date();
+    attempt.remindersCount = (attempt.remindersCount || 0) + 1;
+    await attempt.save();
+
+    const custName = attempt.userInfo?.firstName || `User ${attempt.userId}`;
+    console.log(`🔔 Admin sent checkout reminder to customer ${attempt.userId} (${custName})`);
+
+    return ctx.answerCbQuery(`✅ የማስታወሻ መልእክቱ ወደ ደንበኛው (${custName}) በቦቱ በኩል በተሳካ ሁኔታ ተልኳል!`, { show_alert: true });
+  } catch (errSend) {
+    console.error(`Failed to send checkout reminder to user ${attempt.userId}:`, errSend.message);
+    return ctx.answerCbQuery(`❌ መልእክቱን መላክ አልተቻለም: ደንበኛው ቦቱን አግዶት (block) አድርጎት ሊሆን ይችላል።`, { show_alert: true });
+  }
 });
 
 // ─── /users — List registered users from database ─────────
@@ -2290,6 +2382,7 @@ module.exports = {
   handleStock,
   handleOrders,
   handleCheckouts,
+  callbackRemindCheckout,
   handleStats,
   handleSetPrice,
   handlePriceInput,

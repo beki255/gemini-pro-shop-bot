@@ -508,6 +508,7 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
     reservedAt: Date.now(),
   };
 
+  let attempt = null;
   // Record checkout attempt in database (supersede any prior active attempt for this user)
   try {
     await CheckoutAttempt.updateMany(
@@ -515,7 +516,7 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
       { $set: { status: 'cancelled', cancelledAt: new Date() } }
     );
 
-    await CheckoutAttempt.create({
+    attempt = await CheckoutAttempt.create({
       userId: ctx.from.id,
       userInfo: {
         username: ctx.from.username || null,
@@ -532,7 +533,7 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
     console.error('Error saving CheckoutAttempt:', errAttempt.message);
   }
 
-  // Real-time Telegram notification to admin so admin can DM customer if payment delays
+  // Real-time Telegram notification to admin so admin can DM customer or send bot reminder
   if (config.adminId) {
     (async () => {
       try {
@@ -549,9 +550,10 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
         const rawFullName = `${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim();
         const fullName = rawFullName || (lang === 'en' ? 'Customer' : 'ደንበኛ');
         const rawUsername = ctx.from.username || null;
-        const usernameText = rawUsername ? `@${rawUsername}` : (lang === 'en' ? 'None' : 'የለውም');
-        const dmUrl = rawUsername
-          ? `https://t.me/${rawUsername}`
+        const cleanUsername = rawUsername ? String(rawUsername).replace(/^@+/, '').trim() : '';
+        const usernameText = cleanUsername ? `@${cleanUsername}` : (lang === 'en' ? 'None' : 'የለውም');
+        const dmUrl = cleanUsername
+          ? `https://t.me/${cleanUsername}`
           : `tg://user?id=${ctx.from.id}`;
         const userLink = `<a href="${dmUrl}">${escape(fullName)}</a>`;
 
@@ -564,20 +566,26 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
           `📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b>\n` +
           `💰 <b>የሚከፍለው:</b> <b>${totalAmount} ብር</b>\n` +
           `⏰ <b>ሰዓት:</b> ${new Date().toLocaleTimeString('am-ET')}\n\n` +
-          `⏳ <i>ደንበኛው የክፍያ ስክሪንሾት እስኪያያይዝ እየተጠበቀ ነው። ክፍያ ወደ ሂሳብዎ ከገባና ደንበኛው ደረሰኝ ካዘገየ ከታች ያለውን ቁልፍ በመንካት ቀጥታ በ inbox ማናገር ይችላሉ!</i>`;
+          `⏳ <i>ደንበኛው የክፍያ ስክሪንሾት እስኪያያይዝ እየተጠበቀ ነው። ክፍያ ወደ ሂሳብዎ ከገባና ደንበኛው ደረሰኝ ካዘገየ ከታች ባለው ቁልፍ በቦቱ ማሳሰቢያ መላክ ወይም በ inbox ማናገር ይችላሉ!</i>`;
 
+        const safeAlertName = (fullName ? Array.from(String(fullName)).slice(0, 14).join('') : '').replace(/[\uD800-\uDFFF]/g, '').trim() || 'Customer';
+        const targetAttemptId = attempt ? attempt._id : ctx.from.id;
         const alertKeyboard = {
           reply_markup: {
             inline_keyboard: [
               [
                 {
-                  text: `💬 ለደንበኛው ጻፍ (DM ${fullName.substring(0, 16)})`,
-                  url: dmUrl,
+                  text: '🔔 በቦቱ ማሳሰቢያ ላክ (Send Reminder)',
+                  callback_data: `admin_remind_checkout_${targetAttemptId}`,
                 },
               ],
               [
                 {
-                  text: '💳 በክፍያ ላይ ያሉትን እይ (Checkouts)',
+                  text: `💬 በ Inbox (DM ${safeAlertName})`,
+                  url: dmUrl,
+                },
+                {
+                  text: '💳 በክፍያ ላይ ያሉ',
                   callback_data: 'admin_checkouts_filter_awaiting',
                 },
               ],
