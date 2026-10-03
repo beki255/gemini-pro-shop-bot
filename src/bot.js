@@ -85,6 +85,7 @@ bot.command('resend', adminHandlers.handleResend);
 bot.command('restock', adminHandlers.handleRestock);
 bot.command('broadcast', adminHandlers.handleBroadcast);
 bot.command('announce', adminHandlers.handleBroadcast);
+bot.command(['channelpost', 'post'], adminHandlers.handleChannelPost);
 bot.command(['users', 'customers', 'members'], adminHandlers.handleUsers);
 
 // ─── Persistent Bottom Menu Text Handlers ─────────────────
@@ -214,6 +215,9 @@ bot.on('callback_query', async (ctx) => {
   if (data === 'admin_broadcast') return adminHandlers.startBroadcast(ctx);
   if (data === 'confirm_broadcast') return adminHandlers.callbackConfirmBroadcast(ctx);
   if (data === 'cancel_broadcast') return adminHandlers.callbackCancelBroadcast(ctx);
+  if (data === 'admin_channel_post') return adminHandlers.startChannelPost(ctx);
+  if (data === 'confirm_channel_post') return adminHandlers.callbackConfirmChannelPost(ctx);
+  if (data === 'cancel_channel_post') return adminHandlers.callbackCancelChannelPost(ctx);
   if (data === 'admin_add_help') {
     if (ctx.from.id !== config.adminId) return ctx.answerCbQuery('🚫 Admin only').catch(() => {});
     await ctx.answerCbQuery();
@@ -299,6 +303,11 @@ bot.on('photo', async (ctx) => {
     const handled = await adminHandlers.handleBroadcastMessage(ctx);
     if (handled) return;
   }
+  // Admin channel post with photo
+  if (ctx.from && ctx.from.id === config.adminId && ctx.session?.awaitingChannelPostMessage) {
+    const handled = await adminHandlers.handleChannelPostMessage(ctx);
+    if (handled) return;
+  }
   // User receipt upload
   await userHandlers.handleReceipt(ctx);
 });
@@ -311,6 +320,10 @@ bot.on('document', async (ctx) => {
   }
   if (ctx.from && ctx.from.id === config.adminId && session.awaitingBroadcastMessage) {
     const handled = await adminHandlers.handleBroadcastMessage(ctx);
+    if (handled) return;
+  }
+  if (ctx.from && ctx.from.id === config.adminId && session.awaitingChannelPostMessage) {
+    const handled = await adminHandlers.handleChannelPostMessage(ctx);
     if (handled) return;
   }
   // User receipt upload (image sent as document, PDF receipt, etc.)
@@ -327,6 +340,12 @@ bot.on('text', async (ctx) => {
   // Admin broadcast announcement message input
   if (ctx.from.id === config.adminId && session.awaitingBroadcastMessage) {
     const handled = await adminHandlers.handleBroadcastMessage(ctx);
+    if (handled) return;
+  }
+
+  // Admin channel post message input
+  if (ctx.from.id === config.adminId && session.awaitingChannelPostMessage) {
+    const handled = await adminHandlers.handleChannelPostMessage(ctx);
     if (handled) return;
   }
 

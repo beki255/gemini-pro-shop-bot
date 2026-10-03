@@ -2382,6 +2382,163 @@ const callbackCancelBroadcast = adminOnly(async (ctx) => {
   });
 });
 
+// ─── Channel Post System (Post to Proof Channel with "Buy Now" button) ───────
+// Command: /post, /channelpost, or from admin menu button
+const handleChannelPost = adminOnly(async (ctx) => {
+  return startChannelPost(ctx);
+});
+
+const startChannelPost = adminOnly(async (ctx) => {
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  ctx.session = ctx.session || {};
+  ctx.session.awaitingChannelPostMessage = true;
+  ctx.session.channelPostPayload = null;
+
+  const channelName = config.proofChannel?.username || '@gemini_pro_shop_proof';
+
+  const promptText = isEn
+    ? `📢 <b>Post to Proof Channel (${channelName})</b>\n\n` +
+      `Please send the <b>message or photo</b> you want to post to the channel.\n\n` +
+      `<i>The bot will automatically attach a <b>[ 🛍️ Buy Now ]</b> button to your post!</i>\n\n` +
+      `Type <b>/cancel</b> to cancel.`
+    : `📢 <b>ወደ ቻናል ፖስት ማድረጊያ (${channelName})</b>\n\n` +
+      `እባክዎ ወደ ቻናሉ እንዲለጠፍ የሚፈልጉትን <b>ጽሁፍ ወይም ፎቶ (ስክሪንሾት)</b> ይላኩ።\n\n` +
+      `<i>ቦቱ ከስር በራሱ <b>«🛍️ አሁን ግዛ (Buy Now)»</b> የሚል አዝራር አድርጎ ይለጥፈዋል!</i>\n\n` +
+      `ለመሰረዝ <b>/cancel</b> ብለው መጻፍ ይችላሉ።`;
+
+  return ctx.reply(promptText, {
+    parse_mode: 'HTML',
+    ...keyboards.cancelChannelPost(lang),
+  });
+});
+
+async function handleChannelPostMessage(ctx) {
+  const session = ctx.session || {};
+  if (!session.awaitingChannelPostMessage) return false;
+
+  const rawText = ctx.message.text ? ctx.message.text.trim().toLowerCase() : '';
+  if (['cancel', 'ሰርዝ', '/cancel'].includes(rawText)) {
+    session.awaitingChannelPostMessage = false;
+    session.channelPostPayload = null;
+    const user = await User.findOne({ telegramId: ctx.from.id });
+    const lang = user && user.language ? user.language : 'am';
+    await ctx.reply(lang === 'en' ? '❌ Channel post cancelled.' : '❌ ወደ ቻናል መለጠፉ ተሰርዟል።', {
+      ...keyboards.adminPanel(lang),
+    });
+    return true;
+  }
+
+  session.awaitingChannelPostMessage = false;
+  session.channelPostPayload = {
+    messageId: ctx.message.message_id,
+    chatId: ctx.chat.id,
+  };
+
+  return showChannelPostPreview(ctx);
+}
+
+async function showChannelPostPreview(ctx) {
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+  const channelName = config.proofChannel?.username || '@gemini_pro_shop_proof';
+
+  const previewText = isEn
+    ? `👁️ <b>Channel Post Preview & Confirmation</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `👆 <i>The post you sent above is ready!</i>\n` +
+      `📍 <b>Target Channel:</b> <code>${channelName}</code>\n` +
+      `🔘 <b>Attached Button:</b> <code>[ 🛍️ Buy Now ]</code>\n\n` +
+      `👉 <b>Are you sure you want to publish this to the channel now?</b>`
+    : `👁️ <b>ወደ ቻናል መለጠፊያ ቅድመ-ዕይታ እና ማረጋገጫ</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `👆 <i>ከላይ የላኩት መልእክት/ፎቶ ተዘጋጅቷል!</i>\n` +
+      `📍 <b>የሚለጠፍበት ቻናል:</b> <code>${channelName}</code>\n` +
+      `🔘 <b>አብሮ የሚወጣ አዝራር:</b> <code>[ 🛍️ አሁን ግዛ (Buy Now) ]</code>\n\n` +
+      `👉 <b>ይህ አሁን ወደ ቻናሉ እንዲለጠፍ ይፈልጋሉ?</b>`;
+
+  return ctx.reply(previewText, {
+    parse_mode: 'HTML',
+    ...keyboards.channelPostConfirm(lang),
+  });
+}
+
+async function executeChannelPost(ctx) {
+  const session = ctx.session || {};
+  const payload = session.channelPostPayload;
+  if (!payload) {
+    return ctx.reply('⚠️ የሚለጠፍ መልእክት አልተገኘም። እባክዎ እንደገና ይሞክሩ።');
+  }
+
+  session.channelPostPayload = null;
+  session.awaitingChannelPostMessage = false;
+
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  const channelUsername = config.proofChannel?.username || '@gemini_pro_shop_proof';
+  const channelChatId = channelUsername.startsWith('@') ? channelUsername : `@${channelUsername}`;
+
+  // Get active bot username
+  const botInfo = await ctx.telegram.getMe().catch(() => null);
+  const botUsername = botInfo?.username || config.botUsername || 'Mnbvcnvhd';
+
+  const buyButton = keyboards.channelPostBuyButton(botUsername, lang);
+
+  try {
+    await ctx.telegram.copyMessage(channelChatId, payload.chatId, payload.messageId, {
+      ...buyButton,
+    });
+
+    const channelLink = config.proofChannel?.link || `https://t.me/${channelUsername.replace(/^@/, '')}`;
+    const successText = isEn
+      ? `✅ <b>Successfully posted to channel!</b>\n\n` +
+        `📢 Post is live in <b>${channelUsername}</b> with the <b>[ 🛍️ Buy Now ]</b> button!\n\n` +
+        `👉 <a href="${channelLink}">View in Channel</a>`
+      : `✅ <b>መልእክቱ በተሳካ ሁኔታ ወደ ቻናሉ ተለጥፏል!</b>\n\n` +
+        `📢 በ <b>${channelUsername}</b> ቻናል ላይ ከስር <b>«🛍️ አሁን ግዛ»</b> አዝራር ጋር ወጥቷል!\n\n` +
+        `👉 <a href="${channelLink}">በቻናሉ ውስጥ እይ</a>`;
+
+    return ctx.reply(successText, {
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      ...keyboards.adminPanel(lang),
+    });
+  } catch (err) {
+    console.error('❌ Failed to post to channel:', err.message);
+    const errorMsg = isEn
+      ? `❌ <b>Failed to post to channel:</b> <code>${escapeHtml(err.message)}</code>\n\n` +
+        `⚠️ Please make sure the bot is an <b>ADMINISTRATOR</b> in ${channelUsername} with permission to post messages!`
+      : `❌ <b>ወደ ቻናሉ መለጠፍ አልተቻለም፦</b> <code>${escapeHtml(err.message)}</code>\n\n` +
+        `⚠️ እባክዎ ቦቱ በ <b>${channelUsername}</b> ቻናል ላይ መልእክት የመለጠፍ ፈቃድ ያለው <b>አስተዳዳሪ (Admin)</b> መሆኑን ያረጋግጡ!`;
+
+    return ctx.reply(errorMsg, {
+      parse_mode: 'HTML',
+      ...keyboards.adminPanel(lang),
+    });
+  }
+}
+
+const callbackConfirmChannelPost = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery('🚀 ወደ ቻናሉ በመለጠፍ ላይ...').catch(() => {});
+  return executeChannelPost(ctx);
+});
+
+const callbackCancelChannelPost = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery('ተሰርዟል').catch(() => {});
+  if (ctx.session) {
+    ctx.session.awaitingChannelPostMessage = false;
+    ctx.session.channelPostPayload = null;
+  }
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  return ctx.reply(lang === 'en' ? '❌ Channel post cancelled.' : '❌ ወደ ቻናል መለጠፉ ተሰርዟል።', {
+    ...keyboards.adminPanel(lang),
+  });
+});
+
 module.exports = {
   handleAdmin,
   handleAddStock,
@@ -2418,6 +2575,11 @@ module.exports = {
   handleBroadcastMessage,
   callbackConfirmBroadcast,
   callbackCancelBroadcast,
+  handleChannelPost,
+  startChannelPost,
+  handleChannelPostMessage,
+  callbackConfirmChannelPost,
+  callbackCancelChannelPost,
   handleUsers,
   callbackUsers,
   callbackUsersPage,

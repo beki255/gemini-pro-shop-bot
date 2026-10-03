@@ -52,8 +52,16 @@ async function handleStart(ctx) {
   const user = await getOrSaveUser(ctx.from);
   const isAdmin = ctx.from && ctx.from.id === config.adminId;
 
+  // Extract start payload (e.g. /start buy from channel button or deep link)
+  const textPayload = ctx.message?.text ? ctx.message.text.split(/\s+/)[1] : null;
+  const payload = (ctx.startPayload || textPayload || ctx.session?.startPayload || '').trim().toLowerCase();
+
   // 1. If user hasn't chosen language yet, prompt with welcome photo & language keyboard!
   if (!user.language) {
+    if (payload) {
+      ctx.session = ctx.session || {};
+      ctx.session.startPayload = payload;
+    }
     const welcomePhotoPath = path.join(__dirname, '../../assets/gemini_welcome.png');
     if (fs.existsSync(welcomePhotoPath)) {
       try {
@@ -87,11 +95,17 @@ async function handleStart(ctx) {
     });
   }
 
+  // 3. If customer clicked "Buy Now" button from channel deep link (?start=buy)
+  if (payload === 'buy') {
+    if (ctx.session?.startPayload) delete ctx.session.startPayload;
+    return handleBuy(ctx);
+  }
+
   // Fetch live available stock count
   const reservationService = require('../services/reservationService');
   const stockCount = await reservationService.getAvailableStockCount();
 
-  // 3. Customer Welcome & Main Menu in their chosen language
+  // 4. Customer Welcome & Main Menu in their chosen language
   await ctx.reply(msg.welcome(ctx.from.first_name, lang), {
     parse_mode: 'HTML',
     ...keyboards.mainMenu(lang, false, stockCount),

@@ -486,6 +486,13 @@ const keyboards = {
           style: 'primary',
         },
         {
+          text: isEn ? '📢 Post to Channel' : '📢 ወደ ቻናል ፖስት አድርግ',
+          callback_data: 'admin_channel_post',
+          style: 'primary',
+        },
+      ],
+      [
+        {
           text: isEn ? '👀 View Store' : '👀 ሱቁን እይ',
           callback_data: 'view_customer_store',
           style: 'primary',
@@ -869,6 +876,53 @@ const keyboards = {
           text: isEn ? '❌ Cancel' : '❌ ሰርዝ',
           callback_data: 'cancel_broadcast',
           style: 'danger',
+        },
+      ],
+    ]);
+  },
+
+  // ─── CHANNEL POST CONFIRMATION KEYBOARDS ───────────────────
+  channelPostConfirm(lang = 'am') {
+    const isEn = lang === 'en';
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? '🚀 Yes, Post to Channel' : '🚀 አዎ፣ ወደ ቻናሉ ልጠፍ',
+          callback_data: 'confirm_channel_post',
+          style: 'success',
+        },
+      ],
+      [
+        {
+          text: isEn ? '❌ Cancel' : '❌ ሰርዝ',
+          callback_data: 'cancel_channel_post',
+          style: 'danger',
+        },
+      ],
+    ]);
+  },
+
+  cancelChannelPost(lang = 'am') {
+    const isEn = lang === 'en';
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? '❌ Cancel' : '❌ ሰርዝ',
+          callback_data: 'cancel_channel_post',
+          style: 'danger',
+        },
+      ],
+    ]);
+  },
+
+  channelPostBuyButton(botUsername, lang = 'am') {
+    const isEn = lang === 'en';
+    const username = (botUsername || config.botUsername || 'Mnbvcnvhd').replace(/^@/, '');
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? '🛍️ Buy Now (Order Here)' : '🛍️ አሁን ግዛ (Buy Now)',
+          url: `https://t.me/${username}?start=buy`,
         },
       ],
     ]);

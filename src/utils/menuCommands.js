@@ -31,6 +31,7 @@ const commands = {
       { command: 'addstock', description: '➕ ስቶክ ጨምር' },
       { command: 'setprice', description: '💰 ዋጋ ቀይር' },
       { command: 'broadcast', description: '📢 ማስታወቂያ ላክ' },
+      { command: 'post', description: '📢 ወደ ቻናል ፖስት አድርግ' },
       { command: 'language', description: '🌐 ቋንቋ ቀይር' },
     ],
     en: [
@@ -43,6 +44,7 @@ const commands = {
       { command: 'addstock', description: '➕ Add Stock' },
       { command: 'setprice', description: '💰 Change Price' },
       { command: 'broadcast', description: '📢 Broadcast Announcement' },
+      { command: 'post', description: '📢 Post to Channel' },
       { command: 'language', description: '🌐 Change Language' },
     ],
   },
