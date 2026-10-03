@@ -24,6 +24,27 @@ function sanitizeButtonText(text, maxLength = 60) {
 }
 
 const keyboards = {
+  // ─── MANDATORY CHANNEL SUBSCRIPTION KEYBOARD ─────────────────
+  forceJoinChannel(channelLink, lang = 'am') {
+    const isEn = lang === 'en';
+    const link = channelLink || 'https://t.me/gemini_pro_shop_proof';
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? '📢 Join Channel' : '📢 ቻናሉን ተቀላቀል',
+          url: link,
+        },
+      ],
+      [
+        {
+          text: isEn ? '✅ I Have Joined (Verify)' : '✅ ተቀላቅያለሁ (አረጋግጥ)',
+          callback_data: 'verify_channel_joined',
+          style: 'success',
+        },
+      ],
+    ]);
+  },
+
   // ─── LANGUAGE SELECTION KEYBOARD (Primary Blue) ─────────────
   languageSelection() {
     return Markup.inlineKeyboard([

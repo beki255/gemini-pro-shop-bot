@@ -21,11 +21,20 @@ async function getOrSaveUser(from) {
       language: null, // Prompt for language on first start
     });
   } else {
+    let needsSave = false;
     // Keep username/name fresh
     if (user.username !== (from.username || null) || user.firstName !== (from.first_name || '')) {
       user.username = from.username || null;
       user.firstName = from.first_name || '';
       user.lastName = from.last_name || '';
+      needsSave = true;
+    }
+    // If user was previously marked blocked, unblock them immediately since they are active!
+    if (user.isBlocked) {
+      user.isBlocked = false;
+      needsSave = true;
+    }
+    if (needsSave) {
       await user.save();
     }
   }

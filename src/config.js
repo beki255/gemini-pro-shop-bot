@@ -20,6 +20,10 @@ const config = {
       name: process.env.TELEBIRR_NAME || 'bereket',
     },
   },
+  proofChannel: {
+    username: process.env.PROOF_CHANNEL_USERNAME || '@gemini_pro_shop_proof',
+    link: process.env.PROOF_CHANNEL_LINK || 'https://t.me/gemini_pro_shop_proof',
+  },
 };
 
 // Validate required fields

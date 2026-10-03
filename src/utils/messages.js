@@ -7,6 +7,43 @@ function esc(s) {
 }
 
 const msg = {
+  // ─── MANDATORY CHANNEL SUBSCRIPTION (FORCE JOIN) ───────────
+  forceJoinChannel(channelUsername, lang = null) {
+    const safeChannel = esc(channelUsername || '@gemini_pro_shop_proof');
+
+    if (lang === 'en') {
+      return (
+        `📢 <b>Channel Membership Required!</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `To use our bot and access all features, you must first join our official Telegram channel (${safeChannel}).\n\n` +
+        `🎁 <i>Payment proofs, special discount codes, and new stock announcements are posted there!</i>\n\n` +
+        `👉 Click <b>«📢 Join Channel»</b> below, and once joined, press <b>«✅ I Have Joined (Verify)»</b>.`
+      );
+    }
+
+    if (lang === 'am') {
+      return (
+        `📢 <b>የቴሌግራም ቻናላችንን ይቀላቀሉ!</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `ቦቱን ለመጠቀም እና አገልግሎት ለማግኘት መጀመሪያ የቴሌግራም ቻናላችንን (${safeChannel}) መቀላቀል ግዴታ ነው!\n\n` +
+        `🎁 <i>የደንበኞች ክፍያ ማረጋገጫዎች (Proof)፣ ቅናሾች እና አዳዲስ መረጃዎች በቻናሉ ይለቀቃሉ!</i>\n\n` +
+        `👉 ከስር ያለውን <b>«📢 ቻናሉን ተቀላቀል»</b> የሚለውን ተጭነው ከተቀላቀሉ በኋላ <b>«✅ ተቀላቅያለሁ (አረጋግጥ)»</b> የሚለውን ይጫኑ።`
+      );
+    }
+
+    // Bilingual (when user has not chosen language yet or first /start)
+    return (
+      `📢 <b>የቴሌግራም ቻናላችንን ይቀላቀሉ / Join Our Channel!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `ቦቱን ለመጠቀም እና አገልግሎት ለማግኘት መጀመሪያ የቴሌግራም ቻናላችንን (${safeChannel}) መቀላቀል ግዴታ ነው!\n` +
+      `<i>To use this bot, you must first join our official Telegram channel (${safeChannel})!</i>\n\n` +
+      `🎁 <i>የክፍያ ማረጋገጫዎች (Proof) እና ቅናሾች በቻናላችን ይለቀቃሉ!</i>\n` +
+      `<i>Payment proofs and discounts are shared in our channel!</i>\n\n` +
+      `👉 ከስር <b>«📢 ቻናሉን ተቀላቀል»</b> ተጭነው ከተቀላቀሉ በኋላ <b>«✅ ተቀላቅያለሁ (አረጋግጥ)»</b> ይጫኑ።\n` +
+      `👉 Click <b>«📢 Join Channel»</b> below, then press <b>«✅ I Have Joined (Verify)»</b>.`
+    );
+  },
+
   // ─── WELCOME / LANGUAGE SELECTION PROMPT ───────────────────
   chooseLanguage() {
     return (

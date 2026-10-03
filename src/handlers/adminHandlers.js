@@ -2246,21 +2246,29 @@ async function showBroadcastPreview(ctx, directText = null) {
   const lang = user && user.language ? user.language : 'am';
   const isEn = lang === 'en';
 
-  const totalUsers = await User.countDocuments({ isBlocked: { $ne: true } });
+  const [totalRegistered, activeUsers] = await Promise.all([
+    User.countDocuments(),
+    User.countDocuments({ isBlocked: { $ne: true } }),
+  ]);
+  const blockedUsers = totalRegistered - activeUsers;
 
   let text = isEn
     ? `👁️ <b>Announcement Preview & Confirmation</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
       (directText
         ? `📝 <i>Message Content:</i>\n${escapeHtml(directText)}\n━━━━━━━━━━━━━━━━━━━━\n`
         : `👆 <i>The message you sent above is ready to be sent.</i>\n━━━━━━━━━━━━━━━━━━━━\n`) +
-      `👥 <b>Total Recipients:</b> <code>${totalUsers}</code> active user(s)\n\n` +
-      `👉 <b>Are you sure you want to broadcast this message to all users now?</b>`
+      `👥 <b>Total Registered Users:</b> <code>${totalRegistered}</code>\n` +
+      `🟢 <b>Active Users:</b> <code>${activeUsers}</code>\n` +
+      (blockedUsers > 0 ? `🚫 <b>Blocked Bot / Inactive:</b> <code>${blockedUsers}</code>\n` : '') +
+      `\n👉 <b>Are you sure you want to broadcast this message to all users now?</b>`
     : `👁️ <b>የማስታወቂያ ቅድመ-ዕይታ እና ማረጋገጫ</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
       (directText
         ? `📝 <i>የመልእክቱ ይዘት፦</i>\n${escapeHtml(directText)}\n━━━━━━━━━━━━━━━━━━━━\n`
         : `👆 <i>ከላይ የላኩት መልእክት ለሁሉም ተጠቃሚዎች ለመላክ ተዘጋጅቷል።</i>\n━━━━━━━━━━━━━━━━━━━━\n`) +
-      `👥 <b>ጠቅላላ ተቀባዮች:</b> <code>${totalUsers}</code> ተጠቃሚዎች\n\n` +
-      `👉 <b>ይህ መልእክት አሁን ለሁሉም ተጠቃሚዎች እንዲላክ ይፈልጋሉ?</b>`;
+      `👥 <b>ጠቅላላ የተመዘገቡ ተጠቃሚዎች:</b> <code>${totalRegistered}</code>\n` +
+      `🟢 <b>ንቁ ተጠቃሚዎች:</b> <code>${activeUsers}</code>\n` +
+      (blockedUsers > 0 ? `🚫 <b>ቦቱን ያገዱ / ያልተገኙ:</b> <code>${blockedUsers}</code>\n` : '') +
+      `\n👉 <b>ይህ መልእክት አሁን ለሁሉም ተጠቃሚዎች እንዲላክ ይፈልጋሉ?</b>`;
 
   return ctx.reply(text, {
     parse_mode: 'HTML',
@@ -2279,7 +2287,8 @@ async function executeBroadcast(ctx) {
   session.broadcastPayload = null;
   session.awaitingBroadcastMessage = false;
 
-  const users = await User.find({ isBlocked: { $ne: true } });
+  // Target all registered users in the database so no user is missed
+  const users = await User.find();
   const total = users.length;
 
   const user = await User.findOne({ telegramId: ctx.from.id });
@@ -2287,15 +2296,15 @@ async function executeBroadcast(ctx) {
   const isEn = lang === 'en';
 
   if (total === 0) {
-    return ctx.reply(isEn ? '📭 No active users found in database.' : '📭 በዳታቤዝ ውስጥ ምንም ንቁ ተጠቃሚ አልተገኘም።', {
+    return ctx.reply(isEn ? '📭 No registered users found in database.' : '📭 በዳታቤዝ ውስጥ ምንም ተጠቃሚ አልተገኘም።', {
       ...keyboards.adminPanel(lang),
     });
   }
 
   await ctx.reply(
     isEn
-      ? `⏳ <b>Broadcasting in progress...</b>\nSending to ${total} user(s). Please wait...`
-      : `⏳ <b>ማስታወቂያው በመላክ ላይ ነው...</b>\nለ ${total} ተጠቃሚዎች በመላክ ላይ። እባክዎ ትንሽ ይጠብቁ...`,
+      ? `⏳ <b>Broadcasting in progress...</b>\nSending to all ${total} registered user(s). Please wait...`
+      : `⏳ <b>ማስታወቂያው በመላክ ላይ ነው...</b>\nለ ${total} ጠቅላላ ተጠቃሚዎች በመላክ ላይ። እባክዎ ትንሽ ይጠብቁ...`,
     { parse_mode: 'HTML' }
   );
 
@@ -2311,6 +2320,10 @@ async function executeBroadcast(ctx) {
         await ctx.telegram.sendMessage(u.telegramId, payload.text, { parse_mode: 'HTML' });
       }
       successCount++;
+      // If user had previously been marked blocked, unblock them now since sending succeeded!
+      if (u.isBlocked) {
+        await User.updateOne({ _id: u._id }, { isBlocked: false }).catch(() => {});
+      }
     } catch (err) {
       const errMsg = err.message || '';
       if (
@@ -2325,7 +2338,7 @@ async function executeBroadcast(ctx) {
         failedCount++;
       }
     }
-    // Rate limit safety: 35ms between sends (~28 msgs/sec)
+    // Rate limit safety: 35ms between sends (~28 msgs/sec, safe under Telegram's 30/s limit)
     await new Promise((r) => setTimeout(r, 35));
   }
 
@@ -2334,13 +2347,13 @@ async function executeBroadcast(ctx) {
       `✅ Successfully Sent: <b>${successCount}</b>\n` +
       `🚫 Blocked / Deactivated: <b>${blockedCount}</b>\n` +
       `⚠️ Failed: <b>${failedCount}</b>\n` +
-      `👥 Total Target Users: <b>${total}</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `👥 Total Registered Users: <b>${total}</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
       `🎉 All done!`
     : `📢 <b>የማስታወቂያ መላክ ሂደት ተጠናቋል!</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
       `✅ በተሳካ ሁኔታ የደረሳቸው: <b>${successCount}</b>\n` +
       `🚫 ቦቱን ያገዱ / ያልተገኙ: <b>${blockedCount}</b>\n` +
       `⚠️ ያልተሳካ: <b>${failedCount}</b>\n` +
-      `👥 ጠቅላላ ተጠቃሚዎች: <b>${total}</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `👥 ጠቅላላ የተመዘገቡ ተጠቃሚዎች: <b>${total}</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
       `🎉 ማስታወቂያው ለሁሉም ተጠቃሚዎች ተልኳል!`;
 
   return ctx.reply(reportText, {

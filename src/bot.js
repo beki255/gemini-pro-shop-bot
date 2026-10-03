@@ -7,6 +7,7 @@ const { connectDB } = require('./database');
 // Handlers
 const userHandlers = require('./handlers/userHandlers');
 const adminHandlers = require('./handlers/adminHandlers');
+const subscriptionService = require('./services/subscriptionService');
 
 // ─── Initialize Bot ───────────────────────────────────────
 const bot = new Telegraf(config.botToken);
@@ -34,6 +35,30 @@ bot.use(async (ctx, next) => {
     // Prevent Telegraf error if answerCbQuery is called during message update
     ctx.answerCbQuery = async () => false;
   }
+  return next();
+});
+
+// ─── Mandatory Proof Channel Subscription Middleware ──────
+bot.use(async (ctx, next) => {
+  if (!ctx.from) return next();
+
+  // Admin is always exempt
+  if (ctx.from.id === config.adminId) return next();
+
+  // Allow channel verification callback to pass through
+  if (ctx.callbackQuery && ctx.callbackQuery.data === 'verify_channel_joined') {
+    return next();
+  }
+
+  // Check if user is subscribed to the proof channel
+  const isSubscribed = await subscriptionService.isUserSubscribed(ctx.telegram, ctx.from.id);
+  if (!isSubscribed) {
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery('⚠️ እባክዎ መጀመሪያ ቻናላችንን ይቀላቀሉ!', { show_alert: false }).catch(() => {});
+    }
+    return subscriptionService.sendForceJoinMessage(ctx);
+  }
+
   return next();
 });
 
@@ -76,6 +101,7 @@ bot.on('callback_query', async (ctx) => {
   const data = ctx.callbackQuery.data;
 
   // User callbacks
+  if (data === 'verify_channel_joined') return subscriptionService.handleVerifyChannelJoined(ctx);
   if (data === 'buy') return userHandlers.callbackBuy(ctx);
   if (data === 'refresh_menu') return userHandlers.callbackRefreshMenu(ctx);
   if (data === 'refresh_qty') return userHandlers.callbackRefreshQty(ctx);
