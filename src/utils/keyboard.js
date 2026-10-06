@@ -344,6 +344,20 @@ const keyboards = {
     ]);
   },
 
+  // ─── CANCEL USDT RATE CHANGE BUTTON ────────────────────────
+  cancelUsdtRateChange(lang = 'am') {
+    const isEn = lang === 'en';
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? '❌ Cancel' : '❌ ሰርዝ',
+          callback_data: 'cancel_change_usdt_rate',
+          style: 'danger',
+        },
+      ],
+    ]);
+  },
+
   // ─── BACK TO MAIN MENU (Primary Blue) ──────────────────────
   backToMain(lang = 'am') {
     const isEn = lang === 'en';
@@ -519,27 +533,27 @@ const keyboards = {
           style: 'primary',
         },
         {
+          text: isEn ? '💱 Change USDT Rate' : '💱 የ USDT ተመን ቀይር',
+          callback_data: 'admin_change_usdt_rate',
+          style: 'primary',
+        },
+      ],
+      [
+        {
           text: isEn ? '➕ Add Stock' : '➕ ስቶክ ጨምር',
           callback_data: 'admin_start_add_stock',
           style: 'success',
         },
-      ],
-      [
         {
           text: isEn ? '📢 Broadcast' : '📢 ማስታወቂያ ላክ (Broadcast)',
           callback_data: 'admin_broadcast',
           style: 'primary',
         },
-        {
-          text: isEn ? '📢 Post to Channel' : '📢 ወደ ቻናል ፖስት አድርግ',
-          callback_data: 'admin_channel_post',
-          style: 'primary',
-        },
       ],
       [
         {
-          text: isEn ? '👀 View Store' : '👀 ሱቁን እይ',
-          callback_data: 'view_customer_store',
+          text: isEn ? '📢 Post to Channel' : '📢 ወደ ቻናል ፖስት አድርግ',
+          callback_data: 'admin_channel_post',
           style: 'primary',
         },
       ],
@@ -765,36 +779,6 @@ const keyboards = {
     return Markup.inlineKeyboard(rows);
   },
 
-  // ─── ADMIN STORE PREVIEW KEYBOARD (No customer buttons) ─────
-  adminStorePreview(lang = 'am') {
-    const isEn = lang === 'en';
-    return Markup.inlineKeyboard([
-      [
-        {
-          text: isEn ? '💰 Change Price' : '💰 ዋጋ ቀይር',
-          callback_data: 'admin_change_price',
-          style: 'primary',
-        },
-        {
-          text: isEn ? '➕ Add Stock' : '➕ ስቶክ ጨምር',
-          callback_data: 'admin_start_add_stock',
-          style: 'success',
-        },
-      ],
-      [
-        {
-          text: isEn ? '🔄 Refresh' : '🔄 አድስ',
-          callback_data: 'admin_refresh_store_view',
-          style: 'primary',
-        },
-        {
-          text: isEn ? '🛠️ Admin Panel' : '🛠️ ወደ አድሚን ፓነል ተመለስ',
-          callback_data: 'admin_panel',
-          style: 'primary',
-        },
-      ],
-    ]);
-  },
 
   // ─── STOCK INPUT FLOW KEYBOARD ─────────────────────────────
   stockInputKeyboard(count = 0, lang = 'am') {

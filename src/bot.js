@@ -279,65 +279,8 @@ bot.on('callback_query', async (ctx) => {
       { parse_mode: 'Markdown' }
     );
   }
-  if (data === 'view_customer_store') {
-    if (ctx.from.id !== config.adminId) return ctx.answerCbQuery('🚫 Admin only').catch(() => {});
-    await ctx.answerCbQuery();
-    const path = require('path');
-    const fs = require('fs-extra');
-    const msg = require('./utils/messages');
-    const keyboards = require('./utils/keyboard');
-    const config = require('./config');
-    const reservationService = require('./services/reservationService');
-    const stockCount = await reservationService.getAvailableStockCount();
-    const lang = await userHandlers.getUserLang(ctx.from.id);
-    const price = config.productPrice || 250;
-
-    const productPhotoPath = path.join(__dirname, '../assets/gemini_product.png');
-    if (fs.existsSync(productPhotoPath)) {
-      try {
-        return await ctx.replyWithPhoto(
-          { source: productPhotoPath },
-          {
-            caption: msg.adminStorePreview(price, stockCount, lang),
-            parse_mode: 'HTML',
-            ...keyboards.adminStorePreview(lang),
-          }
-        );
-      } catch (err) {
-        console.error('Failed to replyWithPhoto for store preview:', err.message);
-      }
-    }
-
-    return ctx.reply(msg.adminStorePreview(price, stockCount, lang), {
-      parse_mode: 'HTML',
-      ...keyboards.adminStorePreview(lang),
-    });
-  }
-
-  if (data === 'admin_refresh_store_view') {
-    if (ctx.from.id !== config.adminId) return ctx.answerCbQuery('🚫 Admin only').catch(() => {});
-    const msg = require('./utils/messages');
-    const keyboards = require('./utils/keyboard');
-    const config = require('./config');
-    const reservationService = require('./services/reservationService');
-    const stockCount = await reservationService.getAvailableStockCount();
-    const lang = await userHandlers.getUserLang(ctx.from.id);
-    const price = config.productPrice || 250;
-
-    await ctx.answerCbQuery(lang === 'en' ? '🔄 Store preview refreshed' : '🔄 የሱቅ ሁኔታው ታድሷል');
-
-    try {
-      return await ctx.editMessageCaption(msg.adminStorePreview(price, stockCount, lang), {
-        parse_mode: 'HTML',
-        ...keyboards.adminStorePreview(lang),
-      });
-    } catch {
-      return ctx.editMessageText(msg.adminStorePreview(price, stockCount, lang), {
-        parse_mode: 'HTML',
-        ...keyboards.adminStorePreview(lang),
-      }).catch(() => {});
-    }
-  }
+  if (data === 'admin_change_usdt_rate') return adminHandlers.callbackChangeUsdtRate(ctx);
+  if (data === 'cancel_change_usdt_rate') return adminHandlers.callbackCancelUsdtRateChange(ctx);
 
   // Unknown
   await ctx.answerCbQuery('⚠️ ያልታወቀ ትዕዛዝ');
@@ -399,6 +342,12 @@ bot.on('text', async (ctx) => {
   // Admin direct price change input
   if (ctx.from.id === config.adminId && session.awaitingNewPrice) {
     const handled = await adminHandlers.handlePriceInput(ctx);
+    if (handled) return;
+  }
+
+  // Admin direct USDT rate change input
+  if (ctx.from.id === config.adminId && session.awaitingUsdtRate) {
+    const handled = await adminHandlers.handleUsdtRateInput(ctx);
     if (handled) return;
   }
 

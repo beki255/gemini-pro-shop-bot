@@ -97,56 +97,6 @@ const msg = {
     );
   },
 
-  // ─── ADMIN STORE PREVIEW (No customer action buttons) ───────
-  adminStorePreview(price, stockCount, lang = 'am') {
-    const usdt = config.calculateUsdtPrice(price);
-    if (lang === 'en') {
-      return (
-        `🏪 <b>Store Status Preview (Admin Mode)</b>\n` +
-        `━━━━━━━━━━━━━━━━━━━━━\n` +
-        `📌 <b>Product:</b> Google Gemini Advanced (18 Months)\n` +
-        `💰 <b>Current Price:</b> ${price} ETB (${usdt} USDT)\n` +
-        `📦 <b>Live Available Stock:</b> ${stockCount} item(s)\n\n` +
-        `✨ <b>Active Customer Features:</b>\n` +
-        `✅ 18-month AI Pro plan\n` +
-        `✅ 5 TB cloud storage\n` +
-        `✅ Supports up to five users\n` +
-        `✅ Veo 3 – AI Video Generation 🎥\n` +
-        `✅ Imagen 4 – AI Image Generation 🎨\n` +
-        `✅ Antigravity & Jules AI Agent\n` +
-        `✅ Deep Research\n` +
-        `✅ NotebookLM Plus\n` +
-        `⚠️ No warranty if any problem happens after it's activated\n\n` +
-        `🚀 <b>Delivery is automatic after payment confirmation.</b>\n\n` +
-        `⚙️ <i>Admin Control: Use the management buttons below to update price or stock.</i>`
-      );
-    }
-
-    return (
-      `🏪 <b>የመደብሩ ሁኔታ ቅድመ-እይታ (የአድሚን ሁነታ)</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━\n` +
-      `📌 <b>ምርት:</b> Google Gemini Advanced (18 ወራት)\n` +
-      `💰 <b>የአሁኑ ዋጋ:</b> ${price} ብር (${usdt} USDT)\n` +
-      `📦 <b>በስቶክ የሚገኝ:</b> ${stockCount} ሊንክ\n\n` +
-      `✨ <b>ለደንበኞች የሚታዩ ጥቅሞች (Features):</b>\n` +
-      `✅ 18-month AI Pro plan\n` +
-      `✅ 5 TB cloud storage\n` +
-      `✅ Supports up to five users\n` +
-      `✅ Veo 3 – AI Video Generation 🎥\n` +
-      `✅ Imagen 4 – AI Image Generation 🎨\n` +
-      `✅ Antigravity & Jules AI Agent\n` +
-      `✅ Deep Research & NotebookLM Plus\n\n` +
-      `📜 <b>የግዢ ፖሊሲ (Terms & Warranty):</b>\n` +
-      `<blockquote>⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
-      `• ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
-      `• <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
-      `⏰ <b>የአክቲቬሽን ጊዜ ገደብ (5 ሰዓት):</b>\n` +
-      `• ሊንኩ እንደደረሰዎት በ 5 ሰዓት ውስጥ አክቲቭ መደረግ አለበት፤ ካለፈ ኃላፊነት አንወስድም።</blockquote>\n\n` +
-      `🚀 <b>Delivery is automatic after payment confirmation.</b>\n` +
-      `<i>(ከክፍያ ማረጋገጫ በኋላ ሊንኩ ወዲያውኑ በራስ-ሰር ይላካል)</i>\n\n` +
-      `⚙️ <i>የአድሚን መቆጣጠሪያ፦ ዋጋ ለመቀየር ወይም ስቶክ ለመጨመር ከታች ያሉትን አዝራሮች ይጠቀሙ።</i>`
-    );
-  },
 
   // ─── PRODUCT DETAILS ───────────────────────────────────────
   productDetails(availableCount = 1, lang = 'am') {

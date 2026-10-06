@@ -1947,6 +1947,98 @@ const handleSetUsdtRate = adminOnly(async (ctx) => {
   );
 });
 
+// ─── Callback: "admin_change_usdt_rate" ───────────────────
+const callbackChangeUsdtRate = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  ctx.session = ctx.session || {};
+  ctx.session.awaitingUsdtRate = true;
+
+  const currentRate = config.payment.usdtRate || 195;
+  const currentUsdt = config.calculateUsdtPrice(config.productPrice, currentRate);
+
+  return ctx.reply(
+    isEn
+      ? `💱 *Change USDT Exchange Rate*\n\n` +
+        `Current Rate: *1 USDT = ${currentRate} ETB*\n` +
+        `Product Price: *${config.productPrice} ETB* (~*${currentUsdt} USDT*)\n\n` +
+        `Please enter the **new rate** below (numbers only, e.g. \`197\` or \`200\`):`
+      : `💱 *የ USDT ምንዛሬ ተመን ማስተካከያ*\n\n` +
+        `የአሁኑ ተመን፦ *1 USDT = ${currentRate} ብር*\n` +
+        `የአሁኑ የምርት ዋጋ፦ *${config.productPrice} ብር* (~*${currentUsdt} USDT*)\n\n` +
+        `እባክዎ **አዲሱን የ 1 USDT ተመን** ብቻ እዚህ ይላኩ (ምሳሌ: \`197\` ወይም \`200\`):`,
+    {
+      parse_mode: 'Markdown',
+      ...keyboards.cancelUsdtRateChange(lang),
+    }
+  );
+});
+
+// ─── Handle Direct USDT Rate Input from Admin ─────────────
+const handleUsdtRateInput = adminOnly(async (ctx) => {
+  const session = ctx.session || {};
+  if (!session.awaitingUsdtRate) return false;
+
+  const rawText = ctx.message.text ? ctx.message.text.trim() : '';
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  const newRate = parseFloat(rawText);
+  if (isNaN(newRate) || newRate <= 0) {
+    await ctx.reply(
+      isEn
+        ? '⚠️ Please enter a valid number for the USDT rate (e.g. `197`):'
+        : '⚠️ እባክዎ ትክክለኛ የቁጥር ተመን ብቻ ያስገቡ (ምሳሌ: `197`):',
+      {
+        parse_mode: 'Markdown',
+        ...keyboards.cancelUsdtRateChange(lang),
+      }
+    );
+    return true;
+  }
+
+  session.awaitingUsdtRate = false;
+
+  const settingsService = require('../services/settingsService');
+  await settingsService.setUsdtRate(newRate);
+  const newUsdt = config.calculateUsdtPrice(config.productPrice, newRate);
+
+  await ctx.reply(
+    isEn
+      ? `✅ USDT rate successfully updated to *1 USDT = ${newRate} ETB*!\nNew USDT price per item: *${newUsdt} USDT*`
+      : `✅ የ USDT ተመን በተሳካ ሁኔታ ወደ *1 USDT = ${newRate} ብር* ተቀይሯል!\nአዲሱ የ 1 ሊንክ ዋጋ፦ *${newUsdt} USDT*`,
+    {
+      parse_mode: 'Markdown',
+      ...keyboards.adminPanel(lang),
+    }
+  );
+  return true;
+});
+
+// ─── Callback: Cancel USDT Rate Change ────────────────────
+const callbackCancelUsdtRateChange = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery('ተሰርዟል').catch(() => {});
+  if (ctx.session) ctx.session.awaitingUsdtRate = false;
+
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  await ctx.reply(
+    isEn
+      ? '❌ USDT rate change cancelled.'
+      : '❌ የ USDT ተመን ለውጥ ተሰርዟል።',
+    {
+      parse_mode: 'Markdown',
+      ...keyboards.adminPanel(lang),
+    }
+  );
+});
+
 // ─── /resend <orderId> — Re-send delivered link to customer ─
 const handleResend = adminOnly(async (ctx) => {
   const text = ctx.message?.text || '';
@@ -2644,6 +2736,9 @@ module.exports = {
   callbackAdminStock,
   callbackChangePrice,
   callbackCancelPriceChange,
+  callbackChangeUsdtRate,
+  handleUsdtRateInput,
+  callbackCancelUsdtRateChange,
   handleDirectDeliveryLink,
   callbackDeliverDirect,
   callbackCancelDirectDelivery,
