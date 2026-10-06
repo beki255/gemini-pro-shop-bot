@@ -171,8 +171,8 @@ const keyboards = {
       [
         {
           text: isEn
-            ? `🏦 CBE Bank — ${totalEtb} ETB (${quantity} × ${unitEtb} ETB)`
-            : `🏦 የኢትዮጵያ ንግድ ባንክ — ${totalEtb} ብር (${quantity} × ${unitEtb} ብር)`,
+            ? `🏦 CBE Bank — ${totalEtb} ETB`
+            : `🏦 የኢትዮጵያ ንግድ ባንክ — ${totalEtb} ብር`,
           callback_data: `pay_cbe_${quantity}`,
           style: 'primary',
         },
@@ -180,35 +180,29 @@ const keyboards = {
       [
         {
           text: isEn
-            ? `📱 Telebirr — ${totalEtb} ETB (${quantity} × ${unitEtb} ETB)`
-            : `📱 ቴሌብር — ${totalEtb} ብር (${quantity} × ${unitEtb} ብር)`,
+            ? `📱 Telebirr — ${totalEtb} ETB`
+            : `📱 ቴሌብር — ${totalEtb} ብር`,
           callback_data: `pay_telebirr_${quantity}`,
           style: 'primary',
         },
       ],
       [
         {
-          text: isEn
-            ? `🟡 Binance Pay — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`
-            : `🟡 Binance Pay — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`,
+          text: `🟡 Binance Pay — ${totalUsdt} USDT`,
           callback_data: `pay_binance_${quantity}`,
           style: 'primary',
         },
       ],
       [
         {
-          text: isEn
-            ? `🖤 Bybit (USDT) — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`
-            : `🖤 Bybit (USDT) — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`,
+          text: `🖤 Bybit (USDT) — ${totalUsdt} USDT`,
           callback_data: `pay_bybit_${quantity}`,
           style: 'primary',
         },
       ],
       [
         {
-          text: isEn
-            ? `🌐 USDT (BEP-20) — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`
-            : `🌐 USDT (BEP-20) — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`,
+          text: `🌐 USDT (BEP-20) — ${totalUsdt} USDT`,
           callback_data: `pay_bep20_${quantity}`,
           style: 'primary',
         },
