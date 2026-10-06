@@ -99,12 +99,13 @@ const msg = {
 
   // ─── ADMIN STORE PREVIEW (No customer action buttons) ───────
   adminStorePreview(price, stockCount, lang = 'am') {
+    const usdt = config.calculateUsdtPrice(price);
     if (lang === 'en') {
       return (
         `🏪 <b>Store Status Preview (Admin Mode)</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `📌 <b>Product:</b> Google Gemini Advanced (18 Months)\n` +
-        `💰 <b>Current Price:</b> ${price} ETB\n` +
+        `💰 <b>Current Price:</b> ${price} ETB (${usdt} USDT)\n` +
         `📦 <b>Live Available Stock:</b> ${stockCount} item(s)\n\n` +
         `✨ <b>Active Customer Features:</b>\n` +
         `✅ 18-month AI Pro plan\n` +
@@ -125,7 +126,7 @@ const msg = {
       `🏪 <b>የመደብሩ ሁኔታ ቅድመ-እይታ (የአድሚን ሁነታ)</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
       `📌 <b>ምርት:</b> Google Gemini Advanced (18 ወራት)\n` +
-      `💰 <b>የአሁኑ ዋጋ:</b> ${price} ብር\n` +
+      `💰 <b>የአሁኑ ዋጋ:</b> ${price} ብር (${usdt} USDT)\n` +
       `📦 <b>በስቶክ የሚገኝ:</b> ${stockCount} ሊንክ\n\n` +
       `✨ <b>ለደንበኞች የሚታዩ ጥቅሞች (Features):</b>\n` +
       `✅ 18-month AI Pro plan\n` +
@@ -139,8 +140,8 @@ const msg = {
       `<blockquote>⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
       `• ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
       `• <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
-      `⏰ <b>የአክቲቬሽን ጊዜ ገደብ (1 ሰዓት):</b>\n` +
-      `• ሊንኩ እንደደረሰዎት በ 1 ሰዓት ውስጥ አክቲቭ መደረግ አለበት፤ ካለፈ ኃላፊነት አንወስድም።</blockquote>\n\n` +
+      `⏰ <b>የአክቲቬሽን ጊዜ ገደብ (5 ሰዓት):</b>\n` +
+      `• ሊንኩ እንደደረሰዎት በ 5 ሰዓት ውስጥ አክቲቭ መደረግ አለበት፤ ካለፈ ኃላፊነት አንወስድም።</blockquote>\n\n` +
       `🚀 <b>Delivery is automatic after payment confirmation.</b>\n` +
       `<i>(ከክፍያ ማረጋገጫ በኋላ ሊንኩ ወዲያውኑ በራስ-ሰር ይላካል)</i>\n\n` +
       `⚙️ <i>የአድሚን መቆጣጠሪያ፦ ዋጋ ለመቀየር ወይም ስቶክ ለመጨመር ከታች ያሉትን አዝራሮች ይጠቀሙ።</i>`
@@ -149,12 +150,14 @@ const msg = {
 
   // ─── PRODUCT DETAILS ───────────────────────────────────────
   productDetails(availableCount = 1, lang = 'am') {
+    const price = config.productPrice || 250;
+    const usdt = config.calculateUsdtPrice(price);
     if (lang === 'en') {
       return (
         `🛍️ <b>Gemini Pro 18 Month Link</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
         `📌 <b>Product:</b> Google Gemini Advanced (18 Months)\n` +
-        `💰 <b>Price:</b> ${config.productPrice} ETB / item\n` +
+        `💰 <b>Price:</b> ${price} ETB (${usdt} USDT) / item\n` +
         `📦 <b>Status:</b> 🟢 In Stock (Instant Delivery)\n\n` +
         `✨ <b>Key Features:</b>\n` +
         `✅ 18-Month AI Pro Plan\n` +
@@ -166,9 +169,9 @@ const msg = {
         `<blockquote>⚠️ <b>No Warranty Notice:</b>\n` +
         `• No warranty if any problem happens after it's activated.\n` +
         `• <i>(Rarely ever causes any issues)</i>\n` +
-        `⏰ <b>1-Hour Activation Window:</b>\n` +
-        `• You must activate the link within <b>1 hour</b> of delivery.\n` +
-        `• If the link expires after 1 hour, we are not responsible or liable.\n` +
+        `⏰ <b>5-Hour Activation Window:</b>\n` +
+        `• You must activate the link within <b>5 hours</b> of delivery.\n` +
+        `• If the link expires after 5 hours, we are not responsible or liable.\n` +
         `• By purchasing, you accept these terms.</blockquote>\n\n` +
         `🚀 <b>Automatic delivery right after payment confirmation.</b>\n\n` +
         `🔢 <b>Choose the quantity you want to purchase below:</b>`
@@ -179,7 +182,7 @@ const msg = {
       `🛍️ <b>Gemini Pro 18 Month Link</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
       `📌 <b>ምርት:</b> Google Gemini Advanced (18 ወራት)\n` +
-      `💰 <b>ዋጋ:</b> ${config.productPrice} ብር / በአንድ ሊንክ\n` +
+      `💰 <b>ዋጋ:</b> ${price} ብር (${usdt} USDT) / በአንድ ሊንክ\n` +
       `📦 <b>ሁኔታ:</b> 🟢 በስቶክ ይገኛል (ፈጣን አቅርቦት)\n\n` +
       `✨ <b>ዋና ዋና ጥቅሞች (Features):</b>\n` +
       `✅ የ 18 ወራት AI Pro Plan\n` +
@@ -191,9 +194,9 @@ const msg = {
       `<blockquote>⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
       `• ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
       `• <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
-      `⏰ <b>የአክቲቬሽን ጊዜ ገደብ (1 ሰዓት):</b>\n` +
-      `• ሊንኩ እንደደረሰዎት በ <b>1 ሰዓት (within 1 hour)</b> ውስጥ አክቲቭ ማድረግ አለብዎት።\n` +
-      `• 1 ሰዓት አልፎ ሊንኩ ኤክስፓየር (expire) ቢያደርግ ኃላፊነት አንወስድም።\n` +
+      `⏰ <b>የአክቲቬሽን ጊዜ ገደብ (5 ሰዓት):</b>\n` +
+      `• ሊንኩ እንደደረሰዎት በ <b>5 ሰዓት (within 5 hours)</b> ውስጥ አክቲቭ ማድረግ አለብዎት።\n` +
+      `• 5 ሰዓት አልፎ ሊንኩ ኤክስፓየር (expire) ቢያደርግ ኃላፊነት አንወስድም።\n` +
       `• በመግዛትዎ ይህንን ፖሊሲ ተቀብለዋል።</blockquote>\n\n` +
       `🚀 <b>ክፍያዎ እንደተረጋገጠ ሊንኩ ወዲያውኑ ይላካል!</b>\n\n` +
       `🔢 <b>የሚፈልጉትን ብዛት ከታች ይምረጡ፦</b>`
@@ -455,34 +458,29 @@ const msg = {
 
     if (lang === 'en') {
       let text =
-        `✅ <b>Order Delivered!</b>\n` +
+        `✅ <b>Delivered!</b>\n` +
         `━━━━━━━━━━━━━━━━━━━\n` +
         `🆔 <b>${orderId}</b>\n` +
         `📦 <b>Gemini Pro 18M × ${linkArray.length}</b>\n\n` +
-        `🎁 <b>Your activation link(s):</b>\n`;
+        `🎁 <b>Your delivery:</b>\n`;
 
       linkArray.forEach((lnk, idx) => {
         const safeHref = lnk.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         if (linkArray.length > 1) {
-          text += `\n${idx + 1}️⃣ <a href="${safeHref}">🔗 Open Link #${idx + 1}</a>\n`;
+          text += `\n${idx + 1}️⃣ <a href="${safeHref}">${safeHref}</a>\n`;
         } else {
-          text += `\n<a href="${safeHref}">${safeHref}</a>\n`;
+          text += `<a href="${safeHref}">${safeHref}</a>\n`;
         }
       });
 
       text +=
-        `\n🚨 <b>CRITICAL NOTICE — READ BEFORE OPENING:</b>\n` +
-        `<blockquote>🛑 <b>STEP 1: CONNECT TO VPN FIRST! (Mandatory)</b>\n` +
-        `• <b>You MUST turn on your VPN BEFORE opening the activation link!</b>\n` +
-        `• If you open the link without a VPN, it will show an error or "Offer Unavailable".\n` +
-        `• <i>(Note: VPN is required ONLY for activation. You can turn it off once active!)</i></blockquote>\n\n` +
-        `📋 <b>Activation Steps:</b>\n` +
-        `1️⃣ <b>Turn on your VPN</b> (as stated above)\n` +
-        `2️⃣ <b>Open the activation link</b> (or click the button below)\n` +
-        `3️⃣ <b>Sign in to your target Gmail account</b>\n` +
-        `4️⃣ <b>Click the blue «Activate plan» button</b> (circled in red in the screenshot above!)\n\n` +
-        `⏰ <b>1-Hour Window:</b> Please activate within 1 hour.\n` +
-        `❓ Issues? Contact support: @${supportUser}\n\n` +
+        `\n📋 <b>Activation Instructions:</b>\n` +
+        `• ⏰ <b>Please activate within 5 hours of receiving this link</b>\n` +
+        `• <b>Connect VPN for only activation, after activation you can turn off</b>\n` +
+        `• Click the provided activation link\n` +
+        `• Sign in to the target Gmail account\n` +
+        `• Select Activate Offer\n\n` +
+        `❓ Issues? Contact: @${supportUser}\n\n` +
         `🙏 Thank you for shopping with us!`;
 
       return text;
@@ -493,29 +491,24 @@ const msg = {
       `━━━━━━━━━━━━━━━━━━━\n` +
       `🆔 <b>${orderId}</b>\n` +
       `📦 <b>Gemini Pro 18 ወራት × ${linkArray.length}</b>\n\n` +
-      `🎁 <b>የተላከው የአክቲቬሽን ሊንክ:</b>\n`;
+      `🎁 <b>የተላከው ሊንክ (Your delivery):</b>\n`;
 
     linkArray.forEach((lnk, idx) => {
       const safeHref = lnk.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       if (linkArray.length > 1) {
-        text += `\n${idx + 1}️⃣ <a href="${safeHref}">🔗 ${idx + 1}ኛውን ሊንክ ክፈት</a>\n`;
+        text += `\n${idx + 1}️⃣ <a href="${safeHref}">${safeHref}</a>\n`;
       } else {
-        text += `\n<a href="${safeHref}">${safeHref}</a>\n`;
+        text += `<a href="${safeHref}">${safeHref}</a>\n`;
       }
     });
 
     text +=
-      `\n🚨 <b>በጣም አስፈላጊ ማስጠንቀቂያ — ሊንኩን ከመክፈትዎ በፊት ያንብቡ:</b>\n` +
-      `<blockquote>🛑 <b>ደረጃ 1፦ መጀመሪያ በቅድሚያ VPN ያብሩ! (CONNECT VPN FIRST)</b>\n` +
-      `• <b>ሊንኩን ከመክፈትዎ በፊት VPN ማብራትዎን ያረጋግጡ!</b>\n` +
-      `• VPN ሳያበሩ ሊንኩን ከከፈቱት አይሰራም ወይም ስህተት (Error) ያሳያል!\n` +
-      `• <i>(ማስታወሻ፦ VPN የሚያስፈልገው ለአክቲቬሽን ብቻ ነው፤ አንዴ አክቲቭ ካደረጉ በኋላ VPN ማጥፋት ይችላሉ)</i></blockquote>\n\n` +
-      `📋 <b>የአክቲቬሽን ቅደም ተከተል:</b>\n` +
-      `1️⃣ <b>መጀመሪያ VPN ያብሩ</b> (ከላይ እንደተገለጸው)\n` +
-      `2️⃣ <b>የተላከውን አክቲቬሽን ሊንክ ይክፈቱ</b> (ወይም ከታች ያለውን ቁልፍ ይጫኑ)\n` +
-      `3️⃣ <b>በሚፈልጉት Gmail Account ይግቡ</b>\n` +
-      `4️⃣ <b>ከላይ በምስሉ ላይ በቀይ እንደተከበበው «Activate plan» የሚለውን ሰማያዊ ቁልፍ ይጫኑ!</b>\n\n` +
-      `⏰ <b>የጊዜ ገደብ:</b> እባክዎ ሊንኩ እንደደረሰዎት በ 1 ሰዓት ውስጥ አክቲቭ ያድርጉ!\n` +
+      `\n📋 <b>የአክቲቬሽን መመሪያ (Activation Instructions):</b>\n` +
+      `• ⏰ <b>እባክዎ ሊንኩ እንደደረሰዎት በ 5 ሰዓት ውስጥ አክቲቭ ያድርጉ!</b>\n` +
+      `• <b>Connect VPN for only activation, after activation you can turn off</b> (VPN የሚያስፈልገው ለአክቲቬሽን ብቻ ነው፤ አክቲቭ ካደረጉ በኋላ ማጥፋት ይችላሉ)\n` +
+      `• Click the provided activation link (የተላከውን ሊንክ ይጫኑ)\n` +
+      `• Sign in to the target Gmail account (በሚፈልጉት Gmail Account ይግቡ)\n` +
+      `• Select Activate Offer ("Activate Offer" የሚለውን ይጫኑ)\n\n` +
       `❓ ችግር ካጋጠመዎት ያነጋግሩን፦ @${supportUser}\n\n` +
       `🙏 እኛን ስለመረጡ እናመሰግናለን!`;
 

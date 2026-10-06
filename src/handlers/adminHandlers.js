@@ -7,85 +7,6 @@ const Order = require('../models/Order');
 const CheckoutAttempt = require('../models/CheckoutAttempt');
 const keyboards = require('../utils/keyboard');
 const msg = require('../utils/messages');
-const path = require('path');
-const fs = require('fs-extra');
-
-// Cache for Telegram file_id of activation guide image (reset when image changes)
-let cachedGuideFileId = null;
-
-// ─── Universal Delivery Helper (Single All-in-One Photo Message) ──
-async function sendOrderDeliveryToCustomer(telegram, userId, deliveredLinks, orderId, custLang) {
-  const isEn = custLang === 'en';
-  const supportUser = config.supportUsername || 'Mnbvcnvhd';
-  const guidePhotoPath = path.join(process.cwd(), 'assets/activation_guide.png');
-  const deliveryCaption = msg.orderApproved(deliveredLinks, orderId, custLang);
-  const deliveryKb = keyboards.deliveredLinksKeyboard(deliveredLinks, custLang);
-
-  let sentSuccessfully = false;
-
-  // Send as 1 SINGLE PHOTO MESSAGE containing the guide image, delivery text, and open buttons
-  if (fs.existsSync(guidePhotoPath) || cachedGuideFileId) {
-    try {
-      const photoPayload = cachedGuideFileId || { source: guidePhotoPath };
-      const sentMsg = await telegram.sendPhoto(userId, photoPayload, {
-        caption: deliveryCaption,
-        parse_mode: 'HTML',
-        ...deliveryKb,
-      });
-      if (sentMsg && sentMsg.photo && sentMsg.photo.length > 0) {
-        cachedGuideFileId = sentMsg.photo[sentMsg.photo.length - 1].file_id;
-      }
-      sentSuccessfully = true;
-    } catch (photoErr) {
-      console.warn('sendPhoto with cached fileId failed, retrying with raw file path:', photoErr.message);
-      if (cachedGuideFileId && fs.existsSync(guidePhotoPath)) {
-        try {
-          cachedGuideFileId = null;
-          const sentMsg = await telegram.sendPhoto(userId, { source: guidePhotoPath }, {
-            caption: deliveryCaption,
-            parse_mode: 'HTML',
-            ...deliveryKb,
-          });
-          if (sentMsg && sentMsg.photo && sentMsg.photo.length > 0) {
-            cachedGuideFileId = sentMsg.photo[sentMsg.photo.length - 1].file_id;
-          }
-          sentSuccessfully = true;
-        } catch (retryErr) {
-          console.warn('Retry sendPhoto also failed:', retryErr.message);
-        }
-      }
-    }
-  }
-
-  // Fallback: If sending photo failed (e.g. caption length or network), send as text message
-  if (!sentSuccessfully) {
-    try {
-      await telegram.sendMessage(userId, deliveryCaption, {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        ...deliveryKb,
-      });
-    } catch (textErr) {
-      console.error('HTML delivery fallback failed, trying plain text:', textErr.message);
-      try {
-        let plainMsg =
-          (isEn ? `🎉 Your order ${orderId} has been approved!\n\nGemini Pro Activation Link(s):\n` : `🎉 ትዕዛዝዎ ጸድቋል!\n\n🔢 የትዕዛዝ ቁጥር: ${orderId}\n📦 የተገዛ ብዛት: ${deliveredLinks.length}\n\n🔗 የ Gemini Pro አክቲቬሽን ሊንኮችዎ:\n`);
-        deliveredLinks.forEach((lnk, i) => {
-          plainMsg += `\n${i + 1}️⃣ ${lnk}\n`;
-        });
-        plainMsg += isEn
-          ? `\n🚨 CRITICAL: CONNECT TO VPN FIRST before opening the link!\n• Click link → Sign in to Gmail → Click 'Activate plan'\n\n❓ Issues? Contact: @${supportUser}\n\n🙏 Thank you for shopping with us!`
-          : `\n🚨 በጣም አስፈላጊ፦ ሊንኩን ከመክፈትዎ በፊት መጀመሪያ VPN ያብሩ!\n• ሊንኩን ይክፈቱ → በሚፈልጉት Gmail ይግቡ → 'Activate plan' የሚለውን ይጫኑ\n\n❓ ችግር ካጋጠመዎት ያነጋግሩን፦ @${supportUser}\n\n🙏 እኛን ስለመረጡ እናመሰግናለን!`;
-
-        await telegram.sendMessage(userId, plainMsg, {
-          ...deliveryKb,
-        });
-      } catch (err2) {
-        console.error('All delivery attempts failed:', err2.message);
-      }
-    }
-  }
-}
 
 // Atomic lock tracker to prevent double-tap race conditions on orders
 const processingOrders = new Set();
@@ -1321,7 +1242,15 @@ async function callbackApprove(ctx) {
         try {
           const customer = await User.findOne({ telegramId: order.userId });
           const custLang = customer && customer.language ? customer.language : 'am';
-          await sendOrderDeliveryToCustomer(ctx.telegram, order.userId, links, orderId, custLang);
+          await ctx.telegram.sendMessage(
+            order.userId,
+            msg.orderApproved(links, orderId, custLang),
+            {
+              parse_mode: 'HTML',
+              disable_web_page_preview: true,
+              ...keyboards.deliveredLinksKeyboard(links, custLang),
+            }
+          );
           return ctx.reply(`✅ ትዕዛዝ ${orderId} አስቀድሞ የጸደቀ ነበር። ሊንኩ ዳግም ወደ ደንበኛው (${order.userId}) በተሳካ ሁኔታ ተልኳል!`);
         } catch (err) {
           return ctx.reply(`❌ ወደ ደንበኛው ዳግም መላክ አልተቻለም: ${err.message}`);
@@ -1458,13 +1387,41 @@ async function callbackApprove(ctx) {
     }
   );
 
-  // Send link(s) to customer in HTML format with direct browser open buttons and visual activation guide
+  // Send link(s) to customer in HTML format with direct browser open buttons
   try {
     const customer = await User.findOne({ telegramId: order.userId });
     const custLang = customer && customer.language ? customer.language : 'am';
-    await sendOrderDeliveryToCustomer(ctx.telegram, order.userId, deliveredLinks, orderId, custLang);
+    await ctx.telegram.sendMessage(
+      order.userId,
+      msg.orderApproved(deliveredLinks, orderId, custLang),
+      {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),
+      }
+    );
   } catch (err) {
-    console.error('Failed to send approval delivery to customer:', err.message);
+    console.error('Failed to send approval to user with HTML:', err.message);
+    try {
+      const customer = await User.findOne({ telegramId: order.userId });
+      const custLang = customer && customer.language ? customer.language : 'am';
+      let plainMsg =
+        `🎉 ትዕዛዝዎ ጸድቋል!\n\n` +
+        `🔢 የትዕዛዝ ቁጥር: ${orderId}\n` +
+        `📦 የተገዛ ብዛት: ${deliveredLinks.length}\n\n` +
+        `🔗 የ Gemini Pro አክቲቬሽን ሊንኮችዎ:\n`;
+      deliveredLinks.forEach((lnk, i) => {
+        plainMsg += `\n${i + 1}️⃣ ${lnk}\n`;
+      });
+      const supportUser = config.supportUsername || 'Mnbvcnvhd';
+      plainMsg += `\n📋 Activation Instructions:\n• Connect VPN for only activation, after activation you can turn off\n• Click the provided activation link\n• Sign in to the target Gmail account\n• Select Activate Offer\n\n❓ Issues? Contact: @${supportUser}\n\n🙏 እኛን ስለመረጡ እናመሰግናለን!`;
+
+      await ctx.telegram.sendMessage(order.userId, plainMsg, {
+        ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),
+      });
+    } catch (err2) {
+      console.error('Fallback approval delivery also failed:', err2.message);
+    }
   }
 
   // Update admin message
@@ -1796,7 +1753,15 @@ const callbackResendOrderLink = adminOnly(async (ctx) => {
   try {
     const customer = await User.findOne({ telegramId: order.userId });
     const custLang = customer && customer.language ? customer.language : 'am';
-    await sendOrderDeliveryToCustomer(ctx.telegram, order.userId, links, order.orderId, custLang);
+    await ctx.telegram.sendMessage(
+      order.userId,
+      msg.orderApproved(links, order.orderId, custLang),
+      {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...keyboards.deliveredLinksKeyboard(links, custLang),
+      }
+    );
     return ctx.reply(`✅ ሊንኩ ዳግም ወደ ደንበኛው (${order.userId}) በተሳካ ሁኔታ ተልኳል!`);
   } catch (err) {
     return ctx.reply(`❌ ወደ ደንበኛው መላክ አልተቻለም: ${err.message}`);
@@ -2011,7 +1976,15 @@ const handleResend = adminOnly(async (ctx) => {
   try {
     const customer = await User.findOne({ telegramId: order.userId });
     const custLang = customer && customer.language ? customer.language : 'am';
-    await sendOrderDeliveryToCustomer(ctx.telegram, order.userId, links, order.orderId, custLang);
+    await ctx.telegram.sendMessage(
+      order.userId,
+      msg.orderApproved(links, order.orderId, custLang),
+      {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...keyboards.deliveredLinksKeyboard(links, custLang),
+      }
+    );
     return ctx.reply(`✅ ሊንኩ ዳግም ወደ ደንበኛው (${order.userId}) በተሳካ ሁኔታ ተልኳል!`);
   } catch (err) {
     return ctx.reply(`❌ ወደ ደንበኛው መላክ አልተቻለም: ${err.message}`);
@@ -2086,13 +2059,21 @@ async function executeDirectDelivery(ctx, orderId) {
     }
   );
 
-  // Deliver to customer with HTML format, direct browser open buttons, and visual activation guide
+  // Deliver to customer with HTML format and direct browser open buttons
   try {
     const customer = await User.findOne({ telegramId: order.userId });
     const custLang = customer && customer.language ? customer.language : 'am';
-    await sendOrderDeliveryToCustomer(ctx.telegram, order.userId, deliveredLinks, orderId, custLang);
+    await ctx.telegram.sendMessage(
+      order.userId,
+      msg.orderApproved(deliveredLinks, orderId, custLang),
+      {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),
+      }
+    );
   } catch (err) {
-    console.error('Failed to send direct approval delivery to customer:', err.message);
+    console.error('Failed to send direct approval to user with HTML:', err.message);
   }
 
   // Confirm to admin

@@ -59,12 +59,15 @@ const keyboards = {
   mainMenu(lang = 'am', isAdmin = false, stockCount = null) {
     const isEn = lang === 'en';
     const price = config.productPrice || 250;
+    const usdt = config.calculateUsdtPrice(price);
 
     const buttons = [
       // Product Name & Price (Full-width headline button)
       [
         {
-          text: isEn ? `💎 Gemini Pro 18M · ${price} ETB` : `💎 Gemini Pro 18 ወራት · ${price} ብር`,
+          text: isEn
+            ? `💎 Gemini Pro 18M · ${price} ETB (${usdt} USDT)`
+            : `💎 Gemini Pro 18 ወራት · ${price} ብር (${usdt} USDT)`,
           callback_data: 'buy',
           style: 'primary',
         },
