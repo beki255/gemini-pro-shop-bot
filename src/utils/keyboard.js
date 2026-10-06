@@ -757,6 +757,13 @@ const keyboards = {
     } else if (order.status === 'approved') {
       rows.push([
         {
+          text: isEn ? '🔗 View Sent Link(s)' : '🔗 የተላከውን ሊንክ እይ',
+          callback_data: `admin_view_link_${order.orderId}_${returnFilter}_${returnPage}`,
+          style: 'primary',
+        },
+      ]);
+      rows.push([
+        {
           text: isEn ? '🔄 Resend Links to Buyer' : '🔄 ሊንኮቹን ዳግም ላክ',
           callback_data: `resend_link_${order.orderId}`,
           style: 'primary',
@@ -773,6 +780,55 @@ const keyboards = {
       {
         text: isEn ? '🏠 Admin Panel' : '🏠 ዋና ፓነል',
         callback_data: 'admin_panel',
+      },
+    ]);
+
+    return Markup.inlineKeyboard(rows);
+  },
+
+  // ─── ADMIN VIEW DELIVERED LINKS KEYBOARD ────────────────────
+  adminViewDeliveredLinks(orderId, links, returnFilter = 'all', returnPage = 1, lang = 'am') {
+    const isEn = lang === 'en';
+    const linkArray = Array.isArray(links) ? links : [links];
+    const rows = [];
+
+    // Up to 5 links as direct browser open buttons
+    linkArray.slice(0, 5).forEach((lnk, idx) => {
+      if (lnk && (lnk.startsWith('http://') || lnk.startsWith('https://'))) {
+        const label =
+          linkArray.length > 1
+            ? isEn
+              ? `🚀 Open Link #${idx + 1} in Browser`
+              : `🚀 ሊንክ #${idx + 1} በ Browser ክፈት`
+            : isEn
+              ? `🚀 Open Link in Browser`
+              : `🚀 ሊንኩን በ Browser ክፈት`;
+        rows.push([
+          {
+            text: label,
+            url: lnk,
+          },
+        ]);
+      }
+    });
+
+    rows.push([
+      {
+        text: isEn ? '🔄 Resend Links to Buyer' : '🔄 ሊንኮቹን ለደንበኛው ዳግም ላክ',
+        callback_data: `resend_link_${orderId}`,
+        style: 'primary',
+      },
+    ]);
+
+    rows.push([
+      {
+        text: isEn ? '🔙 Back to Receipt' : '🔙 ወደ ደረሰኙ ተመለስ',
+        callback_data: `admin_view_receipt_${orderId}_${returnFilter}_${returnPage}`,
+        style: 'primary',
+      },
+      {
+        text: isEn ? '🗑️ Close View' : '🗑️ ዝጋ (Close)',
+        callback_data: 'dismiss_admin_msg',
       },
     ]);
 

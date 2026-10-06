@@ -1427,15 +1427,34 @@ async function callbackApprove(ctx) {
   // Update admin message
   try {
     const cust = await getCustomerDetails(order.userId, order.userInfo);
-    await ctx.editMessageCaption(
+    const user = await User.findOne({ telegramId: ctx.from.id });
+    const lang = user && user.language ? user.language : 'am';
+    let approveCaption =
       `✅ <b>ተፈቅዷል! (${deliveredLinks.length}) ሊንክ ወደ ደንበኛው ተልኳል</b>\n\n` +
-        `🔢 ትዕዛዝ: <code>${escapeHtml(orderId)}</code>\n` +
-        `👤 ስም: <b>${cust.safeFullName}</b>\n` +
-        `🔗 ዩዘርኔም: <b>${cust.safeUsername}</b>\n` +
-        `🆔 Telegram ID: <code>${order.userId}</code>\n` +
-        `📦 ብዛት: <b>${deliveredLinks.length}</b>\n` +
-        `💰 መጠን: <b>${order.amount} ብር</b>`,
-      { parse_mode: 'HTML' }
+      `🔢 ትዕዛዝ: <code>${escapeHtml(orderId)}</code>\n` +
+      `👤 ስም: <b>${cust.safeFullName}</b>\n` +
+      `🔗 ዩዘርኔም: <b>${cust.safeUsername}</b>\n` +
+      `🆔 Telegram ID: <code>${order.userId}</code>\n` +
+      `📦 ብዛት: <b>${deliveredLinks.length}</b>\n` +
+      `💰 መጠን: <b>${order.amount} ብር</b>`;
+
+    if (deliveredLinks.length === 1) {
+      approveCaption += `\n🔗 <b>የተላከ ሊንክ:</b> <code>${escapeHtml(deliveredLinks[0])}</code>`;
+    }
+
+    const updatedOrder = {
+      orderId,
+      status: 'approved',
+      deliveredLinks,
+      deliveredLink: deliveredLinks[0] || null,
+    };
+
+    await ctx.editMessageCaption(
+      approveCaption,
+      {
+        parse_mode: 'HTML',
+        ...keyboards.adminOrderReceiptView(updatedOrder, 'all', 1, lang),
+      }
     );
   } catch {}
   } finally {
@@ -1669,8 +1688,18 @@ const callbackViewReceipt = adminOnly(async (ctx, orderIdOverride, returnFilterO
   if (order.status === 'rejected' && order.adminNote) {
     caption += `📝 <b>ውድቅ የተደረገበት ምክንያት:</b> <i>${escapeHtml(order.adminNote)}</i>\n`;
   }
-  if (order.status === 'approved' && order.deliveredLinks && order.deliveredLinks.length > 0) {
-    caption += `🎁 <b>የተላከ ሊንክ:</b> ${order.deliveredLinks.length} ሊንክ ተልኳል\n`;
+  if (order.status === 'approved') {
+    const delivered =
+      order.deliveredLinks && order.deliveredLinks.length > 0
+        ? order.deliveredLinks
+        : order.deliveredLink
+        ? [order.deliveredLink]
+        : [];
+    if (delivered.length === 1) {
+      caption += `🔗 <b>የተላከ ሊንክ:</b> <code>${escapeHtml(delivered[0])}</code>\n`;
+    } else if (delivered.length > 1) {
+      caption += `🎁 <b>የተላከ ሊንክ:</b> <b>${delivered.length} ሊንክ ተልኳል</b>\n`;
+    }
   }
 
   const kb = keyboards.adminOrderReceiptView(order, returnFilter, returnPage, lang);
@@ -1766,6 +1795,84 @@ const callbackResendOrderLink = adminOnly(async (ctx) => {
   } catch (err) {
     return ctx.reply(`❌ ወደ ደንበኛው መላክ አልተቻለም: ${err.message}`);
   }
+});
+
+// ─── Callback: admin_view_link_<orderId> ─────────────────
+const callbackViewOrderLink = adminOnly(async (ctx) => {
+  const rawData = ctx.callbackQuery.data.replace('admin_view_link_', '');
+  const parts = rawData.split('_');
+  const orderId = parts[0];
+  const returnFilter = parts[1] || 'all';
+  const returnPage = parseInt(parts[2], 10) || 1;
+
+  await ctx.answerCbQuery('🔗 ሊንኩን በማውጣት ላይ...').catch(() => {});
+
+  const order = await Order.findOne({ orderId });
+  if (!order) return ctx.reply(`❌ ትዕዛዝ ${orderId} አልተገኘም።`);
+
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  let links =
+    order.deliveredLinks && order.deliveredLinks.length > 0
+      ? order.deliveredLinks
+      : order.deliveredLink
+      ? [order.deliveredLink]
+      : [];
+
+  if (links.length === 0) {
+    const SoldStock = require('../models/SoldStock');
+    const sold = await SoldStock.find({ orderId: order.orderId });
+    if (sold && sold.length > 0) {
+      links = sold.map((s) => s.link);
+    }
+  }
+
+  if (links.length === 0) {
+    return ctx.answerCbQuery(
+      isEn ? `⚠️ No links found for Order ${orderId}` : `⚠️ ለትዕዛዝ ${orderId} የተላከ ሊንክ አልተገኘም!`,
+      { show_alert: true }
+    ).catch(() => {});
+  }
+
+  const cust = await getCustomerDetails(order.userId, order.userInfo);
+  const dateStr = order.processedAt
+    ? new Date(order.processedAt).toLocaleString('am-ET')
+    : new Date(order.updatedAt || order.createdAt).toLocaleString('am-ET');
+
+  let text = isEn
+    ? `🔗 <b>Delivered Link(s) for Order:</b> <code>${escapeHtml(order.orderId)}</code>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>Customer:</b> ${cust.safeFullName}\n` +
+      `🔗 <b>Username:</b> ${cust.safeUsername}\n` +
+      `🆔 <b>Telegram ID:</b> <code>${order.userId}</code>\n` +
+      `📦 <b>Delivered Quantity:</b> <b>${links.length} link(s)</b>\n` +
+      `🕒 <b>Delivered At:</b> ${dateStr}\n\n` +
+      `👇 <b>Activation Link(s) (Tap code to copy):</b>\n\n`
+    : `🔗 <b>ለትዕዛዝ <code>${escapeHtml(order.orderId)}</code> የተላከ ሊንክ</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>ደንበኛ:</b> ${cust.safeFullName}\n` +
+      `🔗 <b>ዩዘርኔም:</b> ${cust.safeUsername}\n` +
+      `🆔 <b>Telegram ID:</b> <code>${order.userId}</code>\n` +
+      `📦 <b>የተላከ ብዛት:</b> <b>${links.length} ሊንክ</b>\n` +
+      `🕒 <b>የተላከበት ቀን:</b> ${dateStr}\n\n` +
+      `👇 <b>የተላኩት ሊንኮች (ለመቅዳት ይንኩት)፦</b>\n\n`;
+
+  links.forEach((lnk, idx) => {
+    const numBadge = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][idx] || `[${idx + 1}]`;
+    text += `${numBadge} <code>${escapeHtml(lnk)}</code>\n\n`;
+  });
+
+  text += isEn
+    ? `💡 <i>Tap any link code above to copy it to clipboard, or use the buttons below to open directly.</i>`
+    : `💡 <i>ሊንኩን ኮፒ ለማድረግ ከላይ ያለውን ኮድ አንድ ጊዜ ይንኩት ወይም ከታች ያሉትን አዝራሮች በመጫን በቀጥታ በ Browser ይክፈቱት።</i>`;
+
+  return ctx.reply(text, {
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    ...keyboards.adminViewDeliveredLinks(order.orderId, links, returnFilter, returnPage, lang),
+  });
 });
 
 // ─── Admin panel callbacks ────────────────────────────────
@@ -2083,6 +2190,90 @@ const handleResend = adminOnly(async (ctx) => {
   }
 });
 
+// ─── /viewlink [orderId] — View sent link for an order ────
+const handleViewLink = adminOnly(async (ctx) => {
+  const text = ctx.message?.text || '';
+  const parts = text.trim().split(/\s+/);
+  const orderId = parts[1];
+
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  if (!orderId) {
+    return ctx.reply(
+      isEn ? '⚠️ Please enter an Order ID: `/viewlink ORD-XXXX`' : '⚠️ የትዕዛዝ ቁጥር ያስገቡ፦ `/viewlink ORD-XXXX`',
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  const order = await Order.findOne({ orderId: orderId.toUpperCase() });
+  if (!order) {
+    return ctx.reply(isEn ? `❌ Order ${orderId} not found.` : `❌ ትዕዛዝ ${orderId} አልተገኘም።`);
+  }
+
+  let links =
+    order.deliveredLinks && order.deliveredLinks.length > 0
+      ? order.deliveredLinks
+      : order.deliveredLink
+      ? [order.deliveredLink]
+      : [];
+
+  if (links.length === 0) {
+    const SoldStock = require('../models/SoldStock');
+    const sold = await SoldStock.find({ orderId: order.orderId });
+    if (sold && sold.length > 0) {
+      links = sold.map((s) => s.link);
+    }
+  }
+
+  if (links.length === 0) {
+    return ctx.reply(
+      isEn
+        ? `⚠️ No links found for Order ${orderId}. It may not be approved yet.`
+        : `⚠️ ለትዕዛዝ ${orderId} የተላከ ሊንክ አልተገኘም። ትዕዛዙ ገና አልጸደቀም ወይም ሊንክ የለውም።`
+    );
+  }
+
+  const cust = await getCustomerDetails(order.userId, order.userInfo);
+  const dateStr = order.processedAt
+    ? new Date(order.processedAt).toLocaleString('am-ET')
+    : new Date(order.updatedAt || order.createdAt).toLocaleString('am-ET');
+
+  let replyMsg = isEn
+    ? `🔗 <b>Delivered Link(s) for Order:</b> <code>${escapeHtml(order.orderId)}</code>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>Customer:</b> ${cust.safeFullName}\n` +
+      `🔗 <b>Username:</b> ${cust.safeUsername}\n` +
+      `🆔 <b>Telegram ID:</b> <code>${order.userId}</code>\n` +
+      `📦 <b>Delivered Quantity:</b> <b>${links.length} link(s)</b>\n` +
+      `🕒 <b>Delivered At:</b> ${dateStr}\n\n` +
+      `👇 <b>Activation Link(s) (Tap code to copy):</b>\n\n`
+    : `🔗 <b>ለትዕዛዝ <code>${escapeHtml(order.orderId)}</code> የተላከ ሊንክ</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>ደንበኛ:</b> ${cust.safeFullName}\n` +
+      `🔗 <b>ዩዘርኔም:</b> ${cust.safeUsername}\n` +
+      `🆔 <b>Telegram ID:</b> <code>${order.userId}</code>\n` +
+      `📦 <b>የተላከ ብዛት:</b> <b>${links.length} ሊንክ</b>\n` +
+      `🕒 <b>የተላከበት ቀን:</b> ${dateStr}\n\n` +
+      `👇 <b>የተላኩት ሊንኮች (ለመቅዳት ይንኩት)፦</b>\n\n`;
+
+  links.forEach((lnk, idx) => {
+    const numBadge = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][idx] || `[${idx + 1}]`;
+    replyMsg += `${numBadge} <code>${escapeHtml(lnk)}</code>\n\n`;
+  });
+
+  replyMsg += isEn
+    ? `💡 <i>Tap any link code above to copy it to clipboard, or use the buttons below to open directly.</i>`
+    : `💡 <i>ሊንኩን ኮፒ ለማድረግ ከላይ ያለውን ኮድ አንድ ጊዜ ይንኩት ወይም ከታች ያሉትን አዝራሮች በመጫን በቀጥታ በ Browser ይክፈቱት።</i>`;
+
+  return ctx.reply(replyMsg, {
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    ...keyboards.adminViewDeliveredLinks(order.orderId, links, 'all', 1, lang),
+  });
+});
+
 // ─── Execute Direct On-Demand Delivery to Customer ────────
 async function executeDirectDelivery(ctx, orderId) {
   if (processingOrders.has(orderId)) {
@@ -2172,7 +2363,7 @@ async function executeDirectDelivery(ctx, orderId) {
   const user = await User.findOne({ telegramId: ctx.from.id });
   const adminLang = user && user.language ? user.language : 'am';
   const cust = await getCustomerDetails(order.userId, order.userInfo);
-  const confirmation =
+  let confirmation =
     adminLang === 'en'
       ? `🎉 <b>Order ${escapeHtml(orderId)} Approved & Delivered!</b>\n\n` +
         `👤 Name: <b>${cust.safeFullName}</b>\n` +
@@ -2189,9 +2380,20 @@ async function executeDirectDelivery(ctx, orderId) {
         `💰 ክፍያ: <b>${order.amount} ብር</b> (${escapeHtml(order.paymentMethod)})\n\n` +
         `✅ ሁሉም ሊንኮች ወዲያውኑ ወደ ደንበኛው በ Browser መክፈቻ አዝራር ተልከዋል!`;
 
+  if (deliveredLinks.length === 1) {
+    confirmation += `\n\n🔗 <b>የተላከ ሊንክ:</b> <code>${escapeHtml(deliveredLinks[0])}</code>`;
+  }
+
+  const updatedOrder = {
+    orderId,
+    status: 'approved',
+    deliveredLinks,
+    deliveredLink: deliveredLinks[0] || null,
+  };
+
   await ctx.reply(confirmation, {
     parse_mode: 'HTML',
-    ...keyboards.adminPanel(adminLang),
+    ...keyboards.adminOrderReceiptView(updatedOrder, 'all', 1, adminLang),
   });
 
   return true;
@@ -2758,5 +2960,7 @@ module.exports = {
   callbackToggleStoreStatus,
   callbackViewReceipt,
   callbackResendOrderLink,
+  callbackViewOrderLink,
+  handleViewLink,
 };
 

@@ -83,6 +83,7 @@ bot.command('setprice', adminHandlers.handleSetPrice);
 bot.command('price', adminHandlers.handleSetPrice);
 bot.command(['setusdtrate', 'usdtrate', 'rate'], adminHandlers.handleSetUsdtRate);
 bot.command('resend', adminHandlers.handleResend);
+bot.command(['viewlink', 'viewlinks'], adminHandlers.handleViewLink);
 bot.command('restock', adminHandlers.handleRestock);
 bot.command('broadcast', adminHandlers.handleBroadcast);
 bot.command('announce', adminHandlers.handleBroadcast);
@@ -249,7 +250,9 @@ bot.on('callback_query', async (ctx) => {
   if (data === 'cancel_rejection') return adminHandlers.callbackCancelRejection(ctx);
   if (data.startsWith('details_')) return adminHandlers.callbackDetails(ctx);
   if (data.startsWith('admin_view_receipt_')) return adminHandlers.callbackViewReceipt(ctx);
+  if (data.startsWith('admin_view_link_')) return adminHandlers.callbackViewOrderLink(ctx);
   if (data.startsWith('resend_link_')) return adminHandlers.callbackResendOrderLink(ctx);
+  if (data === 'dismiss_admin_msg') return ctx.deleteMessage().catch(() => {});
   if (data === 'admin_stats') return adminHandlers.callbackAdminStats(ctx);
   if (data === 'admin_stock') return adminHandlers.callbackAdminStock(ctx);
   if (data === 'admin_change_price') return adminHandlers.callbackChangePrice(ctx);
