@@ -10,80 +10,78 @@ const msg = require('../utils/messages');
 const path = require('path');
 const fs = require('fs-extra');
 
-// Cache for Telegram file_id of activation guide image
+// Cache for Telegram file_id of activation guide image (reset when image changes)
 let cachedGuideFileId = null;
 
-// ─── Universal Delivery Helper (Links + Visual Activate Plan Guide) ──
+// ─── Universal Delivery Helper (Single All-in-One Photo Message) ──
 async function sendOrderDeliveryToCustomer(telegram, userId, deliveredLinks, orderId, custLang) {
   const isEn = custLang === 'en';
   const supportUser = config.supportUsername || 'Mnbvcnvhd';
-
-  // 1. Send the primary delivery message with link(s) & interactive browser buttons
-  try {
-    await telegram.sendMessage(
-      userId,
-      msg.orderApproved(deliveredLinks, orderId, custLang),
-      {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),
-      }
-    );
-  } catch (err) {
-    console.error('Failed to send approval to user with HTML:', err.message);
-    try {
-      let plainMsg =
-        (isEn ? `🎉 Your order ${orderId} has been approved!\n\nGemini Pro Activation Link(s):\n` : `🎉 ትዕዛዝዎ ጸድቋል!\n\n🔢 የትዕዛዝ ቁጥር: ${orderId}\n📦 የተገዛ ብዛት: ${deliveredLinks.length}\n\n🔗 የ Gemini Pro አክቲቬሽን ሊንኮችዎ:\n`);
-      deliveredLinks.forEach((lnk, i) => {
-        plainMsg += `\n${i + 1}️⃣ ${lnk}\n`;
-      });
-      plainMsg += isEn
-        ? `\n🚨 CRITICAL: CONNECT TO VPN FIRST before opening the link!\n• Click link → Sign in to Gmail → Click 'Activate plan'\n\n❓ Issues? Contact: @${supportUser}\n\n🙏 Thank you for shopping with us!`
-        : `\n🚨 በጣም አስፈላጊ፦ ሊንኩን ከመክፈትዎ በፊት መጀመሪያ VPN ያብሩ!\n• ሊንኩን ይክፈቱ → በሚፈልጉት Gmail ይግቡ → 'Activate plan' የሚለውን ይጫኑ\n\n❓ ችግር ካጋጠመዎት ያነጋግሩን፦ @${supportUser}\n\n🙏 እኛን ስለመረጡ እናመሰግናለን!`;
-
-      await telegram.sendMessage(userId, plainMsg, {
-        ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),
-      });
-    } catch (err2) {
-      console.error('Fallback approval delivery also failed:', err2.message);
-    }
-  }
-
-  // 2. Send visual activation guide photo showing "Activate plan"
   const guidePhotoPath = path.join(process.cwd(), 'assets/activation_guide.png');
-  const guideCaption = isEn
-    ? `📸 <b>Visual Activation Step:</b>\n\n` +
-      `🚨 <b>Remember: Connect your VPN first!</b>\n` +
-      `👉 Click the blue <b>«Activate plan»</b> button (highlighted in red) to complete your 18-month AI Pro activation! ✨`
-    : `📸 <b>የአክቲቬሽን ምስላዊ ማብራሪያ (Visual Guide):</b>\n\n` +
-      `🚨 <b>ማስታወሻ፦ መጀመሪያ በቅድሚያ VPN ማብራትዎን እንዳይረሱ!</b>\n` +
-      `👉 በምስሉ ላይ በቀይ እንደተከበበው ሰማያዊውን <b>«Activate plan»</b> የሚለውን ቁልፍ በመጫን የ 18 ወራት Gemini Pro አክቲቬሽንዎን ያጠናቁ! ✨`;
+  const deliveryCaption = msg.orderApproved(deliveredLinks, orderId, custLang);
+  const deliveryKb = keyboards.deliveredLinksKeyboard(deliveredLinks, custLang);
 
+  let sentSuccessfully = false;
+
+  // Send as 1 SINGLE PHOTO MESSAGE containing the guide image, delivery text, and open buttons
   if (fs.existsSync(guidePhotoPath) || cachedGuideFileId) {
     try {
       const photoPayload = cachedGuideFileId || { source: guidePhotoPath };
       const sentMsg = await telegram.sendPhoto(userId, photoPayload, {
-        caption: guideCaption,
+        caption: deliveryCaption,
         parse_mode: 'HTML',
+        ...deliveryKb,
       });
       if (sentMsg && sentMsg.photo && sentMsg.photo.length > 0) {
         cachedGuideFileId = sentMsg.photo[sentMsg.photo.length - 1].file_id;
       }
+      sentSuccessfully = true;
     } catch (photoErr) {
-      console.warn('Failed to send guide photo by cached fileId, trying raw path:', photoErr.message);
+      console.warn('sendPhoto with cached fileId failed, retrying with raw file path:', photoErr.message);
       if (cachedGuideFileId && fs.existsSync(guidePhotoPath)) {
         try {
           cachedGuideFileId = null;
           const sentMsg = await telegram.sendPhoto(userId, { source: guidePhotoPath }, {
-            caption: guideCaption,
+            caption: deliveryCaption,
             parse_mode: 'HTML',
+            ...deliveryKb,
           });
           if (sentMsg && sentMsg.photo && sentMsg.photo.length > 0) {
             cachedGuideFileId = sentMsg.photo[sentMsg.photo.length - 1].file_id;
           }
-        } catch (photoErr2) {
-          console.error('Fallback sendPhoto also failed:', photoErr2.message);
+          sentSuccessfully = true;
+        } catch (retryErr) {
+          console.warn('Retry sendPhoto also failed:', retryErr.message);
         }
+      }
+    }
+  }
+
+  // Fallback: If sending photo failed (e.g. caption length or network), send as text message
+  if (!sentSuccessfully) {
+    try {
+      await telegram.sendMessage(userId, deliveryCaption, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...deliveryKb,
+      });
+    } catch (textErr) {
+      console.error('HTML delivery fallback failed, trying plain text:', textErr.message);
+      try {
+        let plainMsg =
+          (isEn ? `🎉 Your order ${orderId} has been approved!\n\nGemini Pro Activation Link(s):\n` : `🎉 ትዕዛዝዎ ጸድቋል!\n\n🔢 የትዕዛዝ ቁጥር: ${orderId}\n📦 የተገዛ ብዛት: ${deliveredLinks.length}\n\n🔗 የ Gemini Pro አክቲቬሽን ሊንኮችዎ:\n`);
+        deliveredLinks.forEach((lnk, i) => {
+          plainMsg += `\n${i + 1}️⃣ ${lnk}\n`;
+        });
+        plainMsg += isEn
+          ? `\n🚨 CRITICAL: CONNECT TO VPN FIRST before opening the link!\n• Click link → Sign in to Gmail → Click 'Activate plan'\n\n❓ Issues? Contact: @${supportUser}\n\n🙏 Thank you for shopping with us!`
+          : `\n🚨 በጣም አስፈላጊ፦ ሊንኩን ከመክፈትዎ በፊት መጀመሪያ VPN ያብሩ!\n• ሊንኩን ይክፈቱ → በሚፈልጉት Gmail ይግቡ → 'Activate plan' የሚለውን ይጫኑ\n\n❓ ችግር ካጋጠመዎት ያነጋግሩን፦ @${supportUser}\n\n🙏 እኛን ስለመረጡ እናመሰግናለን!`;
+
+        await telegram.sendMessage(userId, plainMsg, {
+          ...deliveryKb,
+        });
+      } catch (err2) {
+        console.error('All delivery attempts failed:', err2.message);
       }
     }
   }

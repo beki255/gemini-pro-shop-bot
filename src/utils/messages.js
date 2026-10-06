@@ -455,7 +455,7 @@ const msg = {
 
     if (lang === 'en') {
       let text =
-        `✅ <b>Delivered!</b>\n` +
+        `✅ <b>Order Delivered!</b>\n` +
         `━━━━━━━━━━━━━━━━━━━\n` +
         `🆔 <b>${orderId}</b>\n` +
         `📦 <b>Gemini Pro 18M × ${linkArray.length}</b>\n\n` +
@@ -464,24 +464,24 @@ const msg = {
       linkArray.forEach((lnk, idx) => {
         const safeHref = lnk.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         if (linkArray.length > 1) {
-          text += `\n${idx + 1}️⃣ <a href="${safeHref}">${safeHref}</a>\n`;
+          text += `\n${idx + 1}️⃣ <a href="${safeHref}">🔗 Open Link #${idx + 1}</a>\n`;
         } else {
-          text += `<a href="${safeHref}">${safeHref}</a>\n`;
+          text += `\n<a href="${safeHref}">${safeHref}</a>\n`;
         }
       });
 
       text +=
-        `\n🚨 <b>CRITICAL NOTICE — PLEASE READ BEFORE OPENING:</b>\n` +
+        `\n🚨 <b>CRITICAL NOTICE — READ BEFORE OPENING:</b>\n` +
         `<blockquote>🛑 <b>STEP 1: CONNECT TO VPN FIRST! (Mandatory)</b>\n` +
         `• <b>You MUST turn on your VPN BEFORE opening the activation link!</b>\n` +
-        `• If you open the link without a VPN connected, it will show an error or say "Offer Unavailable".\n` +
-        `• <i>(Note: VPN is required ONLY for activating. After activation completes, you can turn off the VPN!)</i></blockquote>\n\n` +
-        `📋 <b>Step-by-Step Activation Guide:</b>\n` +
+        `• If you open the link without a VPN, it will show an error or "Offer Unavailable".\n` +
+        `• <i>(Note: VPN is required ONLY for activation. You can turn it off once active!)</i></blockquote>\n\n` +
+        `📋 <b>Activation Steps:</b>\n` +
         `1️⃣ <b>Turn on your VPN</b> (as stated above)\n` +
-        `2️⃣ <b>Click the activation link</b> (or tap the button below)\n` +
+        `2️⃣ <b>Open the activation link</b> (or click the button below)\n` +
         `3️⃣ <b>Sign in to your target Gmail account</b>\n` +
-        `4️⃣ <b>Click «Activate plan»</b> (as highlighted in the screenshot below 👇)\n\n` +
-        `⏰ <b>1-Hour Window:</b> Please activate within 1 hour of delivery.\n` +
+        `4️⃣ <b>Click the blue «Activate plan» button</b> (circled in red in the screenshot above!)\n\n` +
+        `⏰ <b>1-Hour Window:</b> Please activate within 1 hour.\n` +
         `❓ Issues? Contact support: @${supportUser}\n\n` +
         `🙏 Thank you for shopping with us!`;
 
@@ -493,14 +493,14 @@ const msg = {
       `━━━━━━━━━━━━━━━━━━━\n` +
       `🆔 <b>${orderId}</b>\n` +
       `📦 <b>Gemini Pro 18 ወራት × ${linkArray.length}</b>\n\n` +
-      `🎁 <b>የተላከው ሊንክ (Your activation link):</b>\n`;
+      `🎁 <b>የተላከው የአክቲቬሽን ሊንክ:</b>\n`;
 
     linkArray.forEach((lnk, idx) => {
       const safeHref = lnk.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       if (linkArray.length > 1) {
-        text += `\n${idx + 1}️⃣ <a href="${safeHref}">${safeHref}</a>\n`;
+        text += `\n${idx + 1}️⃣ <a href="${safeHref}">🔗 ${idx + 1}ኛውን ሊንክ ክፈት</a>\n`;
       } else {
-        text += `<a href="${safeHref}">${safeHref}</a>\n`;
+        text += `\n<a href="${safeHref}">${safeHref}</a>\n`;
       }
     });
 
@@ -514,7 +514,7 @@ const msg = {
       `1️⃣ <b>መጀመሪያ VPN ያብሩ</b> (ከላይ እንደተገለጸው)\n` +
       `2️⃣ <b>የተላከውን አክቲቬሽን ሊንክ ይክፈቱ</b> (ወይም ከታች ያለውን ቁልፍ ይጫኑ)\n` +
       `3️⃣ <b>በሚፈልጉት Gmail Account ይግቡ</b>\n` +
-      `4️⃣ <b>ከታች በምስሉ ላይ እንደሚታየው «Activate plan» የሚለውን ሰማያዊ ቁልፍ ይጫኑ!</b> 👇\n\n` +
+      `4️⃣ <b>ከላይ በምስሉ ላይ በቀይ እንደተከበበው «Activate plan» የሚለውን ሰማያዊ ቁልፍ ይጫኑ!</b>\n\n` +
       `⏰ <b>የጊዜ ገደብ:</b> እባክዎ ሊንኩ እንደደረሰዎት በ 1 ሰዓት ውስጥ አክቲቭ ያድርጉ!\n` +
       `❓ ችግር ካጋጠመዎት ያነጋግሩን፦ @${supportUser}\n\n` +
       `🙏 እኛን ስለመረጡ እናመሰግናለን!`;
