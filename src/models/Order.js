@@ -14,9 +14,14 @@ const orderSchema = new mongoose.Schema(
     stockIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Stock' }],
     quantity: { type: Number, default: 1 },
     amount: { type: Number, required: true },
+    currency: {
+      type: String,
+      enum: ['ETB', 'USDT'],
+      default: 'ETB',
+    },
     paymentMethod: {
       type: String,
-      enum: ['CBE', 'Telebirr', 'Other'],
+      enum: ['CBE', 'Telebirr', 'Binance', 'Bybit', 'BEP20', 'Other'],
       required: true,
     },
     receiptFileId: { type: String, default: null }, // Telegram file_id

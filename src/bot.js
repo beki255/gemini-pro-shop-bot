@@ -81,6 +81,7 @@ bot.command(['checkouts', 'checkout'], adminHandlers.handleCheckouts);
 bot.command('stats', adminHandlers.handleStats);
 bot.command('setprice', adminHandlers.handleSetPrice);
 bot.command('price', adminHandlers.handleSetPrice);
+bot.command(['setusdtrate', 'usdtrate', 'rate'], adminHandlers.handleSetUsdtRate);
 bot.command('resend', adminHandlers.handleResend);
 bot.command('restock', adminHandlers.handleRestock);
 bot.command('broadcast', adminHandlers.handleBroadcast);
@@ -121,16 +122,62 @@ bot.on('callback_query', async (ctx) => {
     const qty = parts.length > 2 ? parseInt(parts[2]) : 1;
     return userHandlers.callbackPaymentMethod(ctx, 'Telebirr', qty);
   }
+  if (data.startsWith('pay_binance')) {
+    const parts = data.split('_');
+    const qty = parts.length > 2 ? parseInt(parts[2]) : 1;
+    return userHandlers.callbackPaymentMethod(ctx, 'Binance', qty);
+  }
+  if (data.startsWith('pay_bybit')) {
+    const parts = data.split('_');
+    const qty = parts.length > 2 ? parseInt(parts[2]) : 1;
+    return userHandlers.callbackPaymentMethod(ctx, 'Bybit', qty);
+  }
+  if (data.startsWith('pay_bep20')) {
+    const parts = data.split('_');
+    const qty = parts.length > 2 ? parseInt(parts[2]) : 1;
+    return userHandlers.callbackPaymentMethod(ctx, 'BEP20', qty);
+  }
   if (data === 'proceed_payment') return userHandlers.callbackProceedPayment(ctx);
   if (data === 'cancel') return userHandlers.callbackCancel(ctx);
   if (data.startsWith('copy_acc_')) {
-    const isCbe = data === 'copy_acc_cbe';
-    const acc = isCbe ? config.payment.cbe.account : config.payment.telebirr.account;
-    const name = isCbe ? config.payment.cbe.name : config.payment.telebirr.name;
-    const alertText = isCbe
-      ? `🏦 የኢትዮጵያ ንግድ ባንክ (CBE)\n━━━━━━━━━━━━━━\n📋 የሒሳብ ቁጥር:\n${acc}\n\n👤 ስም: ${name}\n\n(ከመልዕክቱ ላይ ቁጥሩን በመንካት ወዲያው መቅዳት ይችላሉ!)`
-      : `📱 ቴሌብር (Telebirr)\n━━━━━━━━━━━━━━\n📋 የስልክ ቁጥር:\n${acc}\n\n👤 ስም: ${name}\n\n(ከመልዕክቱ ላይ ቁጥሩን በመንካት ወዲያው መቅዳት ይችላሉ!)`;
-    return ctx.answerCbQuery(alertText, { show_alert: true }).catch(() => {});
+    if (data === 'copy_acc_cbe') {
+      const acc = config.payment.cbe.account;
+      const name = config.payment.cbe.name;
+      return ctx.answerCbQuery(
+        `🏦 የኢትዮጵያ ንግድ ባንክ (CBE)\n━━━━━━━━━━━━━━\n📋 የሒሳብ ቁጥር:\n${acc}\n\n👤 ስም: ${name}\n\n(ከመልዕክቱ ላይ ቁጥሩን በመንካት ወዲያው መቅዳት ይችላሉ!)`,
+        { show_alert: true }
+      ).catch(() => {});
+    }
+    if (data === 'copy_acc_telebirr') {
+      const acc = config.payment.telebirr.account;
+      const name = config.payment.telebirr.name;
+      return ctx.answerCbQuery(
+        `📱 ቴሌብር (Telebirr)\n━━━━━━━━━━━━━━\n📋 የስልክ ቁጥር:\n${acc}\n\n👤 ስም: ${name}\n\n(ከመልዕክቱ ላይ ቁጥሩን በመንካት ወዲያው መቅዳት ይችላሉ!)`,
+        { show_alert: true }
+      ).catch(() => {});
+    }
+    if (data === 'copy_acc_binance') {
+      const acc = config.payment.binance?.payId || '1225194839';
+      return ctx.answerCbQuery(
+        `🟡 Binance Pay / UID\n━━━━━━━━━━━━━━\n📋 Binance Pay ID / UID:\n${acc}\n\n(ከመልዕክቱ ላይ ቁጥሩን በመንካት ወዲያው መቅዳት ይችላሉ!)`,
+        { show_alert: true }
+      ).catch(() => {});
+    }
+    if (data === 'copy_acc_bybit') {
+      const acc = config.payment.bybit?.uid || '464108781';
+      return ctx.answerCbQuery(
+        `🖤 Bybit UID\n━━━━━━━━━━━━━━\n📋 Bybit UID:\n${acc}\n\n(ከመልዕክቱ ላይ ቁጥሩን በመንካት ወዲያው መቅዳት ይችላሉ!)`,
+        { show_alert: true }
+      ).catch(() => {});
+    }
+    if (data === 'copy_acc_bep20') {
+      const acc = config.payment.bep20?.address || '0x7cde540b6b914483cb2e31e76eafb42f9c717e4b';
+      return ctx.answerCbQuery(
+        `🌐 USDT (BEP-20 BNB Chain)\n━━━━━━━━━━━━━━\n📋 Wallet Address:\n${acc}\n\n⚠️ Network: BNB Smart Chain (BEP20)\n(ከመልዕክቱ ላይ አድራሻውን በመንካት ወዲያው መቅዳት ይችላሉ!)`,
+        { show_alert: true }
+      ).catch(() => {});
+    }
+    return ctx.answerCbQuery().catch(() => {});
   }
   if (data === 'main_menu') return userHandlers.callbackMainMenu(ctx);
   if (data === 'my_orders') return userHandlers.callbackMyOrders(ctx);

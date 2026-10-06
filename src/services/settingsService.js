@@ -27,6 +27,14 @@ class SettingsService {
         this.isAcceptingOrders = true;
         console.log(` Initialized isAcceptingOrders in DB: true`);
       }
+      const rateSetting = await Setting.findOne({ key: 'usdtRate' });
+      if (rateSetting && rateSetting.value) {
+        config.payment.usdtRate = Number(rateSetting.value);
+        console.log(` Loaded USDT rate from DB: ${config.payment.usdtRate} ETB/USDT`);
+      } else {
+        await Setting.create({ key: 'usdtRate', value: config.payment.usdtRate || 195 });
+        console.log(` Initialized USDT rate in DB: ${config.payment.usdtRate || 195} ETB/USDT`);
+      }
     } catch (e) {
       console.error('⚠️ Failed to sync settings from DB:', e.message);
     }
@@ -48,6 +56,24 @@ class SettingsService {
 
   getProductPrice() {
     return config.productPrice;
+  }
+
+  async setUsdtRate(newRate) {
+    const rate = parseInt(newRate);
+    if (isNaN(rate) || rate <= 0) {
+      throw new Error('Invalid USDT rate');
+    }
+    config.payment.usdtRate = rate;
+    await Setting.findOneAndUpdate(
+      { key: 'usdtRate' },
+      { value: rate, updatedAt: new Date() },
+      { upsert: true }
+    );
+    return rate;
+  }
+
+  getUsdtRate() {
+    return config.payment.usdtRate || 195;
   }
 
   getIsAcceptingOrders() {

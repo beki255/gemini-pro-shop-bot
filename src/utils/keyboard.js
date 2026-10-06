@@ -159,14 +159,17 @@ const keyboards = {
   // ─── PAYMENT METHOD SELECTION (With Multiplication & Total Price)
   paymentMethod(lang = 'am', quantity = 1) {
     const isEn = lang === 'en';
-    const unitPrice = config.productPrice || 250;
-    const total = quantity * unitPrice;
+    const unitEtb = config.productPrice || 250;
+    const totalEtb = quantity * unitEtb;
+    const unitUsdt = config.calculateUsdtPrice(unitEtb);
+    const totalUsdt = Number((quantity * unitUsdt).toFixed(2));
+
     return Markup.inlineKeyboard([
       [
         {
           text: isEn
-            ? `🏦 CBE Bank — ${total} ETB (${quantity} × ${unitPrice} ETB)`
-            : `🏦 የኢትዮጵያ ንግድ ባንክ — ${total} ብር (${quantity} × ${unitPrice} ብር)`,
+            ? `🏦 CBE Bank — ${totalEtb} ETB (${quantity} × ${unitEtb} ETB)`
+            : `🏦 የኢትዮጵያ ንግድ ባንክ — ${totalEtb} ብር (${quantity} × ${unitEtb} ብር)`,
           callback_data: `pay_cbe_${quantity}`,
           style: 'primary',
         },
@@ -174,9 +177,36 @@ const keyboards = {
       [
         {
           text: isEn
-            ? `📱 Telebirr — ${total} ETB (${quantity} × ${unitPrice} ETB)`
-            : `📱 ቴሌብር — ${total} ብር (${quantity} × ${unitPrice} ብር)`,
+            ? `📱 Telebirr — ${totalEtb} ETB (${quantity} × ${unitEtb} ETB)`
+            : `📱 ቴሌብር — ${totalEtb} ብር (${quantity} × ${unitEtb} ብር)`,
           callback_data: `pay_telebirr_${quantity}`,
+          style: 'primary',
+        },
+      ],
+      [
+        {
+          text: isEn
+            ? `🟡 Binance Pay — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`
+            : `🟡 Binance Pay — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`,
+          callback_data: `pay_binance_${quantity}`,
+          style: 'primary',
+        },
+      ],
+      [
+        {
+          text: isEn
+            ? `🖤 Bybit (USDT) — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`
+            : `🖤 Bybit (USDT) — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`,
+          callback_data: `pay_bybit_${quantity}`,
+          style: 'primary',
+        },
+      ],
+      [
+        {
+          text: isEn
+            ? `🌐 USDT (BEP-20) — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`
+            : `🌐 USDT (BEP-20) — ${totalUsdt} USDT (${quantity} × ${unitUsdt} USDT)`,
+          callback_data: `pay_bep20_${quantity}`,
           style: 'primary',
         },
       ],
@@ -198,16 +228,28 @@ const keyboards = {
   // ─── PAYMENT DETAILS KEYBOARD (Universal Safe Callback) ─────
   paymentDetails(method, lang = 'am') {
     const isEn = lang === 'en';
-    const isCbe = method === 'CBE';
-    const copyLabel = isEn
-      ? (isCbe ? '📋 View / Copy CBE Account' : '📋 View / Copy Telebirr Number')
-      : (isCbe ? '📋 የ CBE ቁጥር ይመልከቱ / ይቅዱ' : '📋 የቴሌብር ስልክ ይመልከቱ / ይቅዱ');
+    const m = (method || '').toLowerCase();
+    let copyLabel = '';
+
+    if (m === 'cbe') {
+      copyLabel = isEn ? '📋 View / Copy CBE Account' : '📋 የ CBE ቁጥር ይመልከቱ / ይቅዱ';
+    } else if (m === 'telebirr') {
+      copyLabel = isEn ? '📋 View / Copy Telebirr Number' : '📋 የቴሌብር ስልክ ይመልከቱ / ይቅዱ';
+    } else if (m === 'binance') {
+      copyLabel = isEn ? '📋 View / Copy Binance ID' : '📋 የ Binance ID ይመልከቱ / ይቅዱ';
+    } else if (m === 'bybit') {
+      copyLabel = isEn ? '📋 View / Copy Bybit UID' : '📋 የ Bybit UID ይመልከቱ / ይቅዱ';
+    } else if (m === 'bep20') {
+      copyLabel = isEn ? '📋 View / Copy BEP20 Address' : '📋 የ BEP20 አድራሻ ይመልከቱ / ይቅዱ';
+    } else {
+      copyLabel = isEn ? '📋 View / Copy Details' : '📋 መረጃውን ይመልከቱ / ይቅዱ';
+    }
 
     return Markup.inlineKeyboard([
       [
         {
           text: copyLabel,
-          callback_data: `copy_acc_${method.toLowerCase()}`,
+          callback_data: `copy_acc_${m}`,
         },
       ],
       [

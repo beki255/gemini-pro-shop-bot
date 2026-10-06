@@ -202,8 +202,13 @@ const msg = {
 
   // ─── PAYMENT INSTRUCTIONS ──────────────────────────────────
   paymentInstructions(method, lang = 'am', quantity = 1, amount = null) {
-    const unitPrice = config.productPrice || 250;
-    const totalAmount = amount || (quantity * unitPrice);
+    const isCrypto = ['Binance', 'Bybit', 'BEP20'].includes(method);
+    const unitPrice = isCrypto
+      ? config.calculateUsdtPrice(config.productPrice)
+      : (config.productPrice || 250);
+    const totalAmount = amount !== null
+      ? amount
+      : (isCrypto ? Number((quantity * unitPrice).toFixed(2)) : quantity * unitPrice);
 
     if (lang === 'en') {
       const baseEn =
@@ -211,8 +216,8 @@ const msg = {
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `📦 <b>Product:</b> ${config.productName}\n` +
         `🔢 <b>Quantity:</b> <b>${quantity} item(s)</b>\n` +
-        `💵 <b>Unit Price:</b> <b>${unitPrice} ETB</b>\n` +
-        `💰 <b>Total Amount:</b> <b>${quantity} × ${unitPrice} = ${totalAmount} ETB</b>\n\n`;
+        `💵 <b>Unit Price:</b> <b>${unitPrice} ${isCrypto ? 'USDT' : 'ETB'}</b>\n` +
+        `💰 <b>Total Amount:</b> <b>${quantity} × ${unitPrice} = ${totalAmount} ${isCrypto ? 'USDT' : 'ETB'}</b>\n\n`;
 
       if (method === 'CBE') {
         return (
@@ -252,6 +257,60 @@ const msg = {
           `4️⃣ Send the screenshot directly into this chat\n\n` +
           `⏱️ <i>Reserved for 30 minutes. Deliveries are processed immediately upon verification!</i>`
         );
+      } else if (method === 'Binance') {
+        return (
+          baseEn +
+          `🟡 <b>Binance Pay (USDT)</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📋 <b>Binance Pay ID / UID:</b>\n` +
+          `👉 <code>${config.payment.binance.id}</code> 👈\n\n` +
+          `💰 <b>Total to Pay:</b>\n` +
+          `👉 <b>${totalAmount} USDT</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `📸 <b>Payment Steps:</b>\n` +
+          `1️⃣ Tap the Binance ID above to copy\n` +
+          `2️⃣ Open Binance App → Pay → Send → Paste Pay ID <code>${config.payment.binance.id}</code>\n` +
+          `3️⃣ Send exactly <b>${totalAmount} USDT</b>\n` +
+          `4️⃣ Take a screenshot of the completed transfer\n` +
+          `5️⃣ Send the screenshot directly into this chat\n\n` +
+          `⏱️ <i>Reserved for 30 minutes. Deliveries are processed immediately upon verification!</i>`
+        );
+      } else if (method === 'Bybit') {
+        return (
+          baseEn +
+          `🖤 <b>Bybit (USDT)</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📋 <b>Bybit UID:</b>\n` +
+          `👉 <code>${config.payment.bybit.id}</code> 👈\n\n` +
+          `💰 <b>Total to Pay:</b>\n` +
+          `👉 <b>${totalAmount} USDT</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `📸 <b>Payment Steps:</b>\n` +
+          `1️⃣ Tap the Bybit UID above to copy\n` +
+          `2️⃣ Open Bybit App → Transfer / Internal Transfer via UID <code>${config.payment.bybit.id}</code>\n` +
+          `3️⃣ Send exactly <b>${totalAmount} USDT</b>\n` +
+          `4️⃣ Take a screenshot of the completed transaction\n` +
+          `5️⃣ Send the screenshot directly into this chat\n\n` +
+          `⏱️ <i>Reserved for 30 minutes. Deliveries are processed immediately upon verification!</i>`
+        );
+      } else if (method === 'BEP20') {
+        return (
+          baseEn +
+          `🌐 <b>USDT (BNB Smart Chain - BEP20)</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `📋 <b>BEP20 Wallet Address:</b>\n` +
+          `👉 <code>${config.payment.bep20.address}</code> 👈\n\n` +
+          `⚠️ <b>Network:</b> <b>BNB Smart Chain (BEP20)</b>\n` +
+          `💰 <b>Total to Pay:</b>\n` +
+          `👉 <b>${totalAmount} USDT</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `📸 <b>Payment Steps:</b>\n` +
+          `1️⃣ Tap the wallet address above to copy\n` +
+          `2️⃣ Send <b>${totalAmount} USDT</b> via BEP20 (ensure network fee is covered)\n` +
+          `3️⃣ Take a screenshot of the completed transaction\n` +
+          `4️⃣ Send the screenshot directly into this chat\n\n` +
+          `⏱️ <i>Reserved for 30 minutes. Deliveries are processed immediately upon verification!</i>`
+        );
       }
       return baseEn;
     }
@@ -261,8 +320,8 @@ const msg = {
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `📦 <b>ምርት:</b> ${config.productName}\n` +
       `🔢 <b>የተመረጠው ብዛት:</b> <b>${quantity} ሊንክ</b>\n` +
-      `💵 <b>የነጠላ ዋጋ:</b> <b>${unitPrice} ብር</b>\n` +
-      `💰 <b>ጠቅላላ ክፍያ:</b> <b>${quantity} × ${unitPrice} = ${totalAmount} ብር</b>\n\n`;
+      `💵 <b>የነጠላ ዋጋ:</b> <b>${unitPrice} ${isCrypto ? 'USDT' : 'ብር'}</b>\n` +
+      `💰 <b>ጠቅላላ ክፍያ:</b> <b>${quantity} × ${unitPrice} = ${totalAmount} ${isCrypto ? 'USDT' : 'ብር'}</b>\n\n`;
 
     if (method === 'CBE') {
       return (
@@ -300,6 +359,60 @@ const msg = {
         `2️⃣ በ Telebirr App Send Money በማድረግ <b>${totalAmount} ብር</b> ይላኩ\n` +
         `3️⃣ የተላከበትን <b>የደረሰኝ Screenshot ፎቶ</b> ያንሱ\n` +
         `4️⃣ ፎቶውን እዚህ ቦቱ ላይ ይላኩ\n\n` +
+        `⏱️ <i>ማሳሰቢያ፦ ይህ ትዕዛዝ ለ 30 ደቂቃዎች ብቻ የተጠበቀ ነው። ደረሰኙ እንደደረሰን ወዲያው ይላካል!</i>`
+      );
+    } else if (method === 'Binance') {
+      return (
+        baseAm +
+        `🟡 <b>ቢናንስ ፔይ / Binance Pay (USDT)</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📋 <b>የ Binance Pay ID / UID:</b>\n` +
+        `👉 <code>${config.payment.binance.id}</code> 👈\n\n` +
+        `💰 <b>የሚከፈለው ጠቅላላ መጠን:</b>\n` +
+        `👉 <b>${totalAmount} USDT</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `📸 <b>የአከፋፈል ቅደም ተከተል:</b>\n` +
+        `1️⃣ ከላይ ያለውን የ Binance ID ነክተው ይቅዱ\n` +
+        `2️⃣ ወደ Binance App ገብተው Pay (Send) በማድረግ በ Pay ID <code>${config.payment.binance.id}</code> ይላኩ\n` +
+        `3️⃣ ትክክለኛውን <b>${totalAmount} USDT</b> ያስተላልፉ\n` +
+        `4️⃣ የተላከበትን የክፍያ ስክሪንሾት (Screenshot) ያንሱ\n` +
+        `5️⃣ ስክሪንሾቱን እዚህ ቦቱ ላይ ይላኩ\n\n` +
+        `⏱️ <i>ማሳሰቢያ፦ ይህ ትዕዛዝ ለ 30 ደቂቃዎች ብቻ የተጠበቀ ነው። ደረሰኙ እንደደረሰን ወዲያው ይላካል!</i>`
+      );
+    } else if (method === 'Bybit') {
+      return (
+        baseAm +
+        `🖤 <b>ባይቢት / Bybit (USDT)</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📋 <b>የ Bybit UID:</b>\n` +
+        `👉 <code>${config.payment.bybit.id}</code> 👈\n\n` +
+        `💰 <b>የሚከፈለው ጠቅላላ መጠን:</b>\n` +
+        `👉 <b>${totalAmount} USDT</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `📸 <b>የአከፋፈል ቅደም ተከተል:</b>\n` +
+        `1️⃣ ከላይ ያለውን የ Bybit UID ነክተው ይቅዱ\n` +
+        `2️⃣ ወደ Bybit App ገብተው Internal Transfer በማድረግ በ UID <code>${config.payment.bybit.id}</code> ይላኩ\n` +
+        `3️⃣ ትክክለኛውን <b>${totalAmount} USDT</b> ያስተላልፉ\n` +
+        `4️⃣ የተላከበትን የክፍያ ስክሪንሾት (Screenshot) ያንሱ\n` +
+        `5️⃣ ስክሪንሾቱን እዚህ ቦቱ ላይ ይላኩ\n\n` +
+        `⏱️ <i>ማሳሰቢያ፦ ይህ ትዕዛዝ ለ 30 ደቂቃዎች ብቻ የተጠበቀ ነው። ደረሰኙ እንደደረሰን ወዲያው ይላካል!</i>`
+      );
+    } else if (method === 'BEP20') {
+      return (
+        baseAm +
+        `🌐 <b>ዩኤስዲቲ / USDT (BNB Smart Chain - BEP20)</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📋 <b>የዋሌት አድራሻ (BEP20 Address):</b>\n` +
+        `👉 <code>${config.payment.bep20.address}</code> 👈\n\n` +
+        `⚠️ <b>ኔትወርክ (Network):</b> <b>BNB Smart Chain (BEP20)</b>\n` +
+        `💰 <b>የሚከፈለው ጠቅላላ መጠን:</b>\n` +
+        `👉 <b>${totalAmount} USDT</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `📸 <b>የአከፋፈል ቅደም ተከተል:</b>\n` +
+        `1️⃣ ከላይ ያለውን የዋሌት አድራሻ ነክተው ይቅዱ\n` +
+        `2️⃣ ከዋሌትዎ ወይም Exchange <b>${totalAmount} USDT</b> በ <b>BEP20</b> ኔትወርክ ይላኩ\n` +
+        `3️⃣ የተላከበትን የክፍያ ስክሪንሾት (Screenshot) ያንሱ\n` +
+        `4️⃣ ስክሪንሾቱን እዚህ ቦቱ ላይ ይላኩ\n\n` +
         `⏱️ <i>ማሳሰቢያ፦ ይህ ትዕዛዝ ለ 30 ደቂቃዎች ብቻ የተጠበቀ ነው። ደረሰኙ እንደደረሰን ወዲያው ይላካል!</i>`
       );
     }
@@ -346,7 +459,7 @@ const msg = {
         `━━━━━━━━━━━━━━━━━━━\n` +
         `🆔 <b>${orderId}</b>\n` +
         `📦 <b>Gemini Pro 18M × ${linkArray.length}</b>\n\n` +
-        `🎁 <b>Your delivery:</b>\n`;
+        `🎁 <b>Your activation link(s):</b>\n`;
 
       linkArray.forEach((lnk, idx) => {
         const safeHref = lnk.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -358,13 +471,18 @@ const msg = {
       });
 
       text +=
-        `\n📋 <b>Activation Instructions:</b>\n` +
-        `• ⏰ <b>Please activate within 1 hour of receiving this link</b>\n` +
-        `• <b>Connect VPN for only activation, after activation you can turn off</b>\n` +
-        `• Click the provided activation link\n` +
-        `• Sign in to the target Gmail account\n` +
-        `• Select Activate Offer\n\n` +
-        `❓ Issues? Contact: @${supportUser}\n\n` +
+        `\n🚨 <b>CRITICAL NOTICE — PLEASE READ BEFORE OPENING:</b>\n` +
+        `<blockquote>🛑 <b>STEP 1: CONNECT TO VPN FIRST! (Mandatory)</b>\n` +
+        `• <b>You MUST turn on your VPN BEFORE opening the activation link!</b>\n` +
+        `• If you open the link without a VPN connected, it will show an error or say "Offer Unavailable".\n` +
+        `• <i>(Note: VPN is required ONLY for activating. After activation completes, you can turn off the VPN!)</i></blockquote>\n\n` +
+        `📋 <b>Step-by-Step Activation Guide:</b>\n` +
+        `1️⃣ <b>Turn on your VPN</b> (as stated above)\n` +
+        `2️⃣ <b>Click the activation link</b> (or tap the button below)\n` +
+        `3️⃣ <b>Sign in to your target Gmail account</b>\n` +
+        `4️⃣ <b>Click «Activate plan»</b> (as highlighted in the screenshot below 👇)\n\n` +
+        `⏰ <b>1-Hour Window:</b> Please activate within 1 hour of delivery.\n` +
+        `❓ Issues? Contact support: @${supportUser}\n\n` +
         `🙏 Thank you for shopping with us!`;
 
       return text;
@@ -375,7 +493,7 @@ const msg = {
       `━━━━━━━━━━━━━━━━━━━\n` +
       `🆔 <b>${orderId}</b>\n` +
       `📦 <b>Gemini Pro 18 ወራት × ${linkArray.length}</b>\n\n` +
-      `🎁 <b>የተላከው ሊንክ (Your delivery):</b>\n`;
+      `🎁 <b>የተላከው ሊንክ (Your activation link):</b>\n`;
 
     linkArray.forEach((lnk, idx) => {
       const safeHref = lnk.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -387,12 +505,17 @@ const msg = {
     });
 
     text +=
-      `\n📋 <b>የአክቲቬሽን መመሪያ (Activation Instructions):</b>\n` +
-      `• ⏰ <b>እባክዎ ሊንኩ እንደደረሰዎት በ 1 ሰዓት ውስጥ አክቲቭ ያድርጉ!</b>\n` +
-      `• <b>Connect VPN for only activation, after activation you can turn off</b> (VPN የሚያስፈልገው ለአክቲቬሽን ብቻ ነው፤ አክቲቭ ካደረጉ በኋላ ማጥፋት ይችላሉ)\n` +
-      `• Click the provided activation link (የተላከውን ሊንክ ይጫኑ)\n` +
-      `• Sign in to the target Gmail account (በሚፈልጉት Gmail Account ይግቡ)\n` +
-      `• Select Activate Offer ("Activate Offer" የሚለውን ይጫኑ)\n\n` +
+      `\n🚨 <b>በጣም አስፈላጊ ማስጠንቀቂያ — ሊንኩን ከመክፈትዎ በፊት ያንብቡ:</b>\n` +
+      `<blockquote>🛑 <b>ደረጃ 1፦ መጀመሪያ በቅድሚያ VPN ያብሩ! (CONNECT VPN FIRST)</b>\n` +
+      `• <b>ሊንኩን ከመክፈትዎ በፊት VPN ማብራትዎን ያረጋግጡ!</b>\n` +
+      `• VPN ሳያበሩ ሊንኩን ከከፈቱት አይሰራም ወይም ስህተት (Error) ያሳያል!\n` +
+      `• <i>(ማስታወሻ፦ VPN የሚያስፈልገው ለአክቲቬሽን ብቻ ነው፤ አንዴ አክቲቭ ካደረጉ በኋላ VPN ማጥፋት ይችላሉ)</i></blockquote>\n\n` +
+      `📋 <b>የአክቲቬሽን ቅደም ተከተል:</b>\n` +
+      `1️⃣ <b>መጀመሪያ VPN ያብሩ</b> (ከላይ እንደተገለጸው)\n` +
+      `2️⃣ <b>የተላከውን አክቲቬሽን ሊንክ ይክፈቱ</b> (ወይም ከታች ያለውን ቁልፍ ይጫኑ)\n` +
+      `3️⃣ <b>በሚፈልጉት Gmail Account ይግቡ</b>\n` +
+      `4️⃣ <b>ከታች በምስሉ ላይ እንደሚታየው «Activate plan» የሚለውን ሰማያዊ ቁልፍ ይጫኑ!</b> 👇\n\n` +
+      `⏰ <b>የጊዜ ገደብ:</b> እባክዎ ሊንኩ እንደደረሰዎት በ 1 ሰዓት ውስጥ አክቲቭ ያድርጉ!\n` +
       `❓ ችግር ካጋጠመዎት ያነጋግሩን፦ @${supportUser}\n\n` +
       `🙏 እኛን ስለመረጡ እናመሰግናለን!`;
 
@@ -507,8 +630,10 @@ const msg = {
         ? (lang === 'en' ? ` (${order.quantity} links)` : ` (${order.quantity} ሊንክ)`)
         : '';
 
+      const isCrypto = ['Binance', 'Bybit', 'BEP20'].includes(order.paymentMethod);
+      const curr = order.currency || (isCrypto ? 'USDT' : (lang === 'en' ? 'ETB' : 'ብር'));
       text += `<b>${itemNumber}.</b> ${emoji} <code>${esc(order.orderId)}</code>${quantityText}\n`;
-      text += `   💰 <b>${order.amount}</b> ${lang === 'en' ? 'ETB' : 'ብር'} | 📅 ${date} | <b>${st}</b>\n\n`;
+      text += `   💰 <b>${order.amount}</b> ${curr} | 📅 ${date} | <b>${st}</b>\n\n`;
     });
 
     if (totalPages > 1) {
@@ -582,6 +707,8 @@ const msg = {
     const fullName = rawFullName ? rawFullName : 'ስም አልተገለጸም';
     const username = user.username ? `@${user.username}` : 'የለውም';
     const qty = order.quantity || 1;
+    const isCrypto = ['Binance', 'Bybit', 'BEP20'].includes(order.paymentMethod);
+    const curr = order.currency || (isCrypto ? 'USDT' : 'ብር');
     return (
       `🔔 <b>አዲስ ትዕዛዝ!</b>\n\n` +
       `🔢 ትዕዛዝ: <code>${esc(order.orderId)}</code>\n` +
@@ -589,7 +716,7 @@ const msg = {
       `🔗 ዩዘርኔም: <b>${esc(username)}</b>\n` +
       `🆔 Telegram ID: <code>${order.userId}</code>\n` +
       `📦 ብዛት: <b>${qty} ሊንክ</b>\n` +
-      `💰 መጠን: <b>${order.amount} ብር</b>\n` +
+      `💰 መጠን: <b>${order.amount} ${curr}</b>\n` +
       `💳 ክፍያ: <b>${esc(order.paymentMethod)}</b>\n` +
       `📅 ቀን: ${new Date(order.createdAt || Date.now()).toLocaleString('am-ET')}\n\n` +
       `📸 ደረሰኝ ስዕል ከላይ ተላኳል\n` +
@@ -598,6 +725,11 @@ const msg = {
   },
 
   adminStats(stats, lang = 'am') {
+    const revEtb = stats.totalRevenueEtb !== undefined ? stats.totalRevenueEtb : (stats.totalRevenue || 0);
+    const revUsdt = stats.totalRevenueUsdt || 0;
+    const revTextEn = revUsdt > 0 ? `${revEtb} ETB + ${revUsdt} USDT` : `${revEtb} ETB`;
+    const revTextAm = revUsdt > 0 ? `${revEtb} ብር + ${revUsdt} USDT` : `${revEtb} ብር`;
+
     if (lang === 'en') {
       return (
         `📊 *Dashboard Statistics*\n\n` +
@@ -615,7 +747,7 @@ const msg = {
         `✅ Available: ${stats.availableStock}\n` +
         `🔴 Sold: ${stats.soldStock}\n` +
         `📋 Total: ${stats.totalStock}\n\n` +
-        `💰 *Total Revenue:* ${stats.totalRevenue} ETB`
+        `💰 *Total Revenue:* ${revTextEn}`
       );
     }
 
@@ -635,7 +767,7 @@ const msg = {
       `✅ የሚገኝ: ${stats.availableStock}\n` +
       `🔴 የተሸጠ: ${stats.soldStock}\n` +
       `📋 ጠቅላላ: ${stats.totalStock}\n\n` +
-      `💰 *ገቢ:* ${stats.totalRevenue} ብር`
+      `💰 *ገቢ:* ${revTextAm}`
     );
   },
 

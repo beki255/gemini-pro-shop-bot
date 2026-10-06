@@ -518,7 +518,14 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
   const stocks = await reservationService.reserveStock(ctx.from.id, method, qty).catch(() => null);
   const stockIds = stocks && stocks.length > 0 ? stocks.map((s) => s._id) : [];
 
-  const totalAmount = qty * (config.productPrice || 250);
+  const isCrypto = ['Binance', 'Bybit', 'BEP20'].includes(method);
+  const unitPrice = isCrypto
+    ? config.calculateUsdtPrice(config.productPrice)
+    : (config.productPrice || 250);
+  const totalAmount = isCrypto
+    ? Number((qty * unitPrice).toFixed(2))
+    : (qty * unitPrice);
+  const currency = isCrypto ? 'USDT' : 'ETB';
 
   // Store pending info in session
   ctx.session = ctx.session || {};
@@ -527,6 +534,7 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
     stockId: stockIds[0] || null,
     quantity: qty,
     totalAmount,
+    currency,
     method,
     reservedAt: Date.now(),
   };
@@ -548,6 +556,7 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
       },
       quantity: qty,
       amount: totalAmount,
+      currency,
       paymentMethod: method,
       stockIds,
       status: 'awaiting_receipt',
@@ -580,6 +589,7 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
           : `tg://user?id=${ctx.from.id}`;
         const userLink = `<a href="${dmUrl}">${escape(fullName)}</a>`;
 
+        const currLabel = isCrypto ? 'USDT' : 'ብር';
         const alertMsg =
           `🔔 <b>በክፍያ ሂደት ላይ ያለ ደንበኛ (Checkout Started)</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
@@ -587,7 +597,7 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
           `🆔 <b>Telegram ID:</b> <code>${ctx.from.id}</code>\n` +
           `💳 <b>የክፍያ መንገድ:</b> <b>${escape(method)}</b>\n` +
           `📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b>\n` +
-          `💰 <b>የሚከፍለው:</b> <b>${totalAmount} ብር</b>\n` +
+          `💰 <b>የሚከፍለው:</b> <b>${totalAmount} ${currLabel}</b>\n` +
           `⏰ <b>ሰዓት:</b> ${new Date().toLocaleTimeString('am-ET')}\n\n` +
           `⏳ <i>ደንበኛው የክፍያ ስክሪንሾት እስኪያያይዝ እየተጠበቀ ነው። ክፍያ ወደ ሂሳብዎ ከገባና ደንበኛው ደረሰኝ ካዘገየ ከታች ባለው ቁልፍ በቦቱ ማሳሰቢያ መላክ ወይም በ inbox ማናገር ይችላሉ!</i>`;
 
@@ -659,8 +669,8 @@ async function handleReceipt(ctx) {
 
   if (!session.pendingOrder) {
     const warning = lang === 'en'
-      ? '⚠️ *To send a receipt, please first:*\n1. Tap /buy to start an order\n2. Select quantity and payment method (CBE or Telebirr)\n3. Then send your receipt photo or document.'
-      : '⚠️ *ደረሰኝ ለመላክ እባክዎ መጀመሪያ:*\n1. /buy ብለው ይዘዙ\n2. ብዛት እና የክፍያ መንገድ ይምረጡ (CBE ወይም Telebirr)\n3. ከዚያ ደረሰኙን (ስክሪንሾት ወይም ሰነድ) እዚህ ይላኩ።';
+      ? '⚠️ *To send a receipt, please first:*\n1. Tap /buy to start an order\n2. Select quantity and payment method\n3. Then send your receipt photo or document.'
+      : '⚠️ *ደረሰኝ ለመላክ እባክዎ መጀመሪያ:*\n1. /buy ብለው ይዘዙ\n2. ብዛት እና የክፍያ መንገድ ይምረጡ\n3. ከዚያ ደረሰኙን (ስክሪንሾት ወይም ሰነድ) እዚህ ይላኩ።';
 
     return ctx.reply(warning, { parse_mode: 'Markdown' });
   }
@@ -758,8 +768,16 @@ async function handleReceipt(ctx) {
     }
   })();
 
+  const pending = ctx.session?.pendingOrder || {};
+  const isCrypto = ['Binance', 'Bybit', 'BEP20'].includes(method);
+  const defaultUnitPrice = isCrypto
+    ? config.calculateUsdtPrice(config.productPrice)
+    : (config.productPrice || 250);
   const finalQty = quantity || targetStockIds.length || 1;
-  const finalAmount = totalAmount || (finalQty * (config.productPrice || 250));
+  const finalAmount = totalAmount !== undefined && totalAmount !== null
+    ? totalAmount
+    : (isCrypto ? Number((finalQty * defaultUnitPrice).toFixed(2)) : (finalQty * defaultUnitPrice));
+  const orderCurrency = pending.currency || (isCrypto ? 'USDT' : 'ETB');
 
   // Create order (with retry protection against any duplicate key race conditions)
   let order;
@@ -779,6 +797,7 @@ async function handleReceipt(ctx) {
         stockIds: targetStockIds,
         quantity: finalQty,
         amount: finalAmount,
+        currency: orderCurrency,
         paymentMethod: method,
         receiptFileId: fileId,
         receiptPath: filePath,

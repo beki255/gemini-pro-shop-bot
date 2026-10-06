@@ -7,6 +7,87 @@ const Order = require('../models/Order');
 const CheckoutAttempt = require('../models/CheckoutAttempt');
 const keyboards = require('../utils/keyboard');
 const msg = require('../utils/messages');
+const path = require('path');
+const fs = require('fs-extra');
+
+// Cache for Telegram file_id of activation guide image
+let cachedGuideFileId = null;
+
+// ─── Universal Delivery Helper (Links + Visual Activate Plan Guide) ──
+async function sendOrderDeliveryToCustomer(telegram, userId, deliveredLinks, orderId, custLang) {
+  const isEn = custLang === 'en';
+  const supportUser = config.supportUsername || 'Mnbvcnvhd';
+
+  // 1. Send the primary delivery message with link(s) & interactive browser buttons
+  try {
+    await telegram.sendMessage(
+      userId,
+      msg.orderApproved(deliveredLinks, orderId, custLang),
+      {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),
+      }
+    );
+  } catch (err) {
+    console.error('Failed to send approval to user with HTML:', err.message);
+    try {
+      let plainMsg =
+        (isEn ? `🎉 Your order ${orderId} has been approved!\n\nGemini Pro Activation Link(s):\n` : `🎉 ትዕዛዝዎ ጸድቋል!\n\n🔢 የትዕዛዝ ቁጥር: ${orderId}\n📦 የተገዛ ብዛት: ${deliveredLinks.length}\n\n🔗 የ Gemini Pro አክቲቬሽን ሊንኮችዎ:\n`);
+      deliveredLinks.forEach((lnk, i) => {
+        plainMsg += `\n${i + 1}️⃣ ${lnk}\n`;
+      });
+      plainMsg += isEn
+        ? `\n🚨 CRITICAL: CONNECT TO VPN FIRST before opening the link!\n• Click link → Sign in to Gmail → Click 'Activate plan'\n\n❓ Issues? Contact: @${supportUser}\n\n🙏 Thank you for shopping with us!`
+        : `\n🚨 በጣም አስፈላጊ፦ ሊንኩን ከመክፈትዎ በፊት መጀመሪያ VPN ያብሩ!\n• ሊንኩን ይክፈቱ → በሚፈልጉት Gmail ይግቡ → 'Activate plan' የሚለውን ይጫኑ\n\n❓ ችግር ካጋጠመዎት ያነጋግሩን፦ @${supportUser}\n\n🙏 እኛን ስለመረጡ እናመሰግናለን!`;
+
+      await telegram.sendMessage(userId, plainMsg, {
+        ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),
+      });
+    } catch (err2) {
+      console.error('Fallback approval delivery also failed:', err2.message);
+    }
+  }
+
+  // 2. Send visual activation guide photo showing "Activate plan"
+  const guidePhotoPath = path.join(process.cwd(), 'assets/activation_guide.png');
+  const guideCaption = isEn
+    ? `📸 <b>Visual Activation Step:</b>\n\n` +
+      `🚨 <b>Remember: Connect your VPN first!</b>\n` +
+      `👉 Click the blue <b>«Activate plan»</b> button (highlighted in red) to complete your 18-month AI Pro activation! ✨`
+    : `📸 <b>የአክቲቬሽን ምስላዊ ማብራሪያ (Visual Guide):</b>\n\n` +
+      `🚨 <b>ማስታወሻ፦ መጀመሪያ በቅድሚያ VPN ማብራትዎን እንዳይረሱ!</b>\n` +
+      `👉 በምስሉ ላይ በቀይ እንደተከበበው ሰማያዊውን <b>«Activate plan»</b> የሚለውን ቁልፍ በመጫን የ 18 ወራት Gemini Pro አክቲቬሽንዎን ያጠናቁ! ✨`;
+
+  if (fs.existsSync(guidePhotoPath) || cachedGuideFileId) {
+    try {
+      const photoPayload = cachedGuideFileId || { source: guidePhotoPath };
+      const sentMsg = await telegram.sendPhoto(userId, photoPayload, {
+        caption: guideCaption,
+        parse_mode: 'HTML',
+      });
+      if (sentMsg && sentMsg.photo && sentMsg.photo.length > 0) {
+        cachedGuideFileId = sentMsg.photo[sentMsg.photo.length - 1].file_id;
+      }
+    } catch (photoErr) {
+      console.warn('Failed to send guide photo by cached fileId, trying raw path:', photoErr.message);
+      if (cachedGuideFileId && fs.existsSync(guidePhotoPath)) {
+        try {
+          cachedGuideFileId = null;
+          const sentMsg = await telegram.sendPhoto(userId, { source: guidePhotoPath }, {
+            caption: guideCaption,
+            parse_mode: 'HTML',
+          });
+          if (sentMsg && sentMsg.photo && sentMsg.photo.length > 0) {
+            cachedGuideFileId = sentMsg.photo[sentMsg.photo.length - 1].file_id;
+          }
+        } catch (photoErr2) {
+          console.error('Fallback sendPhoto also failed:', photoErr2.message);
+        }
+      }
+    }
+  }
+}
 
 // Atomic lock tracker to prevent double-tap race conditions on orders
 const processingOrders = new Set();
@@ -624,7 +705,9 @@ const handleOrders = adminOnly(async (ctx, filterOverride, pageOverride) => {
     replyText += `<b>${skip + idx + 1}.</b> ${statusEmoji[o.status] || '📦'} <b>የትዕዛዝ ቁጥር:</b> <code>${escapeHtml(o.orderId)}</code> (${statusAm[o.status] || o.status})\n`;
     replyText += `   👤 <b>ደንበኛ:</b> ${userLink} (${escapeHtml(username)})\n`;
     replyText += `   🆔 <b>Telegram ID:</b> <code>${o.userId}</code>\n`;
-    replyText += `   📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b> | 💰 <b>ክፍያ:</b> <b>${o.amount} ብር</b> (${escapeHtml(o.paymentMethod || 'CBE')})\n`;
+    const isCrypto = ['Binance', 'Bybit', 'BEP20'].includes(o.paymentMethod);
+    const curr = o.currency || (isCrypto ? 'USDT' : 'ብር');
+    replyText += `   📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b> | 💰 <b>ክፍያ:</b> <b>${o.amount} ${curr}</b> (${escapeHtml(o.paymentMethod || 'CBE')})\n`;
     replyText += `   📅 <b>ቀን:</b> ${dateStr}\n`;
     if (o.status === 'rejected' && o.adminNote) {
       replyText += `   📝 <b>የተሰረዘበት ምክንያት:</b> <i>${escapeHtml(o.adminNote)}</i>\n`;
@@ -841,7 +924,9 @@ const handleCheckouts = adminOnly(async (ctx, filterOverride, pageOverride) => {
     replyText += `<b>${skip + idx + 1}.</b> ${statusEmoji[att.status] || '💳'} <b>ሁኔታ:</b> <b>${stBadge}</b>\n`;
     replyText += `   👤 <b>ደንበኛ:</b> ${userLink} (${escapeHtml(username)})\n`;
     replyText += `   🆔 <b>Telegram ID:</b> <code>${att.userId || 'N/A'}</code>\n`;
-    replyText += `   📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b> | 💰 <b>ክፍያ:</b> <b>${att.amount || 0} ብር</b> (${escapeHtml(att.paymentMethod || 'CBE')})\n`;
+    const isCrypto = ['Binance', 'Bybit', 'BEP20'].includes(att.paymentMethod);
+    const curr = att.currency || (isCrypto ? 'USDT' : 'ብር');
+    replyText += `   📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b> | 💰 <b>ክፍያ:</b> <b>${att.amount || 0} ${curr}</b> (${escapeHtml(att.paymentMethod || 'CBE')})\n`;
     replyText += `   📅 <b>የተጀመረበት:</b> ${dateStr}\n`;
 
     if (att.orderId) {
@@ -1160,12 +1245,28 @@ const handleStats = adminOnly(async (ctx) => {
 
   const totalStock = availableStock + (await Stock.countDocuments({ isReserved: true }));
 
-  // Revenue from approved orders
+  // Revenue from approved orders (split ETB and USDT)
   const revResult = await Order.aggregate([
     { $match: { status: 'approved' } },
-    { $group: { _id: null, total: { $sum: '$amount' } } },
+    {
+      $group: {
+        _id: {
+          $cond: [
+            { $in: ['$paymentMethod', ['Binance', 'Bybit', 'BEP20']] },
+            'USDT',
+            'ETB',
+          ],
+        },
+        total: { $sum: '$amount' },
+      },
+    },
   ]);
-  const totalRevenue = revResult[0]?.total || 0;
+  let totalRevenueEtb = 0;
+  let totalRevenueUsdt = 0;
+  revResult.forEach((r) => {
+    if (r._id === 'USDT') totalRevenueUsdt = Number(r.total.toFixed(2));
+    else totalRevenueEtb = r.total;
+  });
 
   const user = await User.findOne({ telegramId: ctx.from.id });
   const lang = user && user.language ? user.language : 'am';
@@ -1181,7 +1282,8 @@ const handleStats = adminOnly(async (ctx) => {
         totalStock,
         availableStock,
         soldStock,
-        totalRevenue,
+        totalRevenueEtb,
+        totalRevenueUsdt,
         totalCheckouts,
         awaitingCheckouts,
         completedCheckouts,
@@ -1221,15 +1323,7 @@ async function callbackApprove(ctx) {
         try {
           const customer = await User.findOne({ telegramId: order.userId });
           const custLang = customer && customer.language ? customer.language : 'am';
-          await ctx.telegram.sendMessage(
-            order.userId,
-            msg.orderApproved(links, orderId, custLang),
-            {
-              parse_mode: 'HTML',
-              disable_web_page_preview: true,
-              ...keyboards.deliveredLinksKeyboard(links, custLang),
-            }
-          );
+          await sendOrderDeliveryToCustomer(ctx.telegram, order.userId, links, orderId, custLang);
           return ctx.reply(`✅ ትዕዛዝ ${orderId} አስቀድሞ የጸደቀ ነበር። ሊንኩ ዳግም ወደ ደንበኛው (${order.userId}) በተሳካ ሁኔታ ተልኳል!`);
         } catch (err) {
           return ctx.reply(`❌ ወደ ደንበኛው ዳግም መላክ አልተቻለም: ${err.message}`);
@@ -1366,41 +1460,13 @@ async function callbackApprove(ctx) {
     }
   );
 
-  // Send link(s) to customer in HTML format with direct browser open buttons
+  // Send link(s) to customer in HTML format with direct browser open buttons and visual activation guide
   try {
     const customer = await User.findOne({ telegramId: order.userId });
     const custLang = customer && customer.language ? customer.language : 'am';
-    await ctx.telegram.sendMessage(
-      order.userId,
-      msg.orderApproved(deliveredLinks, orderId, custLang),
-      {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),
-      }
-    );
+    await sendOrderDeliveryToCustomer(ctx.telegram, order.userId, deliveredLinks, orderId, custLang);
   } catch (err) {
-    console.error('Failed to send approval to user with HTML:', err.message);
-    try {
-      const customer = await User.findOne({ telegramId: order.userId });
-      const custLang = customer && customer.language ? customer.language : 'am';
-      let plainMsg =
-        `🎉 ትዕዛዝዎ ጸድቋል!\n\n` +
-        `🔢 የትዕዛዝ ቁጥር: ${orderId}\n` +
-        `📦 የተገዛ ብዛት: ${deliveredLinks.length}\n\n` +
-        `🔗 የ Gemini Pro አክቲቬሽን ሊንኮችዎ:\n`;
-      deliveredLinks.forEach((lnk, i) => {
-        plainMsg += `\n${i + 1}️⃣ ${lnk}\n`;
-      });
-      const supportUser = config.supportUsername || 'Mnbvcnvhd';
-      plainMsg += `\n📋 Activation Instructions:\n• Connect VPN for only activation, after activation you can turn off\n• Click the provided activation link\n• Sign in to the target Gmail account\n• Select Activate Offer\n\n❓ Issues? Contact: @${supportUser}\n\n🙏 እኛን ስለመረጡ እናመሰግናለን!`;
-
-      await ctx.telegram.sendMessage(order.userId, plainMsg, {
-        ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),
-      });
-    } catch (err2) {
-      console.error('Fallback approval delivery also failed:', err2.message);
-    }
+    console.error('Failed to send approval delivery to customer:', err.message);
   }
 
   // Update admin message
@@ -1547,58 +1613,71 @@ async function processOrderRejection(ctx, orderId, reason) {
     const rejectHtml = msg.orderRejected(reason, orderId, custLang, order.amount, order.quantity);
 
     try {
-      await ctx.telegram.sendMessage(order.userId, rejectHtml, {
-        parse_mode: 'HTML',
-        ...keyboards.backToMain(custLang),
-      });
+      await ctx.telegram.sendMessage(order.userId, rejectHtml, { parse_mode: 'HTML' });
       userNotified = true;
     } catch (htmlErr) {
-      console.warn('HTML reject message failed, retrying plain text:', htmlErr.message);
-      const plainText = rejectHtml.replace(/<[^>]*>/g, '');
-      await ctx.telegram.sendMessage(order.userId, plainText, {
-        ...keyboards.backToMain(custLang),
-      });
-      userNotified = true;
+      console.warn(`HTML reject notification failed for order ${orderId}: ${htmlErr.message}`);
+      try {
+        const plainMsg =
+          `❌ ትዕዛዝዎ ውድቅ ተደርጓል\n\n` +
+          `🔢 የትዕዛዝ ቁጥር: ${orderId}\n` +
+          `📦 ብዛት: ${order.quantity || 1} ሊንክ (${order.amount} ${order.currency || 'ብር'})\n` +
+          `📝 ምክንያት: ${reason}\n\n` +
+          `እባክዎ እንደገና በትክክል ይዘዙ ወይም ድጋፍ ያነጋግሩ: @${config.supportUsername || 'Mnbvcnvhd'}`;
+        await ctx.telegram.sendMessage(order.userId, plainMsg);
+        userNotified = true;
+      } catch (plainErr) {
+        notifyError = plainErr.message;
+        console.error(`Plain text reject notification failed for order ${orderId}:`, plainErr.message);
+      }
     }
   } catch (err) {
-    console.error('Failed to notify customer of rejection:', err.message);
     notifyError = err.message;
   }
 
-  if (ctx.session) {
-    ctx.session.pendingRejection = null;
-  }
-
-  const statusText = userNotified
-    ? `✅ ትዕዛዝ <code>${orderId}</code> ተሰርዟል። ለደንበኛው ማስታወቂያ ደርሶታል።`
-    : `⚠️ ትዕዛዝ <code>${orderId}</code> ተሰርዟል። ሆኖም ለደንበኛው ማድረስ አልተቻለም (${notifyError && notifyError.includes('blocked') ? 'ደንበኛው ቦቱን አግዶታል/block አድርጓል' : (notifyError || 'ያልታወቀ ስህተት')})።`;
-
-  if (ctx.callbackQuery) {
-    try {
-      await ctx.editMessageText(statusText, { parse_mode: 'HTML' });
-      return;
-    } catch {}
-  }
-
-  return ctx.reply(statusText, { parse_mode: 'HTML' });
+  // Update admin message
+  try {
+    const cust = await getCustomerDetails(order.userId, order.userInfo);
+    await ctx.editMessageCaption(
+      `❌ <b>ትዕዛዝ ${escapeHtml(orderId)} ውድቅ ተደርጓል</b>\n\n` +
+        `👤 ስም: <b>${cust.safeFullName}</b>\n` +
+        `🔗 ዩዘርኔም: <b>${cust.safeUsername}</b>\n` +
+        `🆔 Telegram ID: <code>${order.userId}</code>\n` +
+        `📦 ብዛት: <b>${order.quantity || 1} ሊንክ</b>\n` +
+        `💰 መጠን: <b>${order.amount} ${order.currency || 'ብር'}</b>\n` +
+        `📝 ምክንያት: <i>${escapeHtml(reason)}</i>` +
+        (!userNotified ? `\n\n⚠️ (ማስታወሻ፦ ለደንበኛው ማሳወቅ አልተቻለም)` : ''),
+      { parse_mode: 'HTML' }
+    );
+  } catch {}
   } finally {
     processingOrders.delete(orderId);
+    if (ctx.session) ctx.session.pendingRejection = null;
   }
 }
 
-// ─── Callback: View Order Receipt (admin_view_receipt_<orderId>_<filter>_<page>) ───
-const callbackViewReceipt = adminOnly(async (ctx) => {
-  await ctx.answerCbQuery('🖼️ ደረሰኝ በማምጣት ላይ...').catch(() => {});
-  const data = ctx.callbackQuery.data.replace('admin_view_receipt_', '');
-  const parts = data.split('_');
-  const orderId = parts[0];
-  const returnFilter = parts[1] || 'all';
-  const returnPage = parseInt(parts[2], 10) || 1;
+// ─── Callback: "admin_view_receipt_<orderId>" ─────────────────
+const callbackViewReceipt = adminOnly(async (ctx, orderIdOverride, returnFilterOverride, returnPageOverride) => {
+  let orderId = orderIdOverride;
+  let returnFilter = returnFilterOverride || 'all';
+  let returnPage = returnPageOverride || 1;
+
+  if (ctx.callbackQuery && ctx.callbackQuery.data) {
+    const data = ctx.callbackQuery.data;
+    if (data.startsWith('admin_view_receipt_')) {
+      const parts = data.replace('admin_view_receipt_', '').split('_');
+      orderId = parts[0];
+      returnFilter = parts[1] || 'all';
+      returnPage = parseInt(parts[2], 10) || 1;
+    }
+  }
+
+  if (!orderId) {
+    return ctx.answerCbQuery('❌ Order ID አልተገኘም').catch(() => {});
+  }
 
   const order = await Order.findOne({ orderId });
-  if (!order) {
-    return ctx.reply(`❌ ትዕዛዝ ${orderId} አልተገኘም።`);
-  }
+  if (!order) return ctx.reply(`❌ ትዕዛዝ ${orderId} አልተገኘም።`);
 
   const user = await User.findOne({ telegramId: ctx.from.id });
   const lang = user && user.language ? user.language : 'am';
@@ -1615,6 +1694,9 @@ const callbackViewReceipt = adminOnly(async (ctx) => {
   const dateStr = new Date(order.createdAt).toLocaleString('am-ET');
   const unitPrice = config.productPrice || 250;
   const qty = order.quantity || 1;
+  const isCrypto = ['Binance', 'Bybit', 'BEP20'].includes(order.paymentMethod);
+  const curr = order.currency || (isCrypto ? 'USDT' : 'ብር');
+  const unitLabel = isCrypto ? `${config.calculateUsdtPrice(config.productPrice)} USDT` : `${unitPrice} ብር`;
 
   let caption =
     `🧾 <b>${isEn ? 'Payment Receipt & Order Details' : 'የትዕዛዝ ደረሰኝ እና ሙሉ መረጃ'}</b>\n` +
@@ -1625,7 +1707,7 @@ const callbackViewReceipt = adminOnly(async (ctx) => {
     `🔗 <b>ዩዘርኔም:</b> ${cust.safeUsername}\n` +
     `🆔 <b>Telegram ID:</b> <code>${order.userId}</code>\n` +
     `📦 <b>የተመረጠ ብዛት:</b> <b>${qty} ሊንክ</b>\n` +
-    `💰 <b>የተከፈለ ክፍያ:</b> <b>${order.amount} ብር</b> (${qty} × ${unitPrice} ብር)\n` +
+    `💰 <b>የተከፈለ ክፍያ:</b> <b>${order.amount} ${curr}</b> (${qty} × ${unitLabel})\n` +
     `💳 <b>የክፍያ መንገድ:</b> <b>${escapeHtml(order.paymentMethod || 'CBE')}</b>\n` +
     `📅 <b>የታዘዘበት ቀን:</b> ${dateStr}\n`;
 
@@ -1716,15 +1798,7 @@ const callbackResendOrderLink = adminOnly(async (ctx) => {
   try {
     const customer = await User.findOne({ telegramId: order.userId });
     const custLang = customer && customer.language ? customer.language : 'am';
-    await ctx.telegram.sendMessage(
-      order.userId,
-      msg.orderApproved(links, order.orderId, custLang),
-      {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        ...keyboards.deliveredLinksKeyboard(links, custLang),
-      }
-    );
+    await sendOrderDeliveryToCustomer(ctx.telegram, order.userId, links, order.orderId, custLang);
     return ctx.reply(`✅ ሊንኩ ዳግም ወደ ደንበኛው (${order.userId}) በተሳካ ሁኔታ ተልኳል!`);
   } catch (err) {
     return ctx.reply(`❌ ወደ ደንበኛው መላክ አልተቻለም: ${err.message}`);
@@ -1754,10 +1828,11 @@ const handleSetPrice = adminOnly(async (ctx) => {
   if (parts.length < 2) {
     ctx.session = ctx.session || {};
     ctx.session.awaitingNewPrice = true;
+    const currentUsdt = config.calculateUsdtPrice(config.productPrice);
     return ctx.reply(
       isEn
-        ? `💰 *Change Product Price*\n\nCurrent Price: *${config.productPrice} ETB*\n\nPlease enter the **new price** below (numbers only, e.g. \`300\`):`
-        : `💰 *የምርት ዋጋ ማስተካከያ*\n\nየአሁኑ ዋጋ፦ *${config.productPrice} ብር*\n\nእባክዎ **አዲሱን ዋጋ** ብቻ እዚህ ይላኩ (ምሳሌ: \`300\`):`,
+        ? `💰 *Change Product Price*\n\nCurrent Price: *${config.productPrice} ETB* (~*${currentUsdt} USDT*)\n\nPlease enter the **new price** below (numbers only, e.g. \`300\`):`
+        : `💰 *የምርት ዋጋ ማስተካከያ*\n\nየአሁኑ ዋጋ፦ *${config.productPrice} ብር* (~*${currentUsdt} USDT*)\n\nእባክዎ **አዲሱን ዋጋ** ብቻ እዚህ ይላኩ (ምሳሌ: \`300\`):`,
       {
         parse_mode: 'Markdown',
         ...keyboards.cancelPriceChange(lang),
@@ -1777,11 +1852,12 @@ const handleSetPrice = adminOnly(async (ctx) => {
 
   const settingsService = require('../services/settingsService');
   await settingsService.setProductPrice(newPrice);
+  const usdtEquiv = config.calculateUsdtPrice(newPrice);
 
   return ctx.reply(
     isEn
-      ? `✅ Product price has been successfully updated to *${newPrice} ETB*!`
-      : `✅ የምርት ዋጋ በተሳካ ሁኔታ ወደ *${newPrice} ብር* ተቀይሯል!`,
+      ? `✅ Product price has been successfully updated to *${newPrice} ETB*! (USDT: *${usdtEquiv} USDT* at ${config.payment.usdtRate || 195} ETB/USDT)`
+      : `✅ የምርት ዋጋ በተሳካ ሁኔታ ወደ *${newPrice} ብር* ተቀይሯል! (የ USDT ዋጋ፦ *${usdtEquiv} USDT* በ ${config.payment.usdtRate || 195} ብር ሂሳብ)`,
     {
       parse_mode: 'Markdown',
       ...keyboards.adminPanel(lang),
@@ -1798,11 +1874,12 @@ const callbackChangePrice = adminOnly(async (ctx) => {
 
   ctx.session = ctx.session || {};
   ctx.session.awaitingNewPrice = true;
+  const currentUsdt = config.calculateUsdtPrice(config.productPrice);
 
   return ctx.reply(
     isEn
-      ? `💰 *Change Product Price*\n\nCurrent Price: *${config.productPrice} ETB*\n\nPlease enter the **new price** below (numbers only, e.g. \`300\`):`
-      : `💰 *የምርት ዋጋ ማስተካከያ*\n\nየአሁኑ ዋጋ፦ *${config.productPrice} ብር*\n\nእባክዎ **አዲሱን ዋጋ** ብቻ እዚህ ይላኩ (ምሳሌ: \`300\`):`,
+      ? `💰 *Change Product Price*\n\nCurrent Price: *${config.productPrice} ETB* (~*${currentUsdt} USDT*)\n\nPlease enter the **new price** below (numbers only, e.g. \`300\`):`
+      : `💰 *የምርት ዋጋ ማስተካከያ*\n\nየአሁኑ ዋጋ፦ *${config.productPrice} ብር* (~*${currentUsdt} USDT*)\n\nእባክዎ **አዲሱን ዋጋ** ብቻ እዚህ ይላኩ (ምሳሌ: \`300\`):`,
     {
       parse_mode: 'Markdown',
       ...keyboards.cancelPriceChange(lang),
@@ -1838,11 +1915,12 @@ const handlePriceInput = adminOnly(async (ctx) => {
 
   const settingsService = require('../services/settingsService');
   await settingsService.setProductPrice(newPrice);
+  const usdtEquiv = config.calculateUsdtPrice(newPrice);
 
   await ctx.reply(
     isEn
-      ? `✅ Product price has been successfully updated to *${newPrice} ETB*!`
-      : `✅ የምርት ዋጋ በተሳካ ሁኔታ ወደ *${newPrice} ብር* ተቀይሯል!`,
+      ? `✅ Product price has been successfully updated to *${newPrice} ETB*! (USDT: *${usdtEquiv} USDT* at ${config.payment.usdtRate || 195} ETB/USDT)`
+      : `✅ የምርት ዋጋ በተሳካ ሁኔታ ወደ *${newPrice} ብር* ተቀይሯል! (የ USDT ዋጋ፦ *${usdtEquiv} USDT* በ ${config.payment.usdtRate || 195} ብር ሂሳብ)`,
     {
       parse_mode: 'Markdown',
       ...keyboards.adminPanel(lang),
@@ -1868,6 +1946,41 @@ const callbackCancelPriceChange = adminOnly(async (ctx) => {
       parse_mode: 'Markdown',
       ...keyboards.adminPanel(lang),
     }
+  );
+});
+
+// ─── /setusdtrate [rate] — Update USDT exchange rate ───────
+const handleSetUsdtRate = adminOnly(async (ctx) => {
+  const parts = ctx.message.text.trim().split(/\s+/);
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  if (parts.length < 2) {
+    const currentRate = config.payment.usdtRate || 195;
+    const currentUsdt = config.calculateUsdtPrice(config.productPrice, currentRate);
+    return ctx.reply(
+      isEn
+        ? `💱 *USDT Exchange Rate*\n\nCurrent Rate: *1 USDT = ${currentRate} ETB*\nProduct Price: *${config.productPrice} ETB* = *${currentUsdt} USDT*\n\nTo update rate, send: \`/setusdtrate 200\``
+        : `💱 *የ USDT ምንዛሬ ተመን*\n\nየአሁኑ ተመን፦ *1 USDT = ${currentRate} ብር*\nየአሁኑ የምርት ዋጋ፦ *${config.productPrice} ብር* = *${currentUsdt} USDT*\n\nተመን ለመቀየር፦ \`/setusdtrate 200\` ብለው ይላኩ`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  const newRate = parseInt(parts[1], 10);
+  if (isNaN(newRate) || newRate <= 0) {
+    return ctx.reply('⚠️ እባክዎ ትክክለኛ ቁጥር ያስገቡ። ምሳሌ፦ `/setusdtrate 195`');
+  }
+
+  const settingsService = require('../services/settingsService');
+  await settingsService.setUsdtRate(newRate);
+  const newUsdt = config.calculateUsdtPrice(config.productPrice, newRate);
+
+  return ctx.reply(
+    isEn
+      ? `✅ USDT rate updated to *1 USDT = ${newRate} ETB*!\nNew USDT price per item: *${newUsdt} USDT*`
+      : `✅ የ USDT ተመን ወደ *1 USDT = ${newRate} ብር* ተቀይሯል!\nአዲሱ የ 1 ሊንክ ዋጋ፦ *${newUsdt} USDT*`,
+    { parse_mode: 'Markdown', ...keyboards.adminPanel(lang) }
   );
 });
 
@@ -1900,15 +2013,7 @@ const handleResend = adminOnly(async (ctx) => {
   try {
     const customer = await User.findOne({ telegramId: order.userId });
     const custLang = customer && customer.language ? customer.language : 'am';
-    await ctx.telegram.sendMessage(
-      order.userId,
-      msg.orderApproved(links, order.orderId, custLang),
-      {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        ...keyboards.deliveredLinksKeyboard(links, custLang),
-      }
-    );
+    await sendOrderDeliveryToCustomer(ctx.telegram, order.userId, links, order.orderId, custLang);
     return ctx.reply(`✅ ሊንኩ ዳግም ወደ ደንበኛው (${order.userId}) በተሳካ ሁኔታ ተልኳል!`);
   } catch (err) {
     return ctx.reply(`❌ ወደ ደንበኛው መላክ አልተቻለም: ${err.message}`);
@@ -1983,21 +2088,13 @@ async function executeDirectDelivery(ctx, orderId) {
     }
   );
 
-  // Deliver to customer with HTML format and direct browser open buttons
+  // Deliver to customer with HTML format, direct browser open buttons, and visual activation guide
   try {
     const customer = await User.findOne({ telegramId: order.userId });
     const custLang = customer && customer.language ? customer.language : 'am';
-    await ctx.telegram.sendMessage(
-      order.userId,
-      msg.orderApproved(deliveredLinks, orderId, custLang),
-      {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-        ...keyboards.deliveredLinksKeyboard(deliveredLinks, custLang),
-      }
-    );
+    await sendOrderDeliveryToCustomer(ctx.telegram, order.userId, deliveredLinks, orderId, custLang);
   } catch (err) {
-    console.error('Failed to send direct approval to user with HTML:', err.message);
+    console.error('Failed to send direct approval delivery to customer:', err.message);
   }
 
   // Confirm to admin
@@ -2555,6 +2652,7 @@ module.exports = {
   callbackRemindCheckout,
   handleStats,
   handleSetPrice,
+  handleSetUsdtRate,
   handlePriceInput,
   handleResend,
   handleRejectionReason,

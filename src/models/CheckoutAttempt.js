@@ -11,9 +11,14 @@ const checkoutAttemptSchema = new mongoose.Schema(
     },
     quantity: { type: Number, default: 1 },
     amount: { type: Number, required: true },
+    currency: {
+      type: String,
+      enum: ['ETB', 'USDT'],
+      default: 'ETB',
+    },
     paymentMethod: {
       type: String,
-      enum: ['CBE', 'Telebirr', 'Other'],
+      enum: ['CBE', 'Telebirr', 'Binance', 'Bybit', 'BEP20', 'Other'],
       required: true,
       index: true,
     },
