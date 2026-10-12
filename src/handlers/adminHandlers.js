@@ -27,6 +27,16 @@ function adminOnly(handler) {
   };
 }
 
+// ─── Helper: Get user's preferred language ───────────────
+async function getUserLang(telegramId) {
+  try {
+    const user = await User.findOne({ telegramId });
+    return user && user.language ? user.language : 'am';
+  } catch {
+    return 'am';
+  }
+}
+
 // ─── HTML safe escape helper ─────────────────────────────
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
@@ -1201,116 +1211,135 @@ const callbackRemindCheckout = adminOnly(async (ctx) => {
 
 // ─── Helper: Render Detailed User Profile ─────────────────────
 async function renderUserDetail(ctx, targetUserId, lang = 'am', isEdit = false) {
-  const isEn = lang === 'en';
-  let query = {};
-  if (typeof targetUserId === 'number' || /^\d+$/.test(targetUserId)) {
-    query = { telegramId: parseInt(targetUserId, 10) };
-  } else {
-    const cleanUser = String(targetUserId).replace(/^@/, '');
-    query = { username: new RegExp(`^${cleanUser}$`, 'i') };
-  }
+  try {
+    const isEn = lang === 'en';
+    const cleanId = String(targetUserId).trim();
+    let query = {};
+    if (/^\d+$/.test(cleanId)) {
+      query = { telegramId: Number(cleanId) };
+    } else {
+      const cleanUser = cleanId.replace(/^@/, '');
+      query = { username: new RegExp(`^${cleanUser}$`, 'i') };
+    }
 
-  const foundUser = await User.findOne(query);
-  if (!foundUser) {
-    const notFoundText = isEn
-      ? `❌ User "<b>${escapeHtml(String(targetUserId))}</b>" was not found in the database.`
-      : `❌ ተጠቃሚ "<b>${escapeHtml(String(targetUserId))}</b>" በዳታቤዝ ውስጥ አልተገኘም።`;
-    if (isEdit && ctx.callbackQuery) {
+    const foundUser = await User.findOne(query);
+    if (!foundUser) {
+      const notFoundText = isEn
+        ? `❌ User "<b>${escapeHtml(cleanId)}</b>" was not found in the database.`
+        : `❌ ተጠቃሚ "<b>${escapeHtml(cleanId)}</b>" በዳታቤዝ ውስጥ አልተገኘም።`;
+      if (isEdit && ctx.callbackQuery) {
+        try {
+          return await ctx.editMessageText(notFoundText, {
+            parse_mode: 'HTML',
+            ...keyboards.adminPanel(lang),
+          });
+        } catch {
+          return ctx.reply(notFoundText, { parse_mode: 'HTML', ...keyboards.adminPanel(lang) });
+        }
+      }
+      return ctx.reply(notFoundText, {
+        parse_mode: 'HTML',
+        ...keyboards.adminPanel(lang),
+      });
+    }
+
+    // Fetch user's orders
+    const userOrders = await Order.find({ userId: foundUser.telegramId }).sort({ createdAt: -1 });
+    const approvedCount = userOrders.filter((o) => o.status === 'approved').length;
+    const totalSpent = userOrders
+      .filter((o) => o.status === 'approved')
+      .reduce((sum, o) => sum + (o.amount || 0), 0);
+
+    const fullName = `${foundUser.firstName || ''} ${foundUser.lastName || ''}`.trim() || (isEn ? 'No Name' : 'ስም የለም');
+    const username = foundUser.username ? `@${foundUser.username}` : (isEn ? 'None' : 'የለውም');
+    const userLang = foundUser.language === 'en' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
+    let regDate = 'ያልታወቀ';
+    if (foundUser.createdAt) {
       try {
-        return await ctx.editMessageText(notFoundText, {
-          parse_mode: 'HTML',
-          ...keyboards.adminPanel(lang),
-        });
+        regDate = new Date(foundUser.createdAt).toISOString().replace('T', ' ').slice(0, 19);
       } catch {
-        return ctx.reply(notFoundText, { parse_mode: 'HTML', ...keyboards.adminPanel(lang) });
+        regDate = String(foundUser.createdAt);
       }
     }
-    return ctx.reply(notFoundText, {
-      parse_mode: 'HTML',
-      ...keyboards.adminPanel(lang),
-    });
-  }
+    const statusText = foundUser.isBlocked ? '🔴 የታገደ (Blocked)' : '🟢 ንቁ (Active)';
 
-  // Fetch user's orders
-  const userOrders = await Order.find({ userId: foundUser.telegramId }).sort({ createdAt: -1 });
-  const approvedCount = userOrders.filter((o) => o.status === 'approved').length;
-  const totalSpent = userOrders
-    .filter((o) => o.status === 'approved')
-    .reduce((sum, o) => sum + (o.amount || 0), 0);
+    let detailText =
+      `👤 <b>የተጠቃሚ ዝርዝር መረጃ (User Details)</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>ስም:</b> <b>${escapeHtml(fullName)}</b>\n` +
+      `🔗 <b>ዩዘርኔም:</b> <b>${escapeHtml(username)}</b>\n` +
+      `🆔 <b>Telegram ID:</b> <code>${foundUser.telegramId}</code>\n` +
+      `🌐 <b>ቋንቋ:</b> ${userLang}\n` +
+      `📊 <b>ሁኔታ:</b> ${statusText}\n` +
+      `📅 <b>የተመዘገበበት:</b> ${regDate}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 <b>ጠቅላላ ትዕዛዞች:</b> ${userOrders.length} (${approvedCount} የጸደቁ)\n` +
+      `💰 <b>ጠቅላላ የወጣው ገንዘብ:</b> ${totalSpent} ብር\n\n`;
 
-  const fullName = `${foundUser.firstName || ''} ${foundUser.lastName || ''}`.trim() || (isEn ? 'No Name' : 'ስም የለም');
-  const username = foundUser.username ? `@${foundUser.username}` : (isEn ? 'None' : 'የለውም');
-  const userLang = foundUser.language === 'en' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
-  const regDate = foundUser.createdAt ? new Date(foundUser.createdAt).toLocaleString('am-ET') : 'ያልታወቀ';
-  const statusText = foundUser.isBlocked ? '🔴 የታገደ (Blocked)' : '🟢 ንቁ (Active)';
-
-  let detailText =
-    `👤 <b>የተጠቃሚ ዝርዝር መረጃ (User Details)</b>\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `👤 <b>ስም:</b> <b>${escapeHtml(fullName)}</b>\n` +
-    `🔗 <b>ዩዘርኔም:</b> <b>${escapeHtml(username)}</b>\n` +
-    `🆔 <b>Telegram ID:</b> <code>${foundUser.telegramId}</code>\n` +
-    `🌐 <b>ቋንቋ:</b> ${userLang}\n` +
-    `📊 <b>ሁኔታ:</b> ${statusText}\n` +
-    `📅 <b>የተመዘገበበት:</b> ${regDate}\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `📦 <b>ጠቅላላ ትዕዛዞች:</b> ${userOrders.length} (${approvedCount} የጸደቁ)\n` +
-    `💰 <b>ጠቅላላ የወጣው ገንዘብ:</b> ${totalSpent} ብር\n\n`;
-
-  if (userOrders.length > 0) {
-    detailText += `📋 <b>የቅርብ ትዕዛዞች:</b>\n`;
-    userOrders.slice(0, 5).forEach((o) => {
-      const stEmoji = o.status === 'approved' ? '✅' : o.status === 'pending' ? '⏳' : '❌';
-      detailText += `• ${stEmoji} <code>${o.orderId}</code> — ${o.amount} ብር (${escapeHtml(o.paymentMethod || 'CBE')})\n`;
-    });
-  }
-
-  const kbd = keyboards.adminUserDetailKeyboard(foundUser.telegramId, lang);
-
-  if (isEdit && ctx.callbackQuery) {
-    try {
-      return await ctx.editMessageText(detailText, {
-        parse_mode: 'HTML',
-        ...kbd,
+    if (userOrders.length > 0) {
+      detailText += `📋 <b>የቅርብ ትዕዛዞች:</b>\n`;
+      userOrders.slice(0, 5).forEach((o) => {
+        const stEmoji = o.status === 'approved' ? '✅' : o.status === 'pending' ? '⏳' : '❌';
+        detailText += `• ${stEmoji} <code>${escapeHtml(o.orderId)}</code> — ${o.amount} ብር (${escapeHtml(o.paymentMethod || 'CBE')})\n`;
       });
-    } catch (err) {
-      if (!err.description || !err.description.includes('message is not modified')) {
-        return await ctx.reply(detailText, {
+    }
+
+    const kbd = keyboards.adminUserDetailKeyboard(foundUser.telegramId, lang);
+
+    if (isEdit && ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(detailText, {
           parse_mode: 'HTML',
           ...kbd,
         });
+      } catch (err) {
+        if (!err.description || !err.description.includes('message is not modified')) {
+          return await ctx.reply(detailText, {
+            parse_mode: 'HTML',
+            ...kbd,
+          });
+        }
+        return;
       }
-      return;
     }
-  }
 
-  return ctx.reply(detailText, {
-    parse_mode: 'HTML',
-    ...kbd,
-  });
+    return ctx.reply(detailText, {
+      parse_mode: 'HTML',
+      ...kbd,
+    });
+  } catch (err) {
+    console.error(`❌ Error in renderUserDetail for ${targetUserId}:`, err.message);
+    const fallbackMsg = `❌ ስህተት ተፈጥሯል: ${escapeHtml(err.message)}`;
+    if (ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(fallbackMsg, { parse_mode: 'HTML' });
+      } catch {}
+    }
+    return ctx.reply(fallbackMsg, { parse_mode: 'HTML' });
+  }
 }
 
 // ─── /users — List registered users from database ─────────
 const handleUsers = adminOnly(async (ctx, pageOverride) => {
-  const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
-  const args = text.split(/\s+/);
-  const searchParam = args.length > 1 ? args[1] : null;
+  try {
+    const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
+    const args = text.split(/\s+/);
+    const searchParam = args.length > 1 ? args[1] : null;
 
-  const adminUser = await User.findOne({ telegramId: ctx.from.id });
-  const lang = adminUser && adminUser.language ? adminUser.language : 'am';
-  const isEn = lang === 'en';
+    const lang = await getUserLang(ctx.from.id);
+    const isEn = lang === 'en';
 
-  const validPageOverride =
-    typeof pageOverride === 'number'
-      ? pageOverride
-      : typeof pageOverride === 'string' && !isNaN(parseInt(pageOverride, 10))
-      ? parseInt(pageOverride, 10)
-      : null;
+    const validPageOverride =
+      typeof pageOverride === 'number'
+        ? pageOverride
+        : typeof pageOverride === 'string' && !isNaN(parseInt(pageOverride, 10))
+        ? parseInt(pageOverride, 10)
+        : null;
 
-  // If a specific user query is provided (/users <id or @username>)
-  if (searchParam && !validPageOverride) {
-    return renderUserDetail(ctx, searchParam, lang, false);
-  }
+    // If a specific user query is provided (/users <id or @username>)
+    if (searchParam && !validPageOverride) {
+      return renderUserDetail(ctx, searchParam, lang, false);
+    }
 
   // Paginated user list
   let page = validPageOverride;
@@ -1385,6 +1414,10 @@ const handleUsers = adminOnly(async (ctx, pageOverride) => {
     disable_web_page_preview: true,
     ...keyboard,
   });
+  } catch (err) {
+    console.error('❌ Error in handleUsers:', err.message);
+    return ctx.reply(`❌ ስህተት ተፈጥሯል: ${escapeHtml(err.message)}`);
+  }
 });
 
 // ─── Callback: admin_users (Page 1) ───────────────────────
