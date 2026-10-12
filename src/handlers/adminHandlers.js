@@ -1199,23 +1199,6 @@ const callbackRemindCheckout = adminOnly(async (ctx) => {
   }
 });
 
-// ─── /users — List registered users from database ─────────
-const handleUsers = adminOnly(async (ctx, pageOverride) => {
-  const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
-  const args = text.split(/\s+/);
-  const searchParam = args.length > 1 ? args[1] : null;
-
-  const adminUser = await User.findOne({ telegramId: ctx.from.id });
-  const lang = adminUser && adminUser.language ? adminUser.language : 'am';
-  const isEn = lang === 'en';
-
-  const validPageOverride =
-    typeof pageOverride === 'number'
-      ? pageOverride
-      : typeof pageOverride === 'string' && !isNaN(parseInt(pageOverride, 10))
-      ? parseInt(pageOverride, 10)
-      : null;
-
 // ─── Helper: Render Detailed User Profile ─────────────────────
 async function renderUserDetail(ctx, targetUserId, lang = 'am', isEdit = false) {
   const isEn = lang === 'en';
