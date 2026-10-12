@@ -90,6 +90,7 @@ bot.command('broadcast', adminHandlers.handleBroadcast);
 bot.command('announce', adminHandlers.handleBroadcast);
 bot.command(['channelpost', 'post'], adminHandlers.handleChannelPost);
 bot.command(['users', 'customers', 'members'], adminHandlers.handleUsers);
+bot.command(['dm', 'inbox', 'messageuser'], adminHandlers.handleDmCommand);
 
 // ─── Persistent Bottom Menu Text Handlers ─────────────────
 bot.hears(['🛒 ምርት ግዛ (Buy Now)', '🛒 ምርት ግዛ', 'Buy'], userHandlers.handleBuy);
@@ -244,6 +245,9 @@ bot.on('callback_query', async (ctx) => {
   }
   if (data === 'admin_users') return adminHandlers.callbackUsers(ctx);
   if (data.startsWith('admin_users_page_')) return adminHandlers.callbackUsersPage(ctx);
+  if (data.startsWith('admin_user_view_')) return adminHandlers.callbackViewUserDetail(ctx);
+  if (data.startsWith('admin_dm_user_')) return adminHandlers.callbackStartDmUser(ctx);
+  if (data.startsWith('admin_cancel_dm_')) return adminHandlers.callbackCancelDmUser(ctx);
   if (data === 'noop') return ctx.answerCbQuery().catch(() => {});
   if (data.startsWith('approve_')) return adminHandlers.callbackApprove(ctx);
   if (data.startsWith('reject_quick_')) return adminHandlers.callbackQuickReject(ctx);
@@ -292,8 +296,13 @@ bot.on('callback_query', async (ctx) => {
   await ctx.answerCbQuery('⚠️ ያልታወቀ ትዕዛዝ');
 });
 
-// ─── Photo Handler (receipt upload & admin broadcast) ────
+// ─── Photo Handler (receipt upload & admin broadcast/DM) ────
 bot.on('photo', async (ctx) => {
+  // Admin direct DM photo to user
+  if (ctx.from && ctx.from.id === config.adminId && ctx.session?.awaitingDmToUser) {
+    const handled = await adminHandlers.handleAdminDmInput(ctx);
+    if (handled) return;
+  }
   // Admin broadcast announcement with photo
   if (ctx.from && ctx.from.id === config.adminId && ctx.session?.awaitingBroadcastMessage) {
     const handled = await adminHandlers.handleBroadcastMessage(ctx);
@@ -304,6 +313,11 @@ bot.on('photo', async (ctx) => {
     const handled = await adminHandlers.handleChannelPostMessage(ctx);
     if (handled) return;
   }
+  // Customer photo when NOT having a pending order (e.g. support screenshot)
+  if (ctx.from && ctx.from.id !== config.adminId && !ctx.session?.pendingOrder) {
+    const handled = await userHandlers.handleCustomerPhotoToAdmin(ctx);
+    if (handled) return;
+  }
   // User receipt upload
   await userHandlers.handleReceipt(ctx);
 });
@@ -311,6 +325,11 @@ bot.on('photo', async (ctx) => {
 // ─── Document Handler (bulk stock file for admin & user receipt) ─────────
 bot.on('document', async (ctx) => {
   const session = ctx.session || {};
+  // Admin direct DM document to user
+  if (ctx.from && ctx.from.id === config.adminId && session.awaitingDmToUser) {
+    const handled = await adminHandlers.handleAdminDmInput(ctx);
+    if (handled) return;
+  }
   if (session.awaitingBulkStock && ctx.from.id === config.adminId) {
     return adminHandlers.handleBulkStockFile(ctx);
   }
@@ -326,12 +345,18 @@ bot.on('document', async (ctx) => {
   await userHandlers.handleReceipt(ctx);
 });
 
-// ─── Text Handler (custom quantity & admin rejection) ───
+// ─── Text Handler (custom quantity, admin rejection, DM & customer inbox) ───
 bot.on('text', async (ctx) => {
   const session = ctx.session || {};
 
   // Skip commands (already handled)
   if (ctx.message.text.startsWith('/')) return;
+
+  // Admin direct DM input to user
+  if (ctx.from.id === config.adminId && session.awaitingDmToUser) {
+    const handled = await adminHandlers.handleAdminDmInput(ctx);
+    if (handled) return;
+  }
 
   // Admin broadcast announcement message input
   if (ctx.from.id === config.adminId && session.awaitingBroadcastMessage) {
@@ -399,6 +424,12 @@ bot.on('text', async (ctx) => {
   // Admin interactive stock adding flow
   if (ctx.from.id === config.adminId && session.addingStockFlow) {
     const handled = await adminHandlers.handleStockInput(ctx);
+    if (handled) return;
+  }
+
+  // Customer regular message to Admin (support chat / reply)
+  if (ctx.from.id !== config.adminId) {
+    const handled = await userHandlers.handleCustomerMessageToAdmin(ctx);
     if (handled) return;
   }
 });

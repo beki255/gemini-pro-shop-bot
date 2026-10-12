@@ -562,9 +562,25 @@ const keyboards = {
   },
 
   // ─── ADMIN USERS LIST PAGINATION ───────────────────────────
-  adminUsersPagination(page, totalPages, lang = 'am') {
+  adminUsersPagination(page, totalPages, lang = 'am', users = []) {
     const isEn = lang === 'en';
     const rows = [];
+
+    // Quick select buttons for each user on the page
+    if (users && users.length > 0) {
+      const userButtons = [];
+      users.forEach((u, idx) => {
+        const num = (page - 1) * 8 + idx + 1;
+        const namePreview = (u.firstName || u.username || `User ${num}`).trim().slice(0, 10);
+        userButtons.push({
+          text: `👤 ${num}. ${namePreview}`,
+          callback_data: `admin_user_view_${u.telegramId}`,
+        });
+      });
+      for (let i = 0; i < userButtons.length; i += 2) {
+        rows.push(userButtons.slice(i, i + 2));
+      }
+    }
 
     if (totalPages > 1) {
       const navRow = [];
@@ -599,6 +615,65 @@ const keyboards = {
     ]);
 
     return Markup.inlineKeyboard(rows);
+  },
+
+  // ─── ADMIN SINGLE USER DETAIL ACTIONS (INBOX / DM) ──────────
+  adminUserDetailKeyboard(telegramId, lang = 'am') {
+    const isEn = lang === 'en';
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? '💬 Send Message (Inbox / DM)' : '💬 ቀጥታ መልዕክት ላክ (Inbox / DM)',
+          callback_data: `admin_dm_user_${telegramId}`,
+        },
+      ],
+      [
+        {
+          text: isEn ? '👥 Users List' : '👥 ወደ ተጠቃሚዎች ዝርዝር',
+          callback_data: 'admin_users_page_1',
+        },
+        {
+          text: isEn ? '🔙 Admin Panel' : '🔙 ወደ ዋና ፓነል',
+          callback_data: 'admin_panel',
+        },
+      ],
+    ]);
+  },
+
+  // ─── CANCEL DM TO USER ─────────────────────────────────────
+  cancelDmUser(telegramId, lang = 'am') {
+    const isEn = lang === 'en';
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? '❌ Cancel' : '❌ ሰርዝ',
+          callback_data: `admin_cancel_dm_${telegramId}`,
+        },
+      ],
+    ]);
+  },
+
+  // ─── CUSTOMER INBOX REPLY KEYBOARD (SENT TO ADMIN) ─────────
+  customerInboxReplyKeyboard(customerTelegramId, lang = 'am') {
+    const isEn = lang === 'en';
+    return Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? '💬 Reply (DM)' : '💬 መልስ ስጥ (DM)',
+          callback_data: `admin_dm_user_${customerTelegramId}`,
+        },
+        {
+          text: isEn ? '👤 User Profile' : '👤 የተጠቃሚ ዝርዝር',
+          callback_data: `admin_user_view_${customerTelegramId}`,
+        },
+      ],
+      [
+        {
+          text: isEn ? '🗑️ Dismiss' : '🗑️ ዝጋ',
+          callback_data: 'dismiss_admin_msg',
+        },
+      ],
+    ]);
   },
 
   // ─── ADMIN ORDERS FILTER MENU ───────────────────────────────

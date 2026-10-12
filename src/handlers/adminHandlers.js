@@ -1216,64 +1216,117 @@ const handleUsers = adminOnly(async (ctx, pageOverride) => {
       ? parseInt(pageOverride, 10)
       : null;
 
+// ─── Helper: Render Detailed User Profile ─────────────────────
+async function renderUserDetail(ctx, targetUserId, lang = 'am', isEdit = false) {
+  const isEn = lang === 'en';
+  let query = {};
+  if (typeof targetUserId === 'number' || /^\d+$/.test(targetUserId)) {
+    query = { telegramId: parseInt(targetUserId, 10) };
+  } else {
+    const cleanUser = String(targetUserId).replace(/^@/, '');
+    query = { username: new RegExp(`^${cleanUser}$`, 'i') };
+  }
+
+  const foundUser = await User.findOne(query);
+  if (!foundUser) {
+    const notFoundText = isEn
+      ? `❌ User "<b>${escapeHtml(String(targetUserId))}</b>" was not found in the database.`
+      : `❌ ተጠቃሚ "<b>${escapeHtml(String(targetUserId))}</b>" በዳታቤዝ ውስጥ አልተገኘም።`;
+    if (isEdit && ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(notFoundText, {
+          parse_mode: 'HTML',
+          ...keyboards.adminPanel(lang),
+        });
+      } catch {
+        return ctx.reply(notFoundText, { parse_mode: 'HTML', ...keyboards.adminPanel(lang) });
+      }
+    }
+    return ctx.reply(notFoundText, {
+      parse_mode: 'HTML',
+      ...keyboards.adminPanel(lang),
+    });
+  }
+
+  // Fetch user's orders
+  const userOrders = await Order.find({ userId: foundUser.telegramId }).sort({ createdAt: -1 });
+  const approvedCount = userOrders.filter((o) => o.status === 'approved').length;
+  const totalSpent = userOrders
+    .filter((o) => o.status === 'approved')
+    .reduce((sum, o) => sum + (o.amount || 0), 0);
+
+  const fullName = `${foundUser.firstName || ''} ${foundUser.lastName || ''}`.trim() || (isEn ? 'No Name' : 'ስም የለም');
+  const username = foundUser.username ? `@${foundUser.username}` : (isEn ? 'None' : 'የለውም');
+  const userLang = foundUser.language === 'en' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
+  const regDate = foundUser.createdAt ? new Date(foundUser.createdAt).toLocaleString('am-ET') : 'ያልታወቀ';
+  const statusText = foundUser.isBlocked ? '🔴 የታገደ (Blocked)' : '🟢 ንቁ (Active)';
+
+  let detailText =
+    `👤 <b>የተጠቃሚ ዝርዝር መረጃ (User Details)</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `👤 <b>ስም:</b> <b>${escapeHtml(fullName)}</b>\n` +
+    `🔗 <b>ዩዘርኔም:</b> <b>${escapeHtml(username)}</b>\n` +
+    `🆔 <b>Telegram ID:</b> <code>${foundUser.telegramId}</code>\n` +
+    `🌐 <b>ቋንቋ:</b> ${userLang}\n` +
+    `📊 <b>ሁኔታ:</b> ${statusText}\n` +
+    `📅 <b>የተመዘገበበት:</b> ${regDate}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `📦 <b>ጠቅላላ ትዕዛዞች:</b> ${userOrders.length} (${approvedCount} የጸደቁ)\n` +
+    `💰 <b>ጠቅላላ የወጣው ገንዘብ:</b> ${totalSpent} ብር\n\n`;
+
+  if (userOrders.length > 0) {
+    detailText += `📋 <b>የቅርብ ትዕዛዞች:</b>\n`;
+    userOrders.slice(0, 5).forEach((o) => {
+      const stEmoji = o.status === 'approved' ? '✅' : o.status === 'pending' ? '⏳' : '❌';
+      detailText += `• ${stEmoji} <code>${o.orderId}</code> — ${o.amount} ብር (${escapeHtml(o.paymentMethod || 'CBE')})\n`;
+    });
+  }
+
+  const kbd = keyboards.adminUserDetailKeyboard(foundUser.telegramId, lang);
+
+  if (isEdit && ctx.callbackQuery) {
+    try {
+      return await ctx.editMessageText(detailText, {
+        parse_mode: 'HTML',
+        ...kbd,
+      });
+    } catch (err) {
+      if (!err.description || !err.description.includes('message is not modified')) {
+        return await ctx.reply(detailText, {
+          parse_mode: 'HTML',
+          ...kbd,
+        });
+      }
+      return;
+    }
+  }
+
+  return ctx.reply(detailText, {
+    parse_mode: 'HTML',
+    ...kbd,
+  });
+}
+
+// ─── /users — List registered users from database ─────────
+const handleUsers = adminOnly(async (ctx, pageOverride) => {
+  const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
+  const args = text.split(/\s+/);
+  const searchParam = args.length > 1 ? args[1] : null;
+
+  const adminUser = await User.findOne({ telegramId: ctx.from.id });
+  const lang = adminUser && adminUser.language ? adminUser.language : 'am';
+  const isEn = lang === 'en';
+
+  const validPageOverride =
+    typeof pageOverride === 'number'
+      ? pageOverride
+      : typeof pageOverride === 'string' && !isNaN(parseInt(pageOverride, 10))
+      ? parseInt(pageOverride, 10)
+      : null;
+
   // If a specific user query is provided (/users <id or @username>)
   if (searchParam && !validPageOverride) {
-    let query = {};
-    if (/^\d+$/.test(searchParam)) {
-      query = { telegramId: parseInt(searchParam) };
-    } else {
-      const cleanUser = searchParam.replace(/^@/, '');
-      query = { username: new RegExp(`^${cleanUser}$`, 'i') };
-    }
-
-    const foundUser = await User.findOne(query);
-    if (!foundUser) {
-      return ctx.reply(
-        isEn
-          ? `❌ User "<b>${escapeHtml(searchParam)}</b>" was not found in the database.`
-          : `❌ ተጠቃሚ "<b>${escapeHtml(searchParam)}</b>" በዳታቤዝ ውስጥ አልተገኘም።`,
-        { parse_mode: 'HTML', ...keyboards.adminPanel(lang) }
-      );
-    }
-
-    // Fetch user's orders
-    const userOrders = await Order.find({ userId: foundUser.telegramId }).sort({ createdAt: -1 });
-    const approvedCount = userOrders.filter((o) => o.status === 'approved').length;
-    const totalSpent = userOrders
-      .filter((o) => o.status === 'approved')
-      .reduce((sum, o) => sum + (o.amount || 0), 0);
-
-    const fullName = `${foundUser.firstName || ''} ${foundUser.lastName || ''}`.trim() || (isEn ? 'No Name' : 'ስም የለም');
-    const username = foundUser.username ? `@${foundUser.username}` : (isEn ? 'None' : 'የለውም');
-    const userLang = foundUser.language === 'en' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
-    const regDate = foundUser.createdAt ? new Date(foundUser.createdAt).toLocaleString('am-ET') : 'ያልታወቀ';
-    const statusText = foundUser.isBlocked ? '🔴 የታገደ (Blocked)' : '🟢 ንቁ (Active)';
-
-    let detailText =
-      `👤 <b>የተጠቃሚ ዝርዝር መረጃ (User Details)</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `👤 <b>ስም:</b> <b>${escapeHtml(fullName)}</b>\n` +
-      `🔗 <b>ዩዘርኔም:</b> <b>${escapeHtml(username)}</b>\n` +
-      `🆔 <b>Telegram ID:</b> <code>${foundUser.telegramId}</code>\n` +
-      `🌐 <b>ቋንቋ:</b> ${userLang}\n` +
-      `📊 <b>ሁኔታ:</b> ${statusText}\n` +
-      `📅 <b>የተመዘገበበት:</b> ${regDate}\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📦 <b>ጠቅላላ ትዕዛዞች:</b> ${userOrders.length} (${approvedCount} የጸደቁ)\n` +
-      `💰 <b>ጠቅላላ የወጣው ገንዘብ:</b> ${totalSpent} ብር\n\n`;
-
-    if (userOrders.length > 0) {
-      detailText += `📋 <b>የቅርብ ትዕዛዞች:</b>\n`;
-      userOrders.slice(0, 5).forEach((o) => {
-        const stEmoji = o.status === 'approved' ? '✅' : o.status === 'pending' ? '⏳' : '❌';
-        detailText += `• ${stEmoji} <code>${o.orderId}</code> — ${o.amount} ብር (${escapeHtml(o.paymentMethod || 'CBE')})\n`;
-      });
-    }
-
-    return ctx.reply(detailText, {
-      parse_mode: 'HTML',
-      ...keyboards.adminUsersPagination(1, 1, lang),
-    });
+    return renderUserDetail(ctx, searchParam, lang, false);
   }
 
   // Paginated user list
@@ -1323,9 +1376,10 @@ const handleUsers = adminOnly(async (ctx, pageOverride) => {
       `   📦 <b>ትዕዛዞች:</b> ${orders} | 🌐 ${userLang} | 📅 ${regDate}\n\n`;
   });
 
-  textMsg += `💡 <i>አንድን ተጠቃሚ በዝርዝር ለማየት:</i> <code>/users &lt;Telegram ID ወይም @username&gt;</code>`;
+  textMsg += `💡 <i>አንድን ተጠቃሚ በዝርዝር ለማየት:</i> <code>/users &lt;Telegram ID ወይም @username&gt;</code>\n` +
+    `<i>ወይም ከታች ያሉትን የተጠቃሚዎች ቁልፍ ይጫኑ:</i>`;
 
-  const keyboard = keyboards.adminUsersPagination(currentPage, totalPages, lang);
+  const keyboard = keyboards.adminUsersPagination(currentPage, totalPages, lang, users);
 
   if (ctx.callbackQuery) {
     try {
@@ -1361,6 +1415,292 @@ const callbackUsersPage = adminOnly(async (ctx) => {
   await ctx.answerCbQuery().catch(() => {});
   const page = parseInt(ctx.callbackQuery.data.replace('admin_users_page_', '')) || 1;
   return handleUsers(ctx, page);
+});
+
+// ─── Callback: admin_user_view_<id> ───────────────────────
+const callbackViewUserDetail = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const targetIdStr = ctx.callbackQuery.data.replace('admin_user_view_', '').trim();
+  const lang = await getUserLang(ctx.from.id);
+  return renderUserDetail(ctx, targetIdStr, lang, true);
+});
+
+// ─── Callback: admin_dm_user_<id> (Start DM session) ───────
+const callbackStartDmUser = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const targetIdStr = ctx.callbackQuery.data.replace('admin_dm_user_', '').trim();
+  const targetId = parseInt(targetIdStr, 10);
+  const lang = await getUserLang(ctx.from.id);
+  const isEn = lang === 'en';
+
+  const targetUser = await User.findOne({ telegramId: targetId });
+  if (!targetUser) {
+    return ctx.reply(
+      isEn ? '❌ User not found in database.' : '❌ ተጠቃሚው በዳታቤዝ ውስጥ አልተገኘም።',
+      { ...keyboards.adminPanel(lang) }
+    );
+  }
+
+  const targetName = `${targetUser.firstName || ''} ${targetUser.lastName || ''}`.trim() || (isEn ? 'User' : 'ደንበኛ');
+  ctx.session = ctx.session || {};
+  ctx.session.awaitingDmToUser = {
+    targetTelegramId: targetId,
+    targetName,
+    targetUsername: targetUser.username || null,
+  };
+
+  const promptText = isEn
+    ? `💬 <b>Direct Message to User (Inbox / DM)</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>To:</b> <b>${escapeHtml(targetName)}</b>\n` +
+      `🆔 <b>Telegram ID:</b> <code>${targetId}</code>\n` +
+      `🔗 <b>Username:</b> ${targetUser.username ? '@' + targetUser.username : 'None'}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `✍️ Please type your <b>message</b> or send a <b>photo/document</b> now.\n\n` +
+      `<i>The bot will directly deliver it into the user's private chat!</i>`
+    : `💬 <b>ለተጠቃሚው ቀጥታ መልዕክት መላኪያ (Inbox / DM)</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>ተቀባይ:</b> <b>${escapeHtml(targetName)}</b>\n` +
+      `🆔 <b>Telegram ID:</b> <code>${targetId}</code>\n` +
+      `🔗 <b>ዩዘርኔም:</b> ${targetUser.username ? '@' + targetUser.username : 'የለውም'}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `✍️ ለዚህ ደንበኛ መላክ የሚፈልጉትን <b>መልዕክት (ጽሑፍ ወይም ፎቶ)</b> አሁን ይላኩ።\n\n` +
+      `<i>ቦቱ በቀጥታ ለተጠቃሚው በግል ቻቱ ያደርስለታል!</i>`;
+
+  return ctx.reply(promptText, {
+    parse_mode: 'HTML',
+    ...keyboards.cancelDmUser(targetId, lang),
+  });
+});
+
+// ─── Callback: admin_cancel_dm_<id> ────────────────────────
+const callbackCancelDmUser = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const targetIdStr = ctx.callbackQuery.data.replace('admin_cancel_dm_', '').trim();
+  const targetId = parseInt(targetIdStr, 10);
+  const lang = await getUserLang(ctx.from.id);
+  const isEn = lang === 'en';
+
+  if (ctx.session) {
+    ctx.session.awaitingDmToUser = null;
+  }
+
+  await ctx.reply(isEn ? '🚫 Direct message cancelled.' : '🚫 መልዕክት መላክ ተሰርዟል።');
+  if (targetId) {
+    return renderUserDetail(ctx, targetId, lang, false);
+  }
+  return handleUsers(ctx, 1);
+});
+
+// ─── Handle Admin Input for DM (Text, Photo, Document) ─────
+const handleAdminDmInput = adminOnly(async (ctx) => {
+  if (!ctx.session || !ctx.session.awaitingDmToUser) return false;
+
+  const { targetTelegramId, targetName } = ctx.session.awaitingDmToUser;
+  const lang = await getUserLang(ctx.from.id);
+  const isEn = lang === 'en';
+
+  // Check if admin typed /cancel
+  if (ctx.message && ctx.message.text && ctx.message.text.trim() === '/cancel') {
+    ctx.session.awaitingDmToUser = null;
+    await ctx.reply(isEn ? '🚫 Direct message cancelled.' : '🚫 መልዕክት መላክ ተሰርዟል።', {
+      ...keyboards.adminUserDetailKeyboard(targetTelegramId, lang),
+    });
+    return true;
+  }
+
+  // Find customer language to format message nicely
+  const targetUser = await User.findOne({ telegramId: targetTelegramId });
+  const custLang = targetUser && targetUser.language ? targetUser.language : 'am';
+  const isCustEn = custLang === 'en';
+
+  const userHeader = isCustEn
+    ? `📩 <b>Message from Admin (Shop Support)</b>\n━━━━━━━━━━━━━━━━━━━━\n`
+    : `📩 <b>መልዕክት ከአስተዳዳሪ (የሱቁ ድጋፍ ሰጪ)</b>\n━━━━━━━━━━━━━━━━━━━━\n`;
+
+  const userFooter = isCustEn
+    ? `\n━━━━━━━━━━━━━━━━━━━━\n💡 <i>You can directly reply to this message in this chat!</i>`
+    : `\n━━━━━━━━━━━━━━━━━━━━\n💡 <i>ለዚህ መልዕክት ምላሽ ለመስጠት እዚሁ ቦት ላይ መጻፍ ወይም መላክ ይችላሉ!</i>`;
+
+  try {
+    if (ctx.message.photo && ctx.message.photo.length > 0) {
+      const photoId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+      const userCaption = ctx.message.caption
+        ? `${userHeader}${escapeHtml(ctx.message.caption)}${userFooter}`
+        : `${userHeader}📷 <i>ፎቶ ተልኮልዎታል</i>${userFooter}`;
+
+      await ctx.telegram.sendPhoto(targetTelegramId, photoId, {
+        caption: userCaption,
+        parse_mode: 'HTML',
+      });
+    } else if (ctx.message.document) {
+      const docId = ctx.message.document.file_id;
+      const userCaption = ctx.message.caption
+        ? `${userHeader}${escapeHtml(ctx.message.caption)}${userFooter}`
+        : `${userHeader}📄 <i>ሰነድ ተልኮልዎታል</i>${userFooter}`;
+
+      await ctx.telegram.sendDocument(targetTelegramId, docId, {
+        caption: userCaption,
+        parse_mode: 'HTML',
+      });
+    } else if (ctx.message.text) {
+      const userMsg = `${userHeader}${escapeHtml(ctx.message.text.trim())}${userFooter}`;
+      await ctx.telegram.sendMessage(targetTelegramId, userMsg, {
+        parse_mode: 'HTML',
+      });
+    } else {
+      await ctx.reply(
+        isEn
+          ? '⚠️ Please send a text message, photo, or document.'
+          : '⚠️ እባክዎ ጽሑፍ፣ ፎቶ ወይም ሰነድ ይላኩ።'
+      );
+      return true;
+    }
+
+    // Success confirmation for admin
+    ctx.session.awaitingDmToUser = null;
+    await ctx.reply(
+      isEn
+        ? `✅ <b>Message delivered successfully!</b>\n` +
+          `👤 <b>To:</b> <b>${escapeHtml(targetName)}</b>\n` +
+          `🆔 <b>ID:</b> <code>${targetTelegramId}</code>`
+        : `✅ <b>መልዕክትዎ ለተጠቃሚው በተሳካ ሁኔታ ደርሷል!</b>\n` +
+          `👤 <b>ተቀባይ:</b> <b>${escapeHtml(targetName)}</b>\n` +
+          `🆔 <b>ID:</b> <code>${targetTelegramId}</code>`,
+      {
+        parse_mode: 'HTML',
+        ...keyboards.adminUserDetailKeyboard(targetTelegramId, lang),
+      }
+    );
+    return true;
+  } catch (errSend) {
+    console.error(`Failed to send DM to user ${targetTelegramId}:`, errSend.message);
+    const blockedMsg = isEn
+      ? `❌ <b>Failed to deliver message!</b>\n` +
+        `Error: ${escapeHtml(errSend.message)}\n\n` +
+        `⚠️ The user may have blocked the bot, deleted their account, or hasn't started the bot.`
+      : `❌ <b>መልዕክቱን ለተጠቃሚው ማድረስ አልተቻለም!</b>\n` +
+        `ስህተት: ${escapeHtml(errSend.message)}\n\n` +
+        `⚠️ ተጠቃሚው ቦቱን አግዶት (block አድርጎት) ወይም አካውንቱን አጥፍቶ ሊሆን ይችላል።`;
+
+    ctx.session.awaitingDmToUser = null;
+    await ctx.reply(blockedMsg, {
+      parse_mode: 'HTML',
+      ...keyboards.adminUserDetailKeyboard(targetTelegramId, lang),
+    });
+    return true;
+  }
+});
+
+// ─── /dm Command (Direct Message from command line) ───────
+const handleDmCommand = adminOnly(async (ctx) => {
+  const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
+  const parts = text.split(/\s+/);
+  const lang = await getUserLang(ctx.from.id);
+  const isEn = lang === 'en';
+
+  if (parts.length < 2) {
+    return ctx.reply(
+      isEn
+        ? '💡 <b>Usage:</b>\n<code>/dm &lt;Telegram ID or @username&gt; [Message]</code>\n\n' +
+          'Example:\n<code>/dm 123456789 Hello customer!</code>\n' +
+          'Or simply view user details: <code>/users &lt;ID&gt;</code> and click DM.'
+        : '💡 <b>አጠቃቀም:</b>\n<code>/dm &lt;Telegram ID ወይም @username&gt; [መልዕክት]</code>\n\n' +
+          'ምሳሌ:\n<code>/dm 123456789 ሰላም ደንበኛችን!</code>\n' +
+          'ወይም ተጠቃሚውን አይተው ለመላክ: <code>/users &lt;ID&gt;</code> ብለው DM ይጫኑ።',
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  const targetIdentifier = parts[1];
+  const directMessage = parts.slice(2).join(' ').trim();
+
+  let query = {};
+  if (/^\d+$/.test(targetIdentifier)) {
+    query = { telegramId: parseInt(targetIdentifier, 10) };
+  } else {
+    query = { username: new RegExp(`^${targetIdentifier.replace(/^@/, '')}$`, 'i') };
+  }
+
+  const foundUser = await User.findOne(query);
+  if (!foundUser) {
+    return ctx.reply(
+      isEn
+        ? `❌ User "<b>${escapeHtml(targetIdentifier)}</b>" was not found in the database.`
+        : `❌ ተጠቃሚ "<b>${escapeHtml(targetIdentifier)}</b>" በዳታቤዝ ውስጥ አልተገኘም።`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  const targetId = foundUser.telegramId;
+  const targetName = `${foundUser.firstName || ''} ${foundUser.lastName || ''}`.trim() || (isEn ? 'User' : 'ደንበኛ');
+
+  if (directMessage) {
+    const custLang = foundUser.language || 'am';
+    const isCustEn = custLang === 'en';
+
+    const userHeader = isCustEn
+      ? `📩 <b>Message from Admin (Shop Support)</b>\n━━━━━━━━━━━━━━━━━━━━\n`
+      : `📩 <b>መልዕክት ከአስተዳዳሪ (የሱቁ ድጋፍ ሰጪ)</b>\n━━━━━━━━━━━━━━━━━━━━\n`;
+
+    const userFooter = isCustEn
+      ? `\n━━━━━━━━━━━━━━━━━━━━\n💡 <i>You can directly reply to this message in this chat!</i>`
+      : `\n━━━━━━━━━━━━━━━━━━━━\n💡 <i>ለዚህ መልዕክት ምላሽ ለመስጠት እዚሁ ቦት ላይ መጻፍ ወይም መላክ ይችላሉ!</i>`;
+
+    try {
+      await ctx.telegram.sendMessage(
+        targetId,
+        `${userHeader}${escapeHtml(directMessage)}${userFooter}`,
+        { parse_mode: 'HTML' }
+      );
+
+      return ctx.reply(
+        isEn
+          ? `✅ <b>Message delivered successfully!</b>\n` +
+            `👤 <b>To:</b> <b>${escapeHtml(targetName)}</b> (<code>${targetId}</code>)`
+          : `✅ <b>መልዕክትዎ ለተጠቃሚው በተሳካ ሁኔታ ደርሷል!</b>\n` +
+            `👤 <b>ተቀባይ:</b> <b>${escapeHtml(targetName)}</b> (<code>${targetId}</code>)`,
+        {
+          parse_mode: 'HTML',
+          ...keyboards.adminUserDetailKeyboard(targetId, lang),
+        }
+      );
+    } catch (err) {
+      console.error('Failed to send DM:', err.message);
+      return ctx.reply(
+        isEn
+          ? `❌ Failed to deliver message: ${escapeHtml(err.message)}`
+          : `❌ መልዕክቱ አልደረሰም: ተጠቃሚው ቦቱን አግዶት ሊሆን ይችላል።`,
+        { ...keyboards.adminUserDetailKeyboard(targetId, lang) }
+      );
+    }
+  }
+
+  ctx.session = ctx.session || {};
+  ctx.session.awaitingDmToUser = {
+    targetTelegramId: targetId,
+    targetName,
+    targetUsername: foundUser.username || null,
+  };
+
+  const promptText = isEn
+    ? `💬 <b>Direct Message to User (Inbox / DM)</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>To:</b> <b>${escapeHtml(targetName)}</b>\n` +
+      `🆔 <b>Telegram ID:</b> <code>${targetId}</code>\n` +
+      `🔗 <b>Username:</b> ${foundUser.username ? '@' + foundUser.username : 'None'}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `✍️ Please type your <b>message</b> or send a <b>photo/document</b> now.\n\n` +
+      `<i>The bot will directly deliver it into the user's private chat!</i>`
+    : `💬 <b>ለተጠቃሚው ቀጥታ መልዕክት መላኪያ (Inbox / DM)</b>\n━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>ተቀባይ:</b> <b>${escapeHtml(targetName)}</b>\n` +
+      `🆔 <b>Telegram ID:</b> <code>${targetId}</code>\n` +
+      `🔗 <b>ዩዘርኔም:</b> ${foundUser.username ? '@' + foundUser.username : 'የለውም'}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `✍️ ለዚህ ደንበኛ መላክ የሚፈልጉትን <b>መልዕክት (ጽሑፍ ወይም ፎቶ)</b> አሁን ይላኩ።\n\n` +
+      `<i>ቦቱ በቀጥታ ለተጠቃሚው በግል ቻቱ ያደርስለታል!</i>`;
+
+  return ctx.reply(promptText, {
+    parse_mode: 'HTML',
+    ...keyboards.cancelDmUser(targetId, lang),
+  });
 });
 
 // ─── /stats — Dashboard statistics ───────────────────────
@@ -3187,6 +3527,12 @@ module.exports = {
   handleUsers,
   callbackUsers,
   callbackUsersPage,
+  renderUserDetail,
+  callbackViewUserDetail,
+  callbackStartDmUser,
+  callbackCancelDmUser,
+  handleAdminDmInput,
+  handleDmCommand,
   callbackToggleStoreStatus,
   callbackViewReceipt,
   callbackResendOrderLink,

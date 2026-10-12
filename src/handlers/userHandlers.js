@@ -1052,6 +1052,104 @@ async function callbackContact(ctx) {
   await handleContact(ctx);
 }
 
+// ─── Helper: HTML Escape ────────────────────────────────────
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ─── Customer Message to Admin (Inbox / DM) ─────────────────
+async function handleCustomerMessageToAdmin(ctx) {
+  const from = ctx.from;
+  if (!from || from.id === config.adminId) return false;
+
+  const user = await getOrSaveUser(from);
+  const lang = user.language || 'am';
+  const isEn = lang === 'en';
+
+  const fullName = [from.first_name, from.last_name].filter(Boolean).join(' ').trim() || (isEn ? 'Customer' : 'ደንበኛ');
+  const username = from.username ? `@${from.username}` : (isEn ? 'None' : 'የለውም');
+  const text = ctx.message && ctx.message.text ? ctx.message.text.trim() : '';
+
+  if (!text) return false;
+
+  const adminNotification =
+    `💬 <b>አዲስ መልዕክት ከተጠቃሚ (Customer Inbox)</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `👤 <b>ስም:</b> <b>${escapeHtml(fullName)}</b>\n` +
+    `🔗 <b>ዩዘርኔም:</b> ${escapeHtml(username)}\n` +
+    `🆔 <b>Telegram ID:</b> <code>${from.id}</code>\n` +
+    `🌐 <b>ቋንቋ:</b> ${lang === 'en' ? '🇬🇧 EN' : '🇪🇹 AM'}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `📝 <b>መልዕክት:</b>\n` +
+    `${escapeHtml(text)}`;
+
+  try {
+    await ctx.telegram.sendMessage(config.adminId, adminNotification, {
+      parse_mode: 'HTML',
+      ...keyboards.customerInboxReplyKeyboard(from.id, 'am'),
+    });
+
+    const ackMsg = isEn
+      ? `✅ <b>Your message has been sent to our support team!</b>\nWe will review it and reply back to you shortly.`
+      : `✅ <b>መልዕክትዎ ለአስተዳዳሪው (ድጋፍ ሰጪ) ደርሷል!</b>\nመልዕክትዎን አይተን በቅርቡ ምላሽ እንሰጥዎታለን። እናመሰግናለን!`;
+
+    await ctx.reply(ackMsg, { parse_mode: 'HTML' });
+    return true;
+  } catch (err) {
+    console.error('Failed to forward customer message to admin:', err.message);
+    return false;
+  }
+}
+
+// ─── Customer Photo to Admin (Inbox / DM) ───────────────────
+async function handleCustomerPhotoToAdmin(ctx) {
+  const from = ctx.from;
+  if (!from || from.id === config.adminId) return false;
+
+  const user = await getOrSaveUser(from);
+  const lang = user.language || 'am';
+  const isEn = lang === 'en';
+
+  const fullName = [from.first_name, from.last_name].filter(Boolean).join(' ').trim() || (isEn ? 'Customer' : 'ደንበኛ');
+  const username = from.username ? `@${from.username}` : (isEn ? 'None' : 'የለውም');
+  const caption = ctx.message && ctx.message.caption ? escapeHtml(ctx.message.caption.trim()) : '';
+
+  const photoId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+
+  const adminCaption =
+    `📷 <b>አዲስ ፎቶ/ደረሰኝ ከተጠቃሚ (Customer Inbox)</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `👤 <b>ስም:</b> <b>${escapeHtml(fullName)}</b>\n` +
+    `🔗 <b>ዩዘርኔም:</b> ${escapeHtml(username)}\n` +
+    `🆔 <b>Telegram ID:</b> <code>${from.id}</code>\n` +
+    (caption ? `━━━━━━━━━━━━━━━━━━━━\n📝 <b>መግለጫ:</b> ${caption}\n` : '') +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `⚠️ <i>ማስታወሻ: ይህ ተጠቃሚ ያለ /buy የላከው ፎቶ/ደረሰኝ ነው።</i>`;
+
+  try {
+    await ctx.telegram.sendPhoto(config.adminId, photoId, {
+      caption: adminCaption,
+      parse_mode: 'HTML',
+      ...keyboards.customerInboxReplyKeyboard(from.id, 'am'),
+    });
+
+    const ackMsg = isEn
+      ? `✅ <b>Your photo has been forwarded to the admin!</b>\nIf this was for a purchase, please make sure to first tap /buy to register your order.`
+      : `✅ <b>የላኩት ፎቶ ለአስተዳዳሪው ደርሷል!</b>\nእቃ ለመግዛት ከሆነ እባክዎ መጀመሪያ /buy ተጭነው ትዕዛዝዎን መመዝገብዎን ያረጋግጡ።`;
+
+    await ctx.reply(ackMsg, { parse_mode: 'HTML' });
+    return true;
+  } catch (err) {
+    console.error('Failed to forward customer photo to admin:', err.message);
+    return false;
+  }
+}
+
 module.exports = {
   getOrSaveUser,
   getUserLang,
@@ -1079,4 +1177,6 @@ module.exports = {
   callbackHelp,
   callbackContact,
   sendOutOfStockMessage,
+  handleCustomerMessageToAdmin,
+  handleCustomerPhotoToAdmin,
 };
