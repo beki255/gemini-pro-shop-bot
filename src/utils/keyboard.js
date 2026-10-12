@@ -571,9 +571,10 @@ const keyboards = {
       const userButtons = [];
       users.forEach((u, idx) => {
         const num = (page - 1) * 8 + idx + 1;
-        const namePreview = (u.firstName || u.username || `User ${num}`).trim().slice(0, 10);
+        const rawName = u.firstName || u.username || `User ${num}`;
+        const namePreview = sanitizeButtonText(rawName, 12) || `User ${num}`;
         userButtons.push({
-          text: `👤 ${num}. ${namePreview}`,
+          text: sanitizeButtonText(`👤 ${num}. ${namePreview}`, 30),
           callback_data: `admin_user_view_${u.telegramId}`,
         });
       });
