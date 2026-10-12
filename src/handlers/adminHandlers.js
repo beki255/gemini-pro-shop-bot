@@ -1251,7 +1251,11 @@ async function renderUserDetail(ctx, targetUserId, lang = 'am', isEdit = false) 
       .reduce((sum, o) => sum + (o.amount || 0), 0);
 
     const fullName = `${foundUser.firstName || ''} ${foundUser.lastName || ''}`.trim() || (isEn ? 'No Name' : 'ስም የለም');
-    const username = foundUser.username ? `@${foundUser.username}` : (isEn ? 'None' : 'የለውም');
+    const cleanUsername = foundUser.username ? String(foundUser.username).replace(/^@+/, '').trim() : '';
+    const directChatUrl = cleanUsername
+      ? `https://t.me/${cleanUsername}`
+      : `tg://user?id=${foundUser.telegramId}`;
+    const username = cleanUsername ? `@${cleanUsername}` : (isEn ? 'None' : 'የለውም');
     const userLang = foundUser.language === 'en' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
     let regDate = 'ያልታወቀ';
     if (foundUser.createdAt) {
@@ -1266,9 +1270,10 @@ async function renderUserDetail(ctx, targetUserId, lang = 'am', isEdit = false) 
     let detailText =
       `👤 <b>የተጠቃሚ ዝርዝር መረጃ (User Details)</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `👤 <b>ስም:</b> <b>${escapeHtml(fullName)}</b>\n` +
-      `🔗 <b>ዩዘርኔም:</b> <b>${escapeHtml(username)}</b>\n` +
+      `👤 <b>ስም:</b> <a href="${directChatUrl}"><b>${escapeHtml(fullName)}</b></a>\n` +
+      `🔗 <b>ዩዘርኔም:</b> ${cleanUsername ? `<a href="https://t.me/${cleanUsername}">@${escapeHtml(cleanUsername)}</a>` : (isEn ? 'None' : 'የለውም')}\n` +
       `🆔 <b>Telegram ID:</b> <code>${foundUser.telegramId}</code>\n` +
+      `💬 <b>ቀጥታ ቻት:</b> <a href="${directChatUrl}">👉 እዚህ በመጫን ቻቱን ይክፈቱ (Open Chat)</a>\n` +
       `🌐 <b>ቋንቋ:</b> ${userLang}\n` +
       `📊 <b>ሁኔታ:</b> ${statusText}\n` +
       `📅 <b>የተመዘገበበት:</b> ${regDate}\n` +
@@ -1284,7 +1289,7 @@ async function renderUserDetail(ctx, targetUserId, lang = 'am', isEdit = false) 
       });
     }
 
-    const kbd = keyboards.adminUserDetailKeyboard(foundUser.telegramId, lang);
+    const kbd = keyboards.adminUserDetailKeyboard(foundUser.telegramId, foundUser.username, lang);
 
     if (isEdit && ctx.callbackQuery) {
       try {
@@ -1572,6 +1577,7 @@ const handleAdminDmInput = adminOnly(async (ctx) => {
     }
 
     // Success confirmation for admin
+    const targetUsername = ctx.session.awaitingDmToUser?.targetUsername;
     ctx.session.awaitingDmToUser = null;
     await ctx.reply(
       isEn
@@ -1583,7 +1589,7 @@ const handleAdminDmInput = adminOnly(async (ctx) => {
           `🆔 <b>ID:</b> <code>${targetTelegramId}</code>`,
       {
         parse_mode: 'HTML',
-        ...keyboards.adminUserDetailKeyboard(targetTelegramId, lang),
+        ...keyboards.adminUserDetailKeyboard(targetTelegramId, targetUsername, lang),
       }
     );
     return true;
@@ -1597,10 +1603,11 @@ const handleAdminDmInput = adminOnly(async (ctx) => {
         `ስህተት: ${escapeHtml(errSend.message)}\n\n` +
         `⚠️ ተጠቃሚው ቦቱን አግዶት (block አድርጎት) ወይም አካውንቱን አጥፍቶ ሊሆን ይችላል።`;
 
+    const targetUsername = ctx.session.awaitingDmToUser?.targetUsername;
     ctx.session.awaitingDmToUser = null;
     await ctx.reply(blockedMsg, {
       parse_mode: 'HTML',
-      ...keyboards.adminUserDetailKeyboard(targetTelegramId, lang),
+      ...keyboards.adminUserDetailKeyboard(targetTelegramId, targetUsername, lang),
     });
     return true;
   }
@@ -1676,7 +1683,7 @@ const handleDmCommand = adminOnly(async (ctx) => {
             `👤 <b>ተቀባይ:</b> <b>${escapeHtml(targetName)}</b> (<code>${targetId}</code>)`,
         {
           parse_mode: 'HTML',
-          ...keyboards.adminUserDetailKeyboard(targetId, lang),
+          ...keyboards.adminUserDetailKeyboard(targetId, foundUser.username, lang),
         }
       );
     } catch (err) {
@@ -1685,7 +1692,7 @@ const handleDmCommand = adminOnly(async (ctx) => {
         isEn
           ? `❌ Failed to deliver message: ${escapeHtml(err.message)}`
           : `❌ መልዕክቱ አልደረሰም: ተጠቃሚው ቦቱን አግዶት ሊሆን ይችላል።`,
-        { ...keyboards.adminUserDetailKeyboard(targetId, lang) }
+        { ...keyboards.adminUserDetailKeyboard(targetId, foundUser.username, lang) }
       );
     }
   }

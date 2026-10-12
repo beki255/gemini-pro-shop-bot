@@ -618,12 +618,23 @@ const keyboards = {
   },
 
   // ─── ADMIN SINGLE USER DETAIL ACTIONS (INBOX / DM) ──────────
-  adminUserDetailKeyboard(telegramId, lang = 'am') {
+  adminUserDetailKeyboard(telegramId, username = null, lang = 'am') {
     const isEn = lang === 'en';
+    const cleanUsername = username ? String(username).replace(/^@+/, '').trim() : '';
+    const directChatUrl = cleanUsername
+      ? `https://t.me/${cleanUsername}`
+      : `tg://user?id=${telegramId}`;
+
     return Markup.inlineKeyboard([
       [
         {
-          text: isEn ? '💬 Send Message (Inbox / DM)' : '💬 ቀጥታ መልዕክት ላክ (Inbox / DM)',
+          text: isEn ? '💬 Open Direct Chat (Inbox)' : '💬 ቀጥታ ወደ ቻት ሂድ (Open Chat)',
+          url: directChatUrl,
+        },
+      ],
+      [
+        {
+          text: isEn ? '🤖 Send Message via Bot' : '🤖 በቦቱ በኩል መልዕክት ላክ',
           callback_data: `admin_dm_user_${telegramId}`,
         },
       ],
@@ -654,20 +665,29 @@ const keyboards = {
   },
 
   // ─── CUSTOMER INBOX REPLY KEYBOARD (SENT TO ADMIN) ─────────
-  customerInboxReplyKeyboard(customerTelegramId, lang = 'am') {
+  customerInboxReplyKeyboard(customerTelegramId, customerUsername = null, lang = 'am') {
     const isEn = lang === 'en';
+    const cleanUsername = customerUsername ? String(customerUsername).replace(/^@+/, '').trim() : '';
+    const directChatUrl = cleanUsername
+      ? `https://t.me/${cleanUsername}`
+      : `tg://user?id=${customerTelegramId}`;
+
     return Markup.inlineKeyboard([
       [
         {
-          text: isEn ? '💬 Reply (DM)' : '💬 መልስ ስጥ (DM)',
+          text: isEn ? '💬 Open Direct Chat' : '💬 ቀጥታ ወደ ቻት ሂድ (Open Chat)',
+          url: directChatUrl,
+        },
+        {
+          text: isEn ? '🤖 Reply Via Bot' : '🤖 በቦቱ መልስ',
           callback_data: `admin_dm_user_${customerTelegramId}`,
         },
+      ],
+      [
         {
           text: isEn ? '👤 User Profile' : '👤 የተጠቃሚ ዝርዝር',
           callback_data: `admin_user_view_${customerTelegramId}`,
         },
-      ],
-      [
         {
           text: isEn ? '🗑️ Dismiss' : '🗑️ ዝጋ',
           callback_data: 'dismiss_admin_msg',

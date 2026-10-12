@@ -1091,7 +1091,7 @@ async function handleCustomerMessageToAdmin(ctx) {
   try {
     await ctx.telegram.sendMessage(config.adminId, adminNotification, {
       parse_mode: 'HTML',
-      ...keyboards.customerInboxReplyKeyboard(from.id, 'am'),
+      ...keyboards.customerInboxReplyKeyboard(from.id, from.username, 'am'),
     });
 
     const ackMsg = isEn
@@ -1135,7 +1135,7 @@ async function handleCustomerPhotoToAdmin(ctx) {
     await ctx.telegram.sendPhoto(config.adminId, photoId, {
       caption: adminCaption,
       parse_mode: 'HTML',
-      ...keyboards.customerInboxReplyKeyboard(from.id, 'am'),
+      ...keyboards.customerInboxReplyKeyboard(from.id, from.username, 'am'),
     });
 
     const ackMsg = isEn
