@@ -24,6 +24,7 @@ const commands = {
     am: [
       { command: 'start', description: '🏠 ዋና ማውጫ' },
       { command: 'stock', description: '📦 የስቶክ ሁኔታ' },
+      { command: 'viewstock', description: '👁️ የስቶክ ሊንኮች እይ' },
       { command: 'orders', description: '📋 የትዕዛዞች ዝርዝር' },
       { command: 'checkouts', description: '💳 በክፍያ ላይ ያሉ (Checkouts)' },
       { command: 'users', description: '👥 የተመዘገቡ ተጠቃሚዎች' },
@@ -37,6 +38,7 @@ const commands = {
     en: [
       { command: 'start', description: '🏠 Main Menu' },
       { command: 'stock', description: '📦 Stock Status' },
+      { command: 'viewstock', description: '👁️ View Stock Links' },
       { command: 'orders', description: '📋 Orders List' },
       { command: 'checkouts', description: '💳 Active Checkouts' },
       { command: 'users', description: '👥 Registered Users' },

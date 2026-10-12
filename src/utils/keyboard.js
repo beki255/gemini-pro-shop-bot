@@ -503,6 +503,13 @@ const keyboards = {
       ],
       [
         {
+          text: isEn ? '👁️ View Stock Links (Open & Test)' : '👁️ የስቶክ ሊንኮች እይ (View Stock)',
+          callback_data: 'admin_view_stock_page_1',
+          style: 'primary',
+        },
+      ],
+      [
+        {
           text: isEn ? '📋 Orders' : '📋 ትዕዛዞች',
           callback_data: 'admin_orders',
           style: 'primary',

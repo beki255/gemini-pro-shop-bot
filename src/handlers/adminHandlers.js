@@ -453,14 +453,243 @@ const handleStock = adminOnly(async (ctx) => {
   const activeTotal = await Stock.countDocuments();
   const sold = await SoldStock.countDocuments();
 
-  await ctx.reply(
-    `📦 *ስቶክ ሁኔታ*\n\n` +
-      `✅ የሚገኝ (Available): *${available}*\n` +
-      `⏳ በጥበቃ ላይ (Reserved): *${reserved}*\n` +
-      `📋 ጠቅላላ በመጋዘን (Active): *${activeTotal}*\n` +
-      `🔴 የተሸጠ (Sold Table): *${sold}*`,
-    { parse_mode: 'Markdown' }
-  );
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  const summaryText = isEn
+    ? `📦 <b>Stock Summary & Overview</b>\n\n` +
+      `✅ <b>Available:</b> <code>${available}</code>\n` +
+      `⏳ <b>Reserved:</b> <code>${reserved}</code>\n` +
+      `📋 <b>Active in DB:</b> <code>${activeTotal}</code>\n` +
+      `🔴 <b>Total Sold:</b> <code>${sold}</code>\n\n` +
+      `👉 <i>Tap "View Stock Links" below to inspect, test in browser, or manage individual links!</i>`
+    : `📦 <b>የስቶክ አጠቃላይ ሁኔታ</b>\n\n` +
+      `✅ <b>የሚገኝ (Available):</b> <code>${available}</code>\n` +
+      `⏳ <b>በጥበቃ ላይ (Reserved):</b> <code>${reserved}</code>\n` +
+      `📋 <b>ጠቅላላ በመጋዘን (Active):</b> <code>${activeTotal}</code>\n` +
+      `🔴 <b>የተሸጠ (Total Sold):</b> <code>${sold}</code>\n\n` +
+      `👉 <i>ሊንኮቹን በ Browser ከፍተው ቼክ ለማድረግ ከታች «👁️ የስቶክ ሊንኮች እይ» የሚለውን ይጫኑ!</i>`;
+
+  const kb = Markup.inlineKeyboard([
+    [
+      {
+        text: isEn ? '👁️ View Stock Links (Open & Test)' : '👁️ የስቶክ ሊንኮች እይ (View & Check)',
+        callback_data: 'admin_view_stock_page_1',
+        style: 'primary',
+      },
+    ],
+    [
+      {
+        text: isEn ? '➕ Add Stock' : '➕ ስቶክ ጨምር',
+        callback_data: 'admin_start_add_stock',
+        style: 'success',
+      },
+      {
+        text: isEn ? '🏠 Admin Panel' : '🏠 ዋና ፓነል',
+        callback_data: 'admin_panel',
+      },
+    ],
+  ]);
+
+  if (ctx.callbackQuery) {
+    try {
+      return await ctx.editMessageText(summaryText, { parse_mode: 'HTML', ...kb });
+    } catch {
+      return await ctx.reply(summaryText, { parse_mode: 'HTML', ...kb });
+    }
+  }
+
+  return await ctx.reply(summaryText, { parse_mode: 'HTML', ...kb });
+});
+
+// ─── Interactive Paginated View of Stock Links with Direct Browser Buttons ───
+const showStockLinksPage = async (ctx, page = 1) => {
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  const totalCount = await Stock.countDocuments();
+
+  if (totalCount === 0) {
+    const emptyText = isEn
+      ? `📦 <b>Stock is Empty!</b>\n\nThere are currently no activation links in the database.`
+      : `📦 <b>ስቶክ ባዶ ነው!</b>\n\nበዳታቤዝ ውስጥ ምንም የተመዘገበ የ Gemini Pro ሊንክ የለም።`;
+
+    const emptyKb = Markup.inlineKeyboard([
+      [
+        {
+          text: isEn ? '➕ Add Stock' : '➕ ስቶክ ጨምር',
+          callback_data: 'admin_start_add_stock',
+          style: 'success',
+        },
+      ],
+      [
+        {
+          text: isEn ? '📦 Stock Summary' : '📦 የስቶክ ሁኔታ',
+          callback_data: 'admin_stock',
+          style: 'primary',
+        },
+        {
+          text: isEn ? '🏠 Admin Panel' : '🏠 ዋና ፓነል',
+          callback_data: 'admin_panel',
+        },
+      ],
+    ]);
+
+    if (ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(emptyText, { parse_mode: 'HTML', ...emptyKb });
+      } catch {
+        return await ctx.reply(emptyText, { parse_mode: 'HTML', ...emptyKb });
+      }
+    }
+    return await ctx.reply(emptyText, { parse_mode: 'HTML', ...emptyKb });
+  }
+
+  const limit = 5;
+  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const skip = (currentPage - 1) * limit;
+
+  const stocks = await Stock.find().sort({ createdAt: -1 }).skip(skip).limit(limit);
+
+  let text = isEn
+    ? `📦 <b>Available Stock Links in DB (${totalCount})</b>\n` +
+      `📄 <b>Page:</b> ${currentPage}/${totalPages}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `💡 <i>Tap "Open in Browser" to test if the link is valid, or tap the code to copy it:</i>\n\n`
+    : `📦 <b>በዳታቤዝ ያሉ የስቶክ ሊንኮች (${totalCount})</b>\n` +
+      `📄 <b>ገጽ:</b> ${currentPage}/${totalPages}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `💡 <i>ሊንኩ መስራቱን በ Browser ከፍተው ቼክ ለማድረግ ከታች «ክፈት» የሚለውን ይጫኑ፣ ወይም ኮዱን ነክተው ኮፒ ያድርጉ፦</i>\n\n`;
+
+  const rows = [];
+
+  stocks.forEach((stk, idx) => {
+    const itemNumber = skip + idx + 1;
+    const addedDate = stk.createdAt ? new Date(stk.createdAt).toLocaleString('am-ET') : 'ያልታወቀ';
+    const statusText = stk.isReserved ? (isEn ? '⏳ Reserved' : '⏳ በጥበቃ ላይ') : (isEn ? '✅ Available' : '✅ ዝግጁ');
+
+    text += `<b>${itemNumber}.</b> <code>${escapeHtml(stk.link)}</code>\n`;
+    text += `   📅 <b>የገባበት:</b> ${addedDate} | <b>ሁኔታ:</b> ${statusText}\n\n`;
+
+    const row = [];
+    if (stk.link && (stk.link.startsWith('http://') || stk.link.startsWith('https://'))) {
+      row.push({
+        text: isEn ? `🌐 Open #${itemNumber} in Browser` : `🌐 ሊንክ #${itemNumber} ክፈት`,
+        url: stk.link,
+      });
+    }
+    row.push({
+      text: isEn ? `🗑️ Delete #${itemNumber}` : `🗑️ ሰርዝ #${itemNumber}`,
+      callback_data: `admin_delete_stock_${stk._id}_${currentPage}`,
+      style: 'danger',
+    });
+    rows.push(row);
+  });
+
+  if (totalPages > 1) {
+    const navRow = [];
+    if (currentPage > 1) {
+      navRow.push({
+        text: isEn ? '⬅️ Prev' : '⬅️ ቀዳሚ',
+        callback_data: `admin_view_stock_page_${currentPage - 1}`,
+      });
+    }
+    navRow.push({
+      text: `📄 ${currentPage}/${totalPages}`,
+      callback_data: 'noop',
+    });
+    if (currentPage < totalPages) {
+      navRow.push({
+        text: isEn ? 'Next ➡️' : 'ቀጣይ ➡️',
+        callback_data: `admin_view_stock_page_${currentPage + 1}`,
+      });
+    }
+    rows.push(navRow);
+  }
+
+  rows.push([
+    {
+      text: isEn ? '🔄 Refresh' : '🔄 አድስ (Refresh)',
+      callback_data: `admin_view_stock_page_${currentPage}`,
+    },
+    {
+      text: isEn ? '➕ Add Stock' : '➕ ስቶክ ጨምር',
+      callback_data: 'admin_start_add_stock',
+      style: 'success',
+    },
+  ]);
+  rows.push([
+    {
+      text: isEn ? '📦 Stock Summary' : '📦 የስቶክ ሁኔታ',
+      callback_data: 'admin_stock',
+      style: 'primary',
+    },
+    {
+      text: isEn ? '🏠 Admin Panel' : '🏠 ዋና ፓነል',
+      callback_data: 'admin_panel',
+    },
+  ]);
+
+  const kb = Markup.inlineKeyboard(rows);
+
+  if (ctx.callbackQuery) {
+    try {
+      return await ctx.editMessageText(text, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...kb,
+      });
+    } catch (e) {
+      if (!e.description?.includes('message is not modified')) {
+        return await ctx.reply(text, {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          ...kb,
+        });
+      }
+      return;
+    }
+  }
+
+  return await ctx.reply(text, {
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    ...kb,
+  });
+};
+
+// ─── Callback: admin_view_stock_page_<page> ──────────────
+const callbackViewStockPage = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  const pageStr = ctx.callbackQuery.data.replace('admin_view_stock_page_', '');
+  const page = parseInt(pageStr, 10) || 1;
+  return showStockLinksPage(ctx, page);
+});
+
+// ─── Callback: admin_delete_stock_<id>_<page> ────────────
+const callbackDeleteStock = adminOnly(async (ctx) => {
+  const parts = ctx.callbackQuery.data.replace('admin_delete_stock_', '').split('_');
+  const stockId = parts[0];
+  const page = parseInt(parts[1], 10) || 1;
+
+  const stock = await Stock.findById(stockId);
+  if (!stock) {
+    await ctx.answerCbQuery('⚠️ ሊንኩ አስቀድሞ ተሰርዟል ወይም አልተገኘም!').catch(() => {});
+    return showStockLinksPage(ctx, page);
+  }
+
+  await Stock.findByIdAndDelete(stockId);
+  console.log(`[ADMIN] Stock link deleted by admin ${ctx.from.id}: ${stock.link}`);
+  await ctx.answerCbQuery('🗑️ ሊንኩ በተሳካ ሁኔታ ተሰርዟል!', { show_alert: true }).catch(() => {});
+  return showStockLinksPage(ctx, page);
+});
+
+// ─── Command: /viewstock ──────────────────────────────────
+const handleViewStock = adminOnly(async (ctx) => {
+  return showStockLinksPage(ctx, 1);
 });
 
 // ─── /orders — List recent orders ─────────────────────────
@@ -2962,5 +3191,8 @@ module.exports = {
   callbackResendOrderLink,
   callbackViewOrderLink,
   handleViewLink,
+  callbackViewStockPage,
+  callbackDeleteStock,
+  handleViewStock,
 };
 

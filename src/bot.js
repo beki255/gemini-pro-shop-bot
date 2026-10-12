@@ -76,6 +76,7 @@ bot.command('admin', adminHandlers.handleAdmin);
 bot.command('addstock', adminHandlers.handleAddStock);
 bot.command('addstockbulk', adminHandlers.handleAddStockBulk);
 bot.command('stock', adminHandlers.handleStock);
+bot.command(['viewstock', 'stocklinks', 'links'], adminHandlers.handleViewStock);
 bot.command(['orders', 'order'], adminHandlers.handleOrders);
 bot.command(['checkouts', 'checkout'], adminHandlers.handleCheckouts);
 bot.command('stats', adminHandlers.handleStats);
@@ -255,6 +256,8 @@ bot.on('callback_query', async (ctx) => {
   if (data === 'dismiss_admin_msg') return ctx.deleteMessage().catch(() => {});
   if (data === 'admin_stats') return adminHandlers.callbackAdminStats(ctx);
   if (data === 'admin_stock') return adminHandlers.callbackAdminStock(ctx);
+  if (data.startsWith('admin_view_stock_page_')) return adminHandlers.callbackViewStockPage(ctx);
+  if (data.startsWith('admin_delete_stock_')) return adminHandlers.callbackDeleteStock(ctx);
   if (data === 'admin_change_price') return adminHandlers.callbackChangePrice(ctx);
   if (data === 'cancel_change_price') return adminHandlers.callbackCancelPriceChange(ctx);
   if (data === 'admin_start_add_stock') return adminHandlers.startInteractiveAddStock(ctx);
