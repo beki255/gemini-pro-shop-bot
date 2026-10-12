@@ -1252,9 +1252,6 @@ async function renderUserDetail(ctx, targetUserId, lang = 'am', isEdit = false) 
 
     const fullName = `${foundUser.firstName || ''} ${foundUser.lastName || ''}`.trim() || (isEn ? 'No Name' : 'ስም የለም');
     const cleanUsername = foundUser.username ? String(foundUser.username).replace(/^@+/, '').trim() : '';
-    const directChatUrl = cleanUsername
-      ? `https://t.me/${cleanUsername}`
-      : `tg://user?id=${foundUser.telegramId}`;
     const username = cleanUsername ? `@${cleanUsername}` : (isEn ? 'None' : 'የለውም');
     const userLang = foundUser.language === 'en' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
     let regDate = 'ያልታወቀ';
@@ -1267,13 +1264,24 @@ async function renderUserDetail(ctx, targetUserId, lang = 'am', isEdit = false) 
     }
     const statusText = foundUser.isBlocked ? '🔴 የታገደ (Blocked)' : '🟢 ንቁ (Active)';
 
+    const userProfileLink = cleanUsername
+      ? `<a href="https://t.me/${cleanUsername}"><b>${escapeHtml(fullName)}</b></a>`
+      : `<a href="tg://user?id=${foundUser.telegramId}"><b>${escapeHtml(fullName)}</b></a>`;
+
     let detailText =
       `👤 <b>የተጠቃሚ ዝርዝር መረጃ (User Details)</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `👤 <b>ስም:</b> <a href="${directChatUrl}"><b>${escapeHtml(fullName)}</b></a>\n` +
+      `👤 <b>ስም:</b> ${userProfileLink}\n` +
       `🔗 <b>ዩዘርኔም:</b> ${cleanUsername ? `<a href="https://t.me/${cleanUsername}">@${escapeHtml(cleanUsername)}</a>` : (isEn ? 'None' : 'የለውም')}\n` +
-      `🆔 <b>Telegram ID:</b> <code>${foundUser.telegramId}</code>\n` +
-      `💬 <b>ቀጥታ ቻት:</b> <a href="${directChatUrl}">👉 እዚህ በመጫን ቻቱን ይክፈቱ (Open Chat)</a>\n` +
+      `🆔 <b>Telegram ID:</b> <code>${foundUser.telegramId}</code>\n`;
+
+    if (cleanUsername) {
+      detailText += `💬 <b>ቀጥታ ቻት:</b> <a href="https://t.me/${cleanUsername}">👉 https://t.me/${escapeHtml(cleanUsername)}</a>\n`;
+    } else {
+      detailText += `💬 <b>ቀጥታ ቻት:</b> <i>(ዩዘርኔም የለውም፤ ከታች ባለው "Inbox / DM" ቁልፍ ያውሩ)</i>\n`;
+    }
+
+    detailText +=
       `🌐 <b>ቋንቋ:</b> ${userLang}\n` +
       `📊 <b>ሁኔታ:</b> ${statusText}\n` +
       `📅 <b>የተመዘገበበት:</b> ${regDate}\n` +

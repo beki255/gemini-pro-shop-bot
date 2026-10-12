@@ -622,34 +622,42 @@ const keyboards = {
   adminUserDetailKeyboard(telegramId, username = null, lang = 'am') {
     const isEn = lang === 'en';
     const cleanUsername = username ? String(username).replace(/^@+/, '').trim() : '';
-    const directChatUrl = cleanUsername
-      ? `https://t.me/${cleanUsername}`
-      : `tg://user?id=${telegramId}`;
+    const rows = [];
 
-    return Markup.inlineKeyboard([
-      [
+    if (cleanUsername) {
+      rows.push([
         {
-          text: isEn ? '💬 Open Direct Chat (Inbox)' : '💬 ቀጥታ ወደ ቻት ሂድ (Open Chat)',
-          url: directChatUrl,
+          text: isEn ? '💬 Open Direct Chat (t.me)' : '💬 ቀጥታ ወደ ቻት ሂድ (t.me)',
+          url: `https://t.me/${cleanUsername}`,
         },
-      ],
-      [
+      ]);
+      rows.push([
         {
-          text: isEn ? '🤖 Send Message via Bot' : '🤖 በቦቱ በኩል መልዕክት ላክ',
+          text: isEn ? '🤖 Send via Bot' : '🤖 በቦቱ በኩል ላክ',
           callback_data: `admin_dm_user_${telegramId}`,
         },
-      ],
-      [
+      ]);
+    } else {
+      rows.push([
         {
-          text: isEn ? '👥 Users List' : '👥 ወደ ተጠቃሚዎች ዝርዝር',
-          callback_data: 'admin_users_page_1',
+          text: isEn ? '💬 Send Message (Inbox / DM)' : '💬 ቀጥታ መልዕክት ላክ (Inbox / DM)',
+          callback_data: `admin_dm_user_${telegramId}`,
         },
-        {
-          text: isEn ? '🔙 Admin Panel' : '🔙 ወደ ዋና ፓነል',
-          callback_data: 'admin_panel',
-        },
-      ],
+      ]);
+    }
+
+    rows.push([
+      {
+        text: isEn ? '👥 Users List' : '👥 ወደ ተጠቃሚዎች ዝርዝር',
+        callback_data: 'admin_users_page_1',
+      },
+      {
+        text: isEn ? '🔙 Admin Panel' : '🔙 ወደ ዋና ፓነል',
+        callback_data: 'admin_panel',
+      },
     ]);
+
+    return Markup.inlineKeyboard(rows);
   },
 
   // ─── CANCEL DM TO USER ─────────────────────────────────────
@@ -669,32 +677,33 @@ const keyboards = {
   customerInboxReplyKeyboard(customerTelegramId, customerUsername = null, lang = 'am') {
     const isEn = lang === 'en';
     const cleanUsername = customerUsername ? String(customerUsername).replace(/^@+/, '').trim() : '';
-    const directChatUrl = cleanUsername
-      ? `https://t.me/${cleanUsername}`
-      : `tg://user?id=${customerTelegramId}`;
+    const rows = [];
 
-    return Markup.inlineKeyboard([
-      [
-        {
-          text: isEn ? '💬 Open Direct Chat' : '💬 ቀጥታ ወደ ቻት ሂድ (Open Chat)',
-          url: directChatUrl,
-        },
-        {
-          text: isEn ? '🤖 Reply Via Bot' : '🤖 በቦቱ መልስ',
-          callback_data: `admin_dm_user_${customerTelegramId}`,
-        },
-      ],
-      [
-        {
-          text: isEn ? '👤 User Profile' : '👤 የተጠቃሚ ዝርዝር',
-          callback_data: `admin_user_view_${customerTelegramId}`,
-        },
-        {
-          text: isEn ? '🗑️ Dismiss' : '🗑️ ዝጋ',
-          callback_data: 'dismiss_admin_msg',
-        },
-      ],
+    const actionRow = [];
+    if (cleanUsername) {
+      actionRow.push({
+        text: isEn ? '💬 Open Chat' : '💬 ቻት ክፈት (t.me)',
+        url: `https://t.me/${cleanUsername}`,
+      });
+    }
+    actionRow.push({
+      text: isEn ? '💬 Reply (DM)' : '💬 መልስ ስጥ (DM)',
+      callback_data: `admin_dm_user_${customerTelegramId}`,
+    });
+    rows.push(actionRow);
+
+    rows.push([
+      {
+        text: isEn ? '👤 User Profile' : '👤 የተጠቃሚ ዝርዝር',
+        callback_data: `admin_user_view_${customerTelegramId}`,
+      },
+      {
+        text: isEn ? '🗑️ Dismiss' : '🗑️ ዝጋ',
+        callback_data: 'dismiss_admin_msg',
+      },
     ]);
+
+    return Markup.inlineKeyboard(rows);
   },
 
   // ─── ADMIN ORDERS FILTER MENU ───────────────────────────────
@@ -1169,9 +1178,6 @@ const keyboards = {
         const name = att.customerName || att.userInfo?.firstName || `User ${att.userId || ''}`;
         const rawUsername = att.userInfo?.username;
         const cleanUsername = rawUsername ? String(rawUsername).replace(/^@+/, '').trim() : '';
-        const dmUrl = cleanUsername
-          ? `https://t.me/${cleanUsername}`
-          : (att.userId ? `tg://user?id=${att.userId}` : null);
 
         const safeName = sanitizeButtonText(name, 12) || (isEn ? 'Customer' : 'ደንበኛ');
         const safeMethod = sanitizeButtonText(att.paymentMethod || 'CBE', 10);
@@ -1193,18 +1199,18 @@ const keyboards = {
 
         const btnText = sanitizeButtonText(`💬 #${itemNumber} DM ${safeName} (${safeMethod} · ${safeAmount} ETB)`, 55);
 
-        if (dmUrl) {
+        if (cleanUsername) {
           rows.push([
             {
               text: btnText,
-              url: dmUrl,
+              url: `https://t.me/${cleanUsername}`,
             },
           ]);
-        } else {
+        } else if (att.userId) {
           rows.push([
             {
               text: btnText,
-              callback_data: 'noop',
+              callback_data: `admin_dm_user_${att.userId}`,
             },
           ]);
         }
