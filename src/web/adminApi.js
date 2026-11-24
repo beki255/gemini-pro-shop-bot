@@ -1496,6 +1496,27 @@ function createAdminRouter(bot) {
     }
   });
 
+  // Manual Sale Proof Poster (Social Proof to Proof Channel)
+  router.post('/sale-proof', requireAuth, async (req, res) => {
+    try {
+      const { productSlug, quantity = 1, format = 'both' } = req.body || {};
+      const saleProofService = require('../services/saleProofService');
+      const result = await saleProofService.publishSaleProof(
+        bot.telegram,
+        productSlug,
+        quantity,
+        format
+      );
+      return res.json({
+        success: true,
+        message: `Sale proof posted to ${result.channel}!`,
+        result,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: `Failed to post sale proof: ${err.message}` });
+    }
+  });
+
   // ─── 9. Products / Services Management (Web-Only Admin) ───
   router.get('/products', requireAuth, async (req, res) => {
     try {

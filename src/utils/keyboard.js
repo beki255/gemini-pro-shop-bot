@@ -586,6 +586,11 @@ const keyboards = {
       ],
       [
         {
+          text: isEn ? '🛒 Post Sale Proof' : '🛒 የሽያጭ Proof ላክ',
+          callback_data: 'admin_sale_proof',
+          style: 'success',
+        },
+        {
           text: isEn ? '📢 Post to Channel' : '📢 ወደ ቻናል ፖስት አድርግ',
           callback_data: 'admin_channel_post',
           style: 'primary',

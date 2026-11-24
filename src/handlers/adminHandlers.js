@@ -3584,6 +3584,229 @@ const handleSetWebUrl = adminOnly(async (ctx) => {
   return ctx.reply(`✅ የዌብ ፖርታል ሊንክ ወደ \`${newUrl}/admin\` ተቀይሯል!`, { parse_mode: 'Markdown' });
 });
 
+// ─── Manual Sale Proof Poster (Admin Bot Menu Flow) ───────
+const productService = require('../services/productService');
+const saleProofService = require('../services/saleProofService');
+
+const startSaleProof = adminOnly(async (ctx) => {
+  if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
+  if (ctx.session) ctx.session.awaitingSaleProofQty = null;
+
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  const products = await productService.getAllProducts();
+  const list = products.length > 0 ? products : [productService.getDefaultProductSync()];
+
+  const rows = list.map((p) => [
+    {
+      text: `${p.emoji || '💎'} ${productService.getDisplayName(p, lang)}`,
+      callback_data: `sp_prod_${p.slug}`,
+      style: 'primary',
+    },
+  ]);
+  rows.push([
+    {
+      text: isEn ? '🔙 Back to Admin Panel' : '🔙 ወደ Admin Panel ተመለስ',
+      callback_data: 'admin_panel',
+    },
+  ]);
+
+  const channel = config.proofChannel?.username || '@gemini_pro_shop_proof';
+  const promptText = isEn
+    ? `🛒 <b>Post Sale Proof to Channel</b>\n━━━━━━━━━━━━━━━━━━━━\n📢 <b>Channel:</b> <code>${escapeHtml(channel)}</code>\n\n👇 <b>Step 1:</b> Choose which product was bought:`
+    : `🛒 <b>የሽያጭ Proof ወደ ቻናል መለጠፊያ</b>\n━━━━━━━━━━━━━━━━━━━━\n📢 <b>ቻናል:</b> <code>${escapeHtml(channel)}</code>\n\n👇 <b>ደረጃ 1:</b> የተገዛውን ምርት ይምረጡ፦`;
+
+  if (ctx.callbackQuery) {
+    try {
+      return await ctx.editMessageText(promptText, {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: rows },
+      });
+    } catch {}
+  }
+  return ctx.reply(promptText, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: rows },
+  });
+});
+
+const callbackSaleProofSelectProduct = adminOnly(async (ctx, slug) => {
+  if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
+  if (ctx.session) ctx.session.awaitingSaleProofQty = null;
+
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  const product = await productService.getProductBySlug(slug);
+  const displayName = escapeHtml(productService.getDisplayName(product, lang));
+  const emoji = escapeHtml(product.emoji || '💎');
+
+  const promptText = isEn
+    ? `🛒 <b>Post Sale Proof</b>\n━━━━━━━━━━━━━━━━━━━━\n📦 <b>Selected Product:</b> ${emoji} <b>${displayName}</b>\n\n👇 <b>Step 2:</b> Choose quantity sold:`
+    : `🛒 <b>የሽያጭ Proof መለጠፊያ</b>\n━━━━━━━━━━━━━━━━━━━━\n📦 <b>የተመረጠ ምርት:</b> ${emoji} <b>${displayName}</b>\n\n👇 <b>ደረጃ 2:</b> የተገዛውን ብዛት (Quantity) ይምረጡ፦`;
+
+  const kb = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '1×', callback_data: `sp_qty_${product.slug}_1`, style: 'primary' },
+          { text: '2×', callback_data: `sp_qty_${product.slug}_2`, style: 'primary' },
+          { text: '3×', callback_data: `sp_qty_${product.slug}_3`, style: 'primary' },
+          { text: '5×', callback_data: `sp_qty_${product.slug}_5`, style: 'primary' },
+          { text: '10×', callback_data: `sp_qty_${product.slug}_10`, style: 'primary' },
+        ],
+        [
+          {
+            text: isEn ? '✏️ Custom Quantity' : '✏️ ሌላ ብዛት ጻፍ (Custom)',
+            callback_data: `sp_custom_${product.slug}`,
+          },
+        ],
+        [
+          { text: isEn ? '⬅️ Change Product' : '⬅️ ምርት ቀይር', callback_data: 'admin_sale_proof' },
+          { text: isEn ? '❌ Cancel' : '❌ ሰርዝ', callback_data: 'admin_panel' },
+        ],
+      ],
+    },
+  };
+
+  if (ctx.callbackQuery) {
+    try {
+      return await ctx.editMessageText(promptText, { parse_mode: 'HTML', ...kb });
+    } catch {}
+  }
+  return ctx.reply(promptText, { parse_mode: 'HTML', ...kb });
+});
+
+async function showSaleProofConfirm(ctx, slug, qty) {
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  const product = await productService.getProductBySlug(slug);
+  const preview = saleProofService.formatSaleProof(product, qty, 'both');
+  const channel = config.proofChannel?.username || '@gemini_pro_shop_proof';
+
+  const confirmText = isEn
+    ? `👀 <b>Sale Proof Preview</b>\n━━━━━━━━━━━━━━━━━━━━\n📢 <b>Channel:</b> <code>${escapeHtml(channel)}</code>\n\n${preview.text}\n\n🔘 <i>Button: [${preview.buttonText}] → opens this product</i>\n\n👇 <b>Tap below to publish now:</b>`
+    : `👀 <b>የሽያጭ Proof ቅድመ-እይታ (Preview)</b>\n━━━━━━━━━━━━━━━━━━━━\n📢 <b>ቻናል:</b> <code>${escapeHtml(channel)}</code>\n\n${preview.text}\n\n🔘 <i>አዝራር: [${preview.buttonText}] → ቀጥታ ወደዚህ ምርት ይወስዳል</i>\n\n👇 <b>ወደ ቻናል ለመለጠፍ ከታች ይምረጡ፦</b>`;
+
+  const kb = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          {
+            text: isEn ? '🚀 Publish Now (EN + AM)' : '🚀 ፖስት አድርግ (በሁለቱም ቋንቋ)',
+            callback_data: `sp_pub_both_${product.slug}_${preview.qty}`,
+            style: 'success',
+          },
+        ],
+        [
+          {
+            text: '🇬🇧 English Only',
+            callback_data: `sp_pub_en_${product.slug}_${preview.qty}`,
+            style: 'primary',
+          },
+          {
+            text: '🇪🇹 አማርኛ ብቻ',
+            callback_data: `sp_pub_am_${product.slug}_${preview.qty}`,
+            style: 'primary',
+          },
+        ],
+        [
+          { text: isEn ? '✏️ Change Qty' : '✏️ ብዛት ቀይር', callback_data: `sp_prod_${product.slug}` },
+          { text: isEn ? '❌ Cancel' : '❌ ሰርዝ', callback_data: 'admin_panel' },
+        ],
+      ],
+    },
+  };
+
+  if (ctx.callbackQuery) {
+    try {
+      return await ctx.editMessageText(confirmText, { parse_mode: 'HTML', ...kb });
+    } catch {}
+  }
+  return ctx.reply(confirmText, { parse_mode: 'HTML', ...kb });
+}
+
+const callbackSaleProofSelectQty = adminOnly(async (ctx, slug, qty) => {
+  if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
+  return showSaleProofConfirm(ctx, slug, qty);
+});
+
+const callbackSaleProofCustomQty = adminOnly(async (ctx, slug) => {
+  if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
+  ctx.session = ctx.session || {};
+  ctx.session.awaitingSaleProofQty = { slug };
+
+  const user = await User.findOne({ telegramId: ctx.from.id });
+  const lang = user && user.language ? user.language : 'am';
+  const isEn = lang === 'en';
+
+  return ctx.reply(
+    isEn
+      ? '✏️ <b>Type the quantity number</b> you want to show in the proof post (e.g. <code>4</code> or <code>15</code>):'
+      : '✏️ <b>በ Proof መልዕክቱ ላይ እንዲታይ የሚፈልጉትን ብዛት በቁጥር ይጻፉ</b> (ምሳሌ: <code>4</code> ወይም <code>15</code>)፦',
+    {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [[{ text: isEn ? '❌ Cancel' : '❌ ሰርዝ', callback_data: 'admin_sale_proof' }]],
+      },
+    }
+  );
+});
+
+const handleSaleProofQtyInput = adminOnly(async (ctx) => {
+  const session = ctx.session || {};
+  if (!session.awaitingSaleProofQty) return false;
+
+  const raw = ctx.message?.text ? ctx.message.text.trim() : '';
+  const qty = parseInt(raw, 10);
+  if (isNaN(qty) || qty <= 0 || qty > 500) {
+    await ctx.reply('⚠️ እባክዎ ከ 1 እስከ 500 ትክክለኛ ቁጥር ያስገቡ (Please enter a number between 1 and 500):');
+    return true;
+  }
+
+  const { slug } = session.awaitingSaleProofQty;
+  session.awaitingSaleProofQty = null;
+  await showSaleProofConfirm(ctx, slug, qty);
+  return true;
+});
+
+const callbackSaleProofPublish = adminOnly(async (ctx, format, slug, qty) => {
+  if (ctx.callbackQuery) await ctx.answerCbQuery('🚀 በመለጠፍ ላይ...').catch(() => {});
+  try {
+    const result = await saleProofService.publishSaleProof(ctx.telegram, slug, qty, format);
+    const user = await User.findOne({ telegramId: ctx.from.id });
+    const lang = user && user.language ? user.language : 'am';
+    const isEn = lang === 'en';
+
+    const doneText = isEn
+      ? `✅ <b>Sale Proof Published!</b>\n━━━━━━━━━━━━━━━━━━━━\n📢 <b>Channel:</b> <code>${escapeHtml(result.channel)}</code>\n\n${result.text}`
+      : `✅ <b>የሽያጭ Proof በተሳካ ሁኔታ ወደ ቻናል ተለጥፏል!</b>\n━━━━━━━━━━━━━━━━━━━━\n📢 <b>ቻናል:</b> <code>${escapeHtml(result.channel)}</code>\n\n${result.text}`;
+
+    const kb = {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: isEn ? '➕ Post Another Sale Proof' : '➕ ሌላ የሽያጭ Proof ላክ', callback_data: 'admin_sale_proof', style: 'success' }],
+          [{ text: isEn ? '🔙 Admin Panel' : '🔙 Admin Panel', callback_data: 'admin_panel' }],
+        ],
+      },
+    };
+
+    if (ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(doneText, { parse_mode: 'HTML', ...kb });
+      } catch {}
+    }
+    return ctx.reply(doneText, { parse_mode: 'HTML', ...kb });
+  } catch (err) {
+    return ctx.reply(`❌ ወደ ቻናል መለጠፍ አልተቻለም: ${err.message}`);
+  }
+});
+
 module.exports = {
   handleAdmin,
   handleOtpCommand,
@@ -3591,6 +3814,12 @@ module.exports = {
   handleSetAdminUser,
   handleSetAdminPass,
   handleSetWebUrl,
+  startSaleProof,
+  callbackSaleProofSelectProduct,
+  callbackSaleProofSelectQty,
+  callbackSaleProofCustomQty,
+  handleSaleProofQtyInput,
+  callbackSaleProofPublish,
   handleAddStock,
   handleAddStockBulk,
   handleRestock,

@@ -89,6 +89,7 @@ bot.command('restock', adminHandlers.handleRestock);
 bot.command('broadcast', adminHandlers.handleBroadcast);
 bot.command('announce', adminHandlers.handleBroadcast);
 bot.command(['channelpost', 'post'], adminHandlers.handleChannelPost);
+bot.command(['saleproof', 'proof'], adminHandlers.startSaleProof);
 bot.command(['users', 'customers', 'members'], adminHandlers.handleUsers);
 bot.command(['dm', 'inbox', 'messageuser'], adminHandlers.handleDmCommand);
 bot.command(['otp', 'adminotp', 'code'], adminHandlers.handleOtpCommand);
@@ -211,6 +212,29 @@ bot.on('callback_query', async (ctx) => {
   // Admin callbacks
   if (data === 'open_admin' || data === 'admin_panel') return adminHandlers.handleAdmin(ctx);
   if (data === 'admin_get_otp') return adminHandlers.callbackGetOtp(ctx);
+  if (data === 'admin_sale_proof') return adminHandlers.startSaleProof(ctx);
+  if (data.startsWith('sp_prod_')) {
+    return adminHandlers.callbackSaleProofSelectProduct(ctx, data.replace('sp_prod_', ''));
+  }
+  if (data.startsWith('sp_custom_')) {
+    return adminHandlers.callbackSaleProofCustomQty(ctx, data.replace('sp_custom_', ''));
+  }
+  if (data.startsWith('sp_qty_')) {
+    const rest = data.replace('sp_qty_', '');
+    const lastIdx = rest.lastIndexOf('_');
+    const slug = rest.slice(0, lastIdx);
+    const qty = parseInt(rest.slice(lastIdx + 1), 10) || 1;
+    return adminHandlers.callbackSaleProofSelectQty(ctx, slug, qty);
+  }
+  if (data.startsWith('sp_pub_')) {
+    const rest = data.replace('sp_pub_', '');
+    const firstIdx = rest.indexOf('_');
+    const lastIdx = rest.lastIndexOf('_');
+    const format = rest.slice(0, firstIdx);
+    const slug = rest.slice(firstIdx + 1, lastIdx);
+    const qty = parseInt(rest.slice(lastIdx + 1), 10) || 1;
+    return adminHandlers.callbackSaleProofPublish(ctx, format, slug, qty);
+  }
   if (data === 'admin_toggle_store_status') return adminHandlers.callbackToggleStoreStatus(ctx);
   if (data === 'admin_orders') {
     await ctx.answerCbQuery().catch(() => {});
@@ -368,6 +392,12 @@ bot.on('text', async (ctx) => {
   // Admin broadcast announcement message input
   if (ctx.from.id === config.adminId && session.awaitingBroadcastMessage) {
     const handled = await adminHandlers.handleBroadcastMessage(ctx);
+    if (handled) return;
+  }
+
+  // Admin sale proof custom quantity input
+  if (ctx.from.id === config.adminId && session.awaitingSaleProofQty) {
+    const handled = await adminHandlers.handleSaleProofQtyInput(ctx);
     if (handled) return;
   }
 

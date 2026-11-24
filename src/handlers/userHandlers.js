@@ -103,7 +103,13 @@ async function handleStart(ctx) {
     });
   }
 
-  // 3. If customer clicked "Buy Now" button from channel deep link (?start=buy)
+  // 3. If customer clicked "Buy Now" button from channel deep link (?start=prod_<slug> or ?start=buy)
+  if (payload.startsWith('prod_')) {
+    const slug = payload.replace(/^prod_/, '').trim();
+    if (ctx.session?.startPayload) delete ctx.session.startPayload;
+    const targetProd = await productService.getProductBySlug(slug);
+    return showProductDetails(ctx, targetProd, lang);
+  }
   if (payload === 'buy') {
     if (ctx.session?.startPayload) delete ctx.session.startPayload;
     return handleBuy(ctx);
