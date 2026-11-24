@@ -72,7 +72,28 @@ async function publishSaleProof(telegram, productSlug, quantity = 1, format = 'b
   };
 }
 
+async function autoPublishForApprovedOrder(telegram, order) {
+  if (!telegram || !order) return null;
+  try {
+    const settingsService = require('./settingsService');
+    if (!settingsService.getAutoSaleProof()) return null;
+    const format = settingsService.getAutoSaleProofFormat();
+    const res = await publishSaleProof(
+      telegram,
+      order.productSlug || 'gemini-pro-18m',
+      order.quantity || 1,
+      format
+    );
+    console.log(`📢 Auto sale proof posted to ${res.channel} for order ${order.orderId}`);
+    return res;
+  } catch (err) {
+    console.error(`⚠️ Auto sale proof failed for order ${order?.orderId}:`, err.message);
+    return null;
+  }
+}
+
 module.exports = {
   formatSaleProof,
   publishSaleProof,
+  autoPublishForApprovedOrder,
 };

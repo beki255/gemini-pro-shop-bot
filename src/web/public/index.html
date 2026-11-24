@@ -759,6 +759,30 @@
               </div>
             </div>
 
+            <!-- Auto Sale Proof Control Bar -->
+            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div class="flex items-start gap-3">
+                <div class="w-9 h-9 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center text-base shrink-0">
+                  🤖
+                </div>
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-bold text-xs text-slate-900 dark:text-white" data-i18n="autoProofTitle">Auto Post on Order Approval</span>
+                    <span id="autoProofBadge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">🟢 ON</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5" data-i18n="autoProofSub">Automatically post a sale proof to your channel whenever any order is approved (Bot or Web)</p>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 shrink-0">
+                <select id="autoProofFormatSelect" onchange="handleChangeAutoSaleProofFormat(this.value)" class="text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold">
+                  <option value="both" data-i18n="spLangBoth">Both (EN + AM)</option>
+                  <option value="en" data-i18n="spLangEn">English</option>
+                  <option value="am" data-i18n="spLangAm">Amharic</option>
+                </select>
+                <button type="button" id="btnToggleAutoProof" onclick="handleToggleAutoSaleProof()" class="px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm bg-rose-600 hover:bg-rose-700 text-white">Turn OFF</button>
+              </div>
+            </div>
+
             <form onsubmit="handlePublishSaleProof(event)" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div class="space-y-4">
                 <!-- Product Selector -->
@@ -1216,6 +1240,8 @@
       prodPendingImageData: null,
       prodRemoveImage: false,
       spFormat: 'both',
+      autoSaleProof: true,
+      autoSaleProofFormat: 'both',
       usdtRate: 195,
       usersPage: 1,
       usersSearch: '',
@@ -1408,6 +1434,15 @@
         spPreviewLabel: 'Live Channel Preview',
         btnPostSaleProof: 'Post Sale Proof',
         toastSaleProofSent: 'Sale proof published to your proof channel!',
+        autoProofTitle: 'Auto Post on Order Approval',
+        autoProofSub: 'Automatically post a sale proof to your channel whenever any order is approved (Bot or Web)',
+        autoProofOn: '🟢 ON',
+        autoProofOff: '🔴 OFF',
+        btnAutoProofTurnOff: 'Turn OFF',
+        btnAutoProofTurnOn: 'Turn ON',
+        toastAutoProofOn: 'Auto Sale Proof enabled!',
+        toastAutoProofOff: 'Auto Sale Proof disabled (manual only).',
+        toastAutoProofFmtSaved: 'Auto Sale Proof language updated!',
       },
       am: {
         loginTitle: 'የአስተዳዳሪ ፖርታል',
@@ -1593,6 +1628,15 @@
         spPreviewLabel: 'የቻናል ቅድመ-እይታ (Preview)',
         btnPostSaleProof: 'የሽያጭ Proof ላክ',
         toastSaleProofSent: 'የሽያጭ Proof ወደ ቻናልዎ በተሳካ ሁኔታ ተለጥፏል!',
+        autoProofTitle: 'Auto Proof (ትዕዛዝ Approve ሲደረግ)',
+        autoProofSub: 'ማንኛውም ትዕዛዝ በቦት ወይም በዌብ Approve ሲደረግ በራሱ ወደ ቻናልዎ ይለጥፋል',
+        autoProofOn: '🟢 በርቷል',
+        autoProofOff: '🔴 ጠፍቷል',
+        btnAutoProofTurnOff: 'አጥፋ',
+        btnAutoProofTurnOn: 'አብራ',
+        toastAutoProofOn: 'Auto Sale Proof በርቷል!',
+        toastAutoProofOff: 'Auto Sale Proof ጠፍቷል (በእጅ ብቻ)።',
+        toastAutoProofFmtSaved: 'የ Auto Sale Proof ቋንቋ ተቀይሯል!',
       }
     };
 
@@ -1626,6 +1670,7 @@
 
       // Update active view title
       updateHeaderTitle();
+      renderAutoSaleProofUI();
     }
 
     function toggleLanguage() {
@@ -2970,21 +3015,91 @@
     }
 
     // ─── MARKETING / SALE PROOF, BROADCAST & CHANNEL ──────────
+    function renderAutoSaleProofUI() {
+      const badge = document.getElementById('autoProofBadge');
+      const btn = document.getElementById('btnToggleAutoProof');
+      const sel = document.getElementById('autoProofFormatSelect');
+      const isOn = Boolean(state.autoSaleProof);
+
+      if (badge) {
+        badge.textContent = isOn ? t('autoProofOn') : t('autoProofOff');
+        badge.className = isOn
+          ? 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+          : 'px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400';
+      }
+      if (btn) {
+        btn.textContent = isOn ? t('btnAutoProofTurnOff') : t('btnAutoProofTurnOn');
+        btn.className = isOn
+          ? 'px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm bg-rose-600 hover:bg-rose-700 text-white'
+          : 'px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white';
+      }
+      if (sel) {
+        sel.value = ['both', 'en', 'am'].includes(state.autoSaleProofFormat) ? state.autoSaleProofFormat : 'both';
+      }
+    }
+
+    async function handleToggleAutoSaleProof() {
+      const btn = document.getElementById('btnToggleAutoProof');
+      if (btn) btn.disabled = true;
+      try {
+        const res = await api('/settings/auto-sale-proof', {
+          method: 'POST',
+          body: JSON.stringify({ enabled: 'toggle' }),
+        });
+        state.autoSaleProof = Boolean(res.autoSaleProof);
+        if (res.autoSaleProofFormat) state.autoSaleProofFormat = res.autoSaleProofFormat;
+        renderAutoSaleProofUI();
+        showToast(state.autoSaleProof ? t('toastAutoProofOn') : t('toastAutoProofOff'));
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function handleChangeAutoSaleProofFormat(fmt) {
+      try {
+        const res = await api('/settings/auto-sale-proof', {
+          method: 'POST',
+          body: JSON.stringify({ format: fmt }),
+        });
+        state.autoSaleProofFormat = res.autoSaleProofFormat || fmt;
+        renderAutoSaleProofUI();
+        showToast(t('toastAutoProofFmtSaved'));
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
     async function loadMarketingData() {
       try {
-        const res = await api('/products');
-        state.productsList = res.products || [];
-        const sel = document.getElementById('spProductSelect');
-        if (sel && state.productsList.length > 0) {
-          const prevVal = sel.value;
-          sel.innerHTML = state.productsList
-            .map((p) => `<option value="${escapeHtml(p.slug)}">${escapeHtml(p.emoji || '💎')} ${escapeHtml(p.nameEn)}</option>`)
-            .join('');
-          if (prevVal && state.productsList.some((p) => p.slug === prevVal)) {
-            sel.value = prevVal;
+        const [prodRes, ovRes] = await Promise.all([
+          api('/products').catch(() => null),
+          api('/overview').catch(() => null),
+        ]);
+        if (prodRes) {
+          state.productsList = prodRes.products || [];
+          const sel = document.getElementById('spProductSelect');
+          if (sel && state.productsList.length > 0) {
+            const prevVal = sel.value;
+            sel.innerHTML = state.productsList
+              .map((p) => `<option value="${escapeHtml(p.slug)}">${escapeHtml(p.emoji || '💎')} ${escapeHtml(p.nameEn)}</option>`)
+              .join('');
+            if (prevVal && state.productsList.some((p) => p.slug === prevVal)) {
+              sel.value = prevVal;
+            }
+          }
+        }
+        if (ovRes && ovRes.store) {
+          if (typeof ovRes.store.autoSaleProof === 'boolean') {
+            state.autoSaleProof = ovRes.store.autoSaleProof;
+          }
+          if (ovRes.store.autoSaleProofFormat) {
+            state.autoSaleProofFormat = ovRes.store.autoSaleProofFormat;
           }
         }
       } catch {}
+      renderAutoSaleProofUI();
       updateSaleProofPreview();
     }
 
@@ -3290,8 +3405,16 @@
           else if (v === 'stats') loadStatsData();
           else if (v === 'products') loadProductsData();
         } else if (eventType === 'settings_updated') {
+          if (evt && typeof evt.autoSaleProof === 'boolean') {
+            state.autoSaleProof = evt.autoSaleProof;
+          }
+          if (evt && evt.autoSaleProofFormat) {
+            state.autoSaleProofFormat = evt.autoSaleProofFormat;
+          }
+          renderAutoSaleProofUI();
           if (v === 'overview') loadOverviewData();
           else if (v === 'settings') loadSettingsData();
+          else if (v === 'marketing') loadMarketingData();
         } else if (eventType === 'products_updated') {
           if (v === 'products') loadProductsData();
         }

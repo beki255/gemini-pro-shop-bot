@@ -2049,11 +2049,12 @@ async function callbackApprove(ctx) {
     );
   } catch {}
 
-  // Also clear the original receipt notification if approved from /orders list, and sync Web Admin live!
+  // Also clear the original receipt notification if approved from /orders list, auto-post sale proof if ON, and sync Web Admin live!
   const refreshedOrder = await Order.findById(order._id).lean().catch(() => null);
   if (refreshedOrder && refreshedOrder.adminNotificationMessageId && ctx.callbackQuery?.message?.message_id !== refreshedOrder.adminNotificationMessageId) {
     await realtimeEvents.syncAdminOrderNotification(ctx.telegram, refreshedOrder, { status: 'approved', source: 'bot' });
   }
+  saleProofService.autoPublishForApprovedOrder(ctx.telegram, refreshedOrder || order).catch(() => {});
   realtimeEvents.emitAdminEvent('order_updated', { orderId, status: 'approved', source: 'bot' });
   } finally {
     processingOrders.delete(orderId);
@@ -3009,7 +3010,7 @@ async function executeDirectDelivery(ctx, orderId) {
     ...keyboards.adminOrderReceiptView(updatedOrder, 'all', 1, adminLang),
   });
 
-  // Also clear the original receipt notification buttons in Telegram & sync Web Admin live!
+  // Also clear the original receipt notification buttons in Telegram, auto-post sale proof if ON & sync Web Admin live!
   const refreshedDirectOrder = await Order.findById(order._id).lean().catch(() => null);
   if (refreshedDirectOrder) {
     await realtimeEvents.syncAdminOrderNotification(ctx.telegram, refreshedDirectOrder, {
@@ -3017,6 +3018,7 @@ async function executeDirectDelivery(ctx, orderId) {
       source: 'bot',
     });
   }
+  saleProofService.autoPublishForApprovedOrder(ctx.telegram, refreshedDirectOrder || order).catch(() => {});
   realtimeEvents.emitAdminEvent('order_updated', { orderId, status: 'approved', source: 'bot' });
 
   return true;
@@ -3595,17 +3597,42 @@ const startSaleProof = adminOnly(async (ctx) => {
   const user = await User.findOne({ telegramId: ctx.from.id });
   const lang = user && user.language ? user.language : 'am';
   const isEn = lang === 'en';
+  const settingsService = require('../services/settingsService');
+  const autoOn = settingsService.getAutoSaleProof();
+  const autoFmt = settingsService.getAutoSaleProofFormat();
+  const fmtLabel = autoFmt === 'en' ? '🇬🇧 EN' : autoFmt === 'am' ? '🇪🇹 AM' : '🌐 EN + AM';
 
   const products = await productService.getAllProducts();
   const list = products.length > 0 ? products : [productService.getDefaultProductSync()];
 
-  const rows = list.map((p) => [
-    {
-      text: `${p.emoji || '💎'} ${productService.getDisplayName(p, lang)}`,
-      callback_data: `sp_prod_${p.slug}`,
-      style: 'primary',
-    },
-  ]);
+  const rows = [
+    [
+      {
+        text: autoOn
+          ? (isEn ? '🤖 Auto Post on Approval: 🟢 ON' : '🤖 Auto Proof (Approve ሲደረግ): 🟢 በርቷል')
+          : (isEn ? '🤖 Auto Post on Approval: 🔴 OFF' : '🤖 Auto Proof (Approve ሲደረግ): 🔴 ጠፍቷል'),
+        callback_data: 'sp_toggle_auto',
+        style: autoOn ? 'success' : 'danger',
+      },
+    ],
+    [
+      {
+        text: isEn ? `🌐 Auto Language: ${fmtLabel} (Tap to Switch)` : `🌐 የ Auto ቋንቋ: ${fmtLabel} (ለመቀየር ይጫኑ)`,
+        callback_data: 'sp_cycle_auto_fmt',
+      },
+    ],
+  ];
+
+  list.forEach((p) => {
+    rows.push([
+      {
+        text: `${p.emoji || '💎'} ${productService.getDisplayName(p, lang)}`,
+        callback_data: `sp_prod_${p.slug}`,
+        style: 'primary',
+      },
+    ]);
+  });
+
   rows.push([
     {
       text: isEn ? '🔙 Back to Admin Panel' : '🔙 ወደ Admin Panel ተመለስ',
@@ -3614,9 +3641,13 @@ const startSaleProof = adminOnly(async (ctx) => {
   ]);
 
   const channel = config.proofChannel?.username || '@gemini_pro_shop_proof';
+  const autoStatusLine = autoOn
+    ? (isEn ? '🟢 <b>ON</b> (auto-posts whenever an order is approved)' : '🟢 <b>በርቷል</b> (ማንኛውም ትዕዛዝ Approve ሲደረግ በራሱ ይለጥፋል)')
+    : (isEn ? '🔴 <b>OFF</b> (manual only)' : '🔴 <b>ጠፍቷል</b> (በእጅ ብቻ)');
+
   const promptText = isEn
-    ? `🛒 <b>Post Sale Proof to Channel</b>\n━━━━━━━━━━━━━━━━━━━━\n📢 <b>Channel:</b> <code>${escapeHtml(channel)}</code>\n\n👇 <b>Step 1:</b> Choose which product was bought:`
-    : `🛒 <b>የሽያጭ Proof ወደ ቻናል መለጠፊያ</b>\n━━━━━━━━━━━━━━━━━━━━\n📢 <b>ቻናል:</b> <code>${escapeHtml(channel)}</code>\n\n👇 <b>ደረጃ 1:</b> የተገዛውን ምርት ይምረጡ፦`;
+    ? `🛒 <b>Sale Proof to Channel</b>\n━━━━━━━━━━━━━━━━━━━━\n📢 <b>Channel:</b> <code>${escapeHtml(channel)}</code>\n🤖 <b>Auto Mode:</b> ${autoStatusLine}\n\n👇 <b>Manual Post — Step 1:</b> Choose a product below:`
+    : `🛒 <b>የሽያጭ Proof ወደ ቻናል መለጠፊያ</b>\n━━━━━━━━━━━━━━━━━━━━\n📢 <b>ቻናል:</b> <code>${escapeHtml(channel)}</code>\n🤖 <b>Auto ሁኔታ:</b> ${autoStatusLine}\n\n👇 <b>በእጅ ለመለጠፍ — ደረጃ 1:</b> ምርቱን ይምረጡ፦`;
 
   if (ctx.callbackQuery) {
     try {
@@ -3630,6 +3661,34 @@ const startSaleProof = adminOnly(async (ctx) => {
     parse_mode: 'HTML',
     reply_markup: { inline_keyboard: rows },
   });
+});
+
+const callbackSaleProofToggleAuto = adminOnly(async (ctx) => {
+  const settingsService = require('../services/settingsService');
+  const nextState = await settingsService.toggleAutoSaleProof();
+  realtimeEvents.emitAdminEvent('settings_updated', {
+    autoSaleProof: nextState,
+    autoSaleProofFormat: settingsService.getAutoSaleProofFormat(),
+    source: 'bot',
+  });
+  await ctx.answerCbQuery(nextState ? '🟢 Auto Sale Proof: ON' : '🔴 Auto Sale Proof: OFF').catch(() => {});
+  return startSaleProof(ctx);
+});
+
+const callbackSaleProofCycleFormat = adminOnly(async (ctx) => {
+  const settingsService = require('../services/settingsService');
+  const order = ['both', 'en', 'am'];
+  const cur = settingsService.getAutoSaleProofFormat();
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  await settingsService.setAutoSaleProofFormat(next);
+  realtimeEvents.emitAdminEvent('settings_updated', {
+    autoSaleProof: settingsService.getAutoSaleProof(),
+    autoSaleProofFormat: next,
+    source: 'bot',
+  });
+  const label = next === 'en' ? '🇬🇧 English' : next === 'am' ? '🇪🇹 Amharic' : '🌐 Both (EN + AM)';
+  await ctx.answerCbQuery(`🌐 Auto Proof Format: ${label}`).catch(() => {});
+  return startSaleProof(ctx);
 });
 
 const callbackSaleProofSelectProduct = adminOnly(async (ctx, slug) => {
@@ -3815,6 +3874,8 @@ module.exports = {
   handleSetAdminPass,
   handleSetWebUrl,
   startSaleProof,
+  callbackSaleProofToggleAuto,
+  callbackSaleProofCycleFormat,
   callbackSaleProofSelectProduct,
   callbackSaleProofSelectQty,
   callbackSaleProofCustomQty,

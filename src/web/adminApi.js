@@ -238,6 +238,8 @@ function createAdminRouter(bot) {
           usdtRate: config.payment.usdtRate,
           usdtPrice: config.calculateUsdtPrice(),
           proofChannel: config.proofChannel.username,
+          autoSaleProof: settingsService.getAutoSaleProof(),
+          autoSaleProofFormat: settingsService.getAutoSaleProofFormat(),
         },
         counts: {
           totalOrders,
@@ -834,6 +836,10 @@ function createAdminRouter(bot) {
         status: 'approved',
         source: 'web',
       });
+      // Auto-post sale proof to Proof Channel if Auto Sale Proof is enabled
+      const saleProofService = require('../services/saleProofService');
+      saleProofService.autoPublishForApprovedOrder(bot.telegram, order).catch(() => {});
+
       realtimeEvents.emitAdminEvent('order_updated', {
         orderId: order.orderId,
         status: 'approved',
@@ -1514,6 +1520,34 @@ function createAdminRouter(bot) {
       });
     } catch (err) {
       return res.status(500).json({ error: `Failed to post sale proof: ${err.message}` });
+    }
+  });
+
+  // Toggle / Configure Auto Sale Proof on Order Approval
+  router.post('/settings/auto-sale-proof', requireAuth, async (req, res) => {
+    try {
+      const { enabled, format } = req.body || {};
+      let autoSaleProof = settingsService.getAutoSaleProof();
+      let autoSaleProofFormat = settingsService.getAutoSaleProofFormat();
+
+      if (typeof enabled === 'boolean') {
+        autoSaleProof = await settingsService.setAutoSaleProof(enabled);
+      } else if (enabled === 'toggle') {
+        autoSaleProof = await settingsService.toggleAutoSaleProof();
+      }
+      if (format && ['both', 'en', 'am'].includes(format)) {
+        autoSaleProofFormat = await settingsService.setAutoSaleProofFormat(format);
+      }
+
+      realtimeEvents.emitAdminEvent('settings_updated', {
+        autoSaleProof,
+        autoSaleProofFormat,
+        source: 'web',
+      });
+
+      return res.json({ success: true, autoSaleProof, autoSaleProofFormat });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
     }
   });
 

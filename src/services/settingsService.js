@@ -5,6 +5,8 @@ const config = require('../config');
 class SettingsService {
   constructor() {
     this.isAcceptingOrders = true;
+    this.autoSaleProof = true;
+    this.autoSaleProofFormat = 'both';
   }
 
   async init() {
@@ -34,6 +36,22 @@ class SettingsService {
       } else {
         await Setting.create({ key: 'usdtRate', value: config.payment.usdtRate || 195 });
         console.log(` Initialized USDT rate in DB: ${config.payment.usdtRate || 195} ETB/USDT`);
+      }
+
+      const autoProofSetting = await Setting.findOne({ key: 'autoSaleProof' });
+      if (autoProofSetting !== null && autoProofSetting.value !== undefined) {
+        this.autoSaleProof = Boolean(autoProofSetting.value);
+      } else {
+        await Setting.create({ key: 'autoSaleProof', value: true });
+        this.autoSaleProof = true;
+      }
+
+      const autoProofFmtSetting = await Setting.findOne({ key: 'autoSaleProofFormat' });
+      if (autoProofFmtSetting && ['both', 'en', 'am'].includes(autoProofFmtSetting.value)) {
+        this.autoSaleProofFormat = autoProofFmtSetting.value;
+      } else {
+        await Setting.create({ key: 'autoSaleProofFormat', value: 'both' });
+        this.autoSaleProofFormat = 'both';
       }
     } catch (e) {
       console.error('⚠️ Failed to sync settings from DB:', e.message);
@@ -97,6 +115,39 @@ class SettingsService {
 
   async toggleAcceptingOrders() {
     return this.setAcceptingOrders(!this.isAcceptingOrders);
+  }
+
+  getAutoSaleProof() {
+    return this.autoSaleProof;
+  }
+
+  async setAutoSaleProof(enabled) {
+    this.autoSaleProof = Boolean(enabled);
+    await Setting.findOneAndUpdate(
+      { key: 'autoSaleProof' },
+      { value: this.autoSaleProof, updatedAt: new Date() },
+      { upsert: true }
+    );
+    return this.autoSaleProof;
+  }
+
+  async toggleAutoSaleProof() {
+    return this.setAutoSaleProof(!this.autoSaleProof);
+  }
+
+  getAutoSaleProofFormat() {
+    return this.autoSaleProofFormat || 'both';
+  }
+
+  async setAutoSaleProofFormat(fmt) {
+    const valid = ['both', 'en', 'am'].includes(fmt) ? fmt : 'both';
+    this.autoSaleProofFormat = valid;
+    await Setting.findOneAndUpdate(
+      { key: 'autoSaleProofFormat' },
+      { value: valid, updatedAt: new Date() },
+      { upsert: true }
+    );
+    return valid;
   }
 }
 

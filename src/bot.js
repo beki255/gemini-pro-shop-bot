@@ -213,6 +213,8 @@ bot.on('callback_query', async (ctx) => {
   if (data === 'open_admin' || data === 'admin_panel') return adminHandlers.handleAdmin(ctx);
   if (data === 'admin_get_otp') return adminHandlers.callbackGetOtp(ctx);
   if (data === 'admin_sale_proof') return adminHandlers.startSaleProof(ctx);
+  if (data === 'sp_toggle_auto') return adminHandlers.callbackSaleProofToggleAuto(ctx);
+  if (data === 'sp_cycle_auto_fmt') return adminHandlers.callbackSaleProofCycleFormat(ctx);
   if (data.startsWith('sp_prod_')) {
     return adminHandlers.callbackSaleProofSelectProduct(ctx, data.replace('sp_prod_', ''));
   }
