@@ -518,20 +518,26 @@ const msg = {
     );
   },
 
-  // ─── NO STOCK ──────────────────────────────────────────────
-  noStock(lang = 'am') {
+  // ─── NO STOCK (Dynamic per Product) ────────────────────────
+  noStock(lang = 'am', product = null) {
+    const productService = require('../services/productService');
+    const prod = product || productService.getDefaultProductSync();
+    const displayName = esc(productService.getDisplayName(prod, lang));
+    const emoji = esc(prod.emoji || '📦');
+    const support = esc(config.supportUsername || 'Mnbvcnvhd');
+
     if (lang === 'en') {
       return (
-        `😔 <b>Sorry, we are currently out of stock!</b>\n\n` +
-        `New Gemini Pro activation links are added regularly.\n` +
-        `Please check back shortly or contact: @${config.supportUsername || 'Mnbvcnvhd'}`
+        `😔 <b>Sorry, ${emoji} ${displayName} is currently out of stock!</b>\n\n` +
+        `New stock for <b>${displayName}</b> is added regularly.\n` +
+        `Please check back shortly or contact: @${support}`
       );
     }
 
     return (
-      `😔 <b>ይቅርታ! በአሁኑ ሰዓት ስቶክ አልቋል</b>\n\n` +
-      `አዳዲስ የ Gemini Pro ሊንኮች በቅርቡ ይጨመራሉ።\n` +
-      `እባክዎ ጥቂት ቆይተው ይሞክሩ ወይም ያነጋግሩ: @${config.supportUsername || 'Mnbvcnvhd'}`
+      `😔 <b>ይቅርታ! ${emoji} ${displayName} በአሁኑ ሰዓት ስቶክ አልቋል</b>\n\n` +
+      `አዳዲስ የ <b>${displayName}</b> ስቶክ በቅርቡ ይጨመራል።\n` +
+      `እባክዎ ጥቂት ቆይተው ይሞክሩ ወይም ያነጋግሩ: @${support}`
     );
   },
 

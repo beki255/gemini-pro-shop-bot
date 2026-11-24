@@ -177,10 +177,11 @@ async function handleContact(ctx) {
   });
 }
 
-// ─── Helper: Send Out of Stock notification with product image ───
-async function sendOutOfStockMessage(ctx, lang = 'am') {
-  const productPhotoPath = path.join(__dirname, '../../assets/gemini_product.png');
-  const caption = msg.noStock(lang);
+// ─── Helper: Send Out of Stock notification with THAT product's own image ───
+async function sendOutOfStockMessage(ctx, lang = 'am', product = null) {
+  const prod = product || (await getSelectedProduct(ctx));
+  const photoSource = productService.getProductPhotoSource(prod);
+  const caption = msg.noStock(lang, prod);
   const keyboard = keyboards.backToMain(lang);
 
   // If this was an inline button callback query:
@@ -205,23 +206,20 @@ async function sendOutOfStockMessage(ctx, lang = 'am') {
     }
   }
 
-  // Send gemini_product.png with the Out of Stock caption
-  if (fs.existsSync(productPhotoPath)) {
+  // Send THIS product's own description image (uploaded in Web Admin, URL, or default asset)
+  if (photoSource) {
     try {
-      return await ctx.replyWithPhoto(
-        { source: productPhotoPath },
-        {
-          caption,
-          parse_mode: 'HTML',
-          ...keyboard,
-        }
-      );
+      return await ctx.replyWithPhoto(photoSource, {
+        caption,
+        parse_mode: 'HTML',
+        ...keyboard,
+      });
     } catch (err) {
       console.error('Failed to send out of stock product photo:', err.message);
     }
   }
 
-  // Fallback to text reply if photo does not exist or sending fails
+  // Fallback to text reply if this product has no image or sending photo fails
   return ctx.reply(caption, {
     parse_mode: 'HTML',
     ...keyboard,
@@ -230,14 +228,14 @@ async function sendOutOfStockMessage(ctx, lang = 'am') {
 
 // ─── Helper: Show specific product details & quantity picker ─
 async function showProductDetails(ctx, product, lang = 'am') {
-  const settingsService = require('../services/settingsService');
-  if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
-    return sendOutOfStockMessage(ctx, lang);
-  }
-
   const prod = product || productService.getDefaultProductSync();
   ctx.session = ctx.session || {};
   ctx.session.selectedProductSlug = prod.slug;
+
+  const settingsService = require('../services/settingsService');
+  if (!settingsService.getIsAcceptingOrders() || prod.isInStock === false) {
+    return sendOutOfStockMessage(ctx, lang, prod);
+  }
 
   const reservationService = require('../services/reservationService');
   const available = await reservationService.getAvailableStockCount(prod.slug);
@@ -434,7 +432,7 @@ async function callbackRefreshQty(ctx) {
   if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
     const alertText = lang === 'en' ? '🔴 Out of stock' : '🔴 ስቶክ አልቋል';
     await ctx.answerCbQuery(alertText).catch(() => {});
-    return sendOutOfStockMessage(ctx, lang);
+    return sendOutOfStockMessage(ctx, lang, product);
   }
 
   const reservationService = require('../services/reservationService');
@@ -466,7 +464,7 @@ async function callbackSelectQty(ctx, qty) {
   const settingsService = require('../services/settingsService');
   const product = await getSelectedProduct(ctx);
   if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
-    return sendOutOfStockMessage(ctx, lang);
+    return sendOutOfStockMessage(ctx, lang, product);
   }
 
   const quantity = Math.max(1, parseInt(qty) || 1);
@@ -501,7 +499,7 @@ async function callbackCustomQty(ctx) {
   const settingsService = require('../services/settingsService');
   const product = await getSelectedProduct(ctx);
   if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
-    return sendOutOfStockMessage(ctx, lang);
+    return sendOutOfStockMessage(ctx, lang, product);
   }
 
   const unitPrice = product.priceEtb || config.productPrice || 250;
@@ -534,9 +532,10 @@ async function handleCustomQtyInput(ctx) {
 
   const lang = await getUserLang(ctx.from.id);
   const settingsService = require('../services/settingsService');
-  if (!settingsService.getIsAcceptingOrders()) {
+  const product = await getSelectedProduct(ctx);
+  if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
     session.awaitingCustomQty = false;
-    await sendOutOfStockMessage(ctx, lang);
+    await sendOutOfStockMessage(ctx, lang, product);
     return true;
   }
 
@@ -581,7 +580,7 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
   const settingsService = require('../services/settingsService');
   const product = await getSelectedProduct(ctx);
   if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
-    return sendOutOfStockMessage(ctx, lang);
+    return sendOutOfStockMessage(ctx, lang, product);
   }
 
   const qty = Math.max(1, parseInt(quantity) || 1);
