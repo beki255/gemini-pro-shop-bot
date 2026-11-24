@@ -494,13 +494,17 @@ const keyboards = {
       [statusBtn],
       [
         {
-          text: isEn ? '🌐 Admin Web Portal' : '🌐 Admin Web Portal ክፈት',
-          url: portalUrl,
+          text: isEn ? '📱 Open Admin Mini App' : '📱 Admin Mini App ክፈት',
+          web_app: { url: portalUrl },
         },
       ],
       [
         {
-          text: isEn ? '🔑 Web Login OTP' : '🔑 የWeb መግቢያ ኮድ (OTP)',
+          text: isEn ? '🌐 Open in Browser' : '🌐 በብሮውዘር ክፈት',
+          url: portalUrl,
+        },
+        {
+          text: isEn ? '🔑 Web OTP Code' : '🔑 የWeb OTP ኮድ',
           callback_data: 'admin_get_otp',
         },
       ],

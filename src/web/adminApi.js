@@ -30,7 +30,62 @@ function createAdminRouter(bot) {
     next();
   };
 
+  // ─── 0. Telegram WebApp HMAC Validator ────────────────────
+  const crypto = require('crypto');
+  function validateTelegramWebAppData(initData, botToken) {
+    if (!initData) return null;
+    try {
+      const params = new URLSearchParams(initData);
+      const hash = params.get('hash');
+      if (!hash) return null;
+
+      params.delete('hash');
+      const items = [];
+      for (const [key, val] of params.entries()) {
+        items.push(`${key}=${val}`);
+      }
+      items.sort();
+      const dataCheckString = items.join('\n');
+
+      const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+      const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+      if (computedHash !== hash) return null;
+
+      const userJson = params.get('user');
+      if (!userJson) return null;
+      return JSON.parse(userJson);
+    } catch {
+      return null;
+    }
+  }
+
   // ─── 1. Authentication Endpoints ─────────────────────────
+  // Telegram Mini App 1-Click Auto Login
+  router.post('/login-telegram', async (req, res) => {
+    try {
+      const { initData } = req.body;
+      if (!initData) {
+        return res.status(400).json({ error: 'No Telegram initData provided.' });
+      }
+
+      const tgUser = validateTelegramWebAppData(initData, config.botToken);
+      if (!tgUser) {
+        return res.status(401).json({ error: 'Invalid Telegram WebApp authentication signature.' });
+      }
+
+      if (Number(tgUser.id) !== Number(config.adminId)) {
+        return res.status(403).json({ error: 'Access denied. You are not authorized as store admin.' });
+      }
+
+      const username = tgUser.username || tgUser.first_name || 'admin';
+      const token = otpService.createSession(username);
+      return res.json({ success: true, token, username });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   router.post('/login', async (req, res) => {
     try {
       const { method, code, username, password } = req.body;

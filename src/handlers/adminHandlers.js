@@ -3517,12 +3517,13 @@ const handleOtpCommand = adminOnly(async (ctx) => {
   const code = otpService.generateOtp(ctx.from.id);
   const portalUrl = otpService.getWebUrl();
 
-  const msgText = `🔐 <b>Web Admin Login Code</b>\n\nCode: <code>${code}</code>\n<b>ለ5 ደቂቃ ያገለግላል።</b>\nPortal: ${portalUrl}`;
+  const msgText = `🔐 <b>Web Admin Login Code</b>\n\nCode: <code>${code}</code>\n<b>ለ5 ደቂቃ ያገለግላል።</b>\nPortal: ${portalUrl}\n\n<i>💡 በቴሌግራም ውስጥ በቀጥታ ለመክፈት ከታች "📱 Admin Mini App ክፈት" የሚለውን ይጫኑ (Auto-login ይሆናል)፤ በብሮውዘር ለመክፈት ደግሞ "🌐 በብሮውዘር ክፈት" የሚለውን ተጠቅመው ኮዱን ያስገቡ።</i>`;
   return ctx.reply(msgText, {
     parse_mode: 'HTML',
     reply_markup: {
       inline_keyboard: [
-        [{ text: '🌐 Admin Web Portal ክፈት', url: portalUrl }],
+        [{ text: '📱 Admin Mini App ክፈት', web_app: { url: portalUrl } }],
+        [{ text: '🌐 በብሮውዘር ክፈት', url: portalUrl }],
         [{ text: '🔙 Admin Panel', callback_data: 'admin_panel' }],
       ],
     },
