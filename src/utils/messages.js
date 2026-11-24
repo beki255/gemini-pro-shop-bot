@@ -47,11 +47,11 @@ const msg = {
   // ─── WELCOME / LANGUAGE SELECTION PROMPT ───────────────────
   chooseLanguage() {
     return (
-      `✨ <b>Welcome to Gemini Pro Shop!</b> ✨\n` +
-      `🛍️ <b>ወደ Gemini Pro መደብር እንኳን ደህና መጡ!</b>\n` +
+      `✨ <b>Welcome to Our Digital Products Store!</b> ✨\n` +
+      `🛍️ <b>ወደ ዲጂታል ምርቶች መደብራችን እንኳን ደህና መጡ!</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
-      `⚡ <i>Get 18 Months of Google Gemini Advanced with fast automated delivery!</i>\n` +
-      `⚡ <i>የ 18 ወራት የ Gemini Pro አክቲቬሽን በታላቅ ቅናሽና በፈጣን አቅርቦት ያግኙ!</i>\n\n` +
+      `⚡ <i>Premium AI, VPN & digital subscriptions at the best prices with fast delivery!</i>\n` +
+      `⚡ <i>ምርጥ የ AI፣ VPN እና የተለያዩ ዲጂታል አገልግሎቶችን በተመጣጣኝ ዋጋና በፈጣን አቅርቦት ያግኙ!</i>\n\n` +
       `🌐 <b>እባክዎ ቋንቋ ይምረጡ / Please choose your language:</b>`
     );
   },
@@ -60,22 +60,26 @@ const msg = {
   welcome(firstName, lang = 'am') {
     if (lang === 'en') {
       return (
-        `🛍️ <b>Welcome to Gemini Pro Store</b>\n\n` +
-        `💵 <b>Best prices</b>\n` +
-        `⚡ <b>Fast delivery after payment</b>\n` +
-        `⚠️ <b>No warranty</b>\n` +
+        `🛍️ <b>Welcome to Our Products Store!</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💵 <b>Best & Affordable Prices</b>\n` +
+        `⚡ <b>Fast Delivery Right After Payment</b>\n` +
+        `🛡️ <b>100% Verified & Trusted Service</b>\n` +
+        `💳 <b>Easy Payments (CBE · Telebirr · USDT)</b>\n` +
         `💬 <b>Can't find what you need? Contact support</b>\n\n` +
-        `Choose a section below:`
+        `👇 <b>Choose a product below to get started:</b>`
       );
     }
 
     return (
-      `🛍️ <b>ወደ Gemini Pro መደብር እንኳን ደህና መጡ!</b>\n\n` +
+      `🛍️ <b>ወደ ምርቶቻችን መደብር እንኳን ደህና መጡ!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
       `💵 <b>ምርጥ እና ተመጣጣኝ ዋጋ</b>\n` +
-      `⚡ <b>ከክፍያ በኋላ ፈጣን ማድረስ</b>\n` +
-      `⚠️ <b>ዋስትና የለውም (No warranty)</b>\n` +
-      `💬 <b>እርዳታ ይፈልጋሉ? ድጋፍ ሰጪን ያነጋግሩ</b>\n\n` +
-      `ከታች ካሉት ክፍሎች አንዱን ይምረጡ፦`
+      `⚡ <b>ከክፍያ በኋላ ፈጣን አቅርቦት</b>\n` +
+      `🛡️ <b>100% አስተማማኝ እና የተረጋገጠ አገልግሎት</b>\n` +
+      `💳 <b>ቀላል የክፍያ አማራጮች (CBE · ቴሌብር · USDT)</b>\n` +
+      `💬 <b>የሚፈልጉትን ካላገኙ? ድጋፍ ሰጪን ያነጋግሩ</b>\n\n` +
+      `👇 <b>ለመጀመር ከታች የሚፈልጉትን ምርት ይምረጡ፦</b>`
     );
   },
 
@@ -597,7 +601,7 @@ const msg = {
     if (lang === 'en') {
       return (
         `❓ <b>Help & FAQ</b>\n\n` +
-        `🛒 <b>/buy</b> — Purchase a Gemini Pro 18 Months link\n` +
+        `🛒 <b>/buy</b> — Browse & purchase our digital products\n` +
         `📦 <b>/myorders</b> — View your past orders & statuses\n` +
         `🌐 <b>/language</b> — Change language (English / አማርኛ)\n` +
         `🏠 <b>/start</b> — Back to main menu\n\n` +
@@ -609,7 +613,7 @@ const msg = {
 
     return (
       `❓ <b>እርዳታ እና መረጃ</b>\n\n` +
-      `🛒 <b>/buy</b> — የ Gemini Pro 18 ወራት ሊንክ ግዙ\n` +
+      `🛒 <b>/buy</b> — ምርቶቻችንን ይመልከቱና ይግዙ\n` +
       `📦 <b>/myorders</b> — ያለፉ ትዕዛዞችዎን ይመልከቱ\n` +
       `🌐 <b>/language</b> — ቋንቋ ይቀይሩ (አማርኛ / English)\n` +
       `🏠 <b>/start</b> — ወደ ዋና ማውጫ ይመለሱ\n\n` +
