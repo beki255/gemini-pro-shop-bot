@@ -37,6 +37,7 @@ const checkoutAttemptSchema = new mongoose.Schema(
     expiredAt: { type: Date, default: null },
     lastReminderAt: { type: Date, default: null },
     remindersCount: { type: Number, default: 0 },
+    adminAlertMessageId: { type: Number, default: null },
   },
   { timestamps: true }
 );

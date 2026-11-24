@@ -7,6 +7,7 @@ const Stock = require('../models/Stock');
 const Order = require('../models/Order');
 const CheckoutAttempt = require('../models/CheckoutAttempt');
 const productService = require('../services/productService');
+const realtimeEvents = require('../services/realtimeEvents');
 const keyboards = require('../utils/keyboard');
 const msg = require('../utils/messages');
 
@@ -705,11 +706,18 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
           },
         };
 
-        await ctx.telegram.sendMessage(config.adminId, alertMsg, {
+        const sentAlert = await ctx.telegram.sendMessage(config.adminId, alertMsg, {
           parse_mode: 'HTML',
           disable_web_page_preview: true,
           ...alertKeyboard,
         });
+        if (attempt && sentAlert && sentAlert.message_id) {
+          await CheckoutAttempt.updateOne(
+            { _id: attempt._id },
+            { $set: { adminAlertMessageId: sentAlert.message_id } }
+          ).catch(() => {});
+        }
+        realtimeEvents.emitAdminEvent('checkout_updated', { status: 'awaiting_receipt', source: 'bot' });
         console.log(`🔔 Admin alerted for checkout attempt by user ${ctx.from.id}`);
       } catch (notifyErr) {
         console.error('Failed to notify admin of checkout start:', notifyErr.message);
@@ -898,9 +906,9 @@ async function handleReceipt(ctx) {
 
   await User.updateOne({ telegramId: from.id }, { $inc: { totalOrders: 1 } });
 
-  // Update checkout attempt to completed
+  // Update checkout attempt to completed and clear stale admin checkout alert
   try {
-    await CheckoutAttempt.findOneAndUpdate(
+    const completedAttempt = await CheckoutAttempt.findOneAndUpdate(
       { userId: from.id, status: 'awaiting_receipt' },
       {
         $set: {
@@ -909,8 +917,11 @@ async function handleReceipt(ctx) {
           completedAt: new Date(),
         },
       },
-      { sort: { createdAt: -1 } }
+      { sort: { createdAt: -1 }, new: true }
     );
+    if (completedAttempt && completedAttempt.adminAlertMessageId) {
+      realtimeEvents.syncAdminCheckoutAlert(ctx.telegram, completedAttempt, 'completed').catch(() => {});
+    }
   } catch (errAttempt) {
     console.error('Failed to update CheckoutAttempt to completed:', errAttempt.message);
   }
@@ -1014,16 +1025,17 @@ async function handleReceipt(ctx) {
 
   ctx.session.pendingOrder = null;
 
-  // Notify admin with photo or document accordingly
+  // Notify admin with photo or document accordingly and save message_id for two-way Web<->Bot sync
+  let sentAdminMsg = null;
   try {
     if (isDocument) {
-      await ctx.telegram.sendDocument(config.adminId, fileId, {
+      sentAdminMsg = await ctx.telegram.sendDocument(config.adminId, fileId, {
         caption: msg.adminNewOrder(order, { username: from.username, firstName: from.first_name, lastName: from.last_name }),
         parse_mode: 'HTML',
         ...keyboards.adminApproval(orderId),
       });
     } else {
-      await ctx.telegram.sendPhoto(config.adminId, fileId, {
+      sentAdminMsg = await ctx.telegram.sendPhoto(config.adminId, fileId, {
         caption: msg.adminNewOrder(order, { username: from.username, firstName: from.first_name, lastName: from.last_name }),
         parse_mode: 'HTML',
         ...keyboards.adminApproval(orderId),
@@ -1038,22 +1050,23 @@ async function handleReceipt(ctx) {
       const plainCaption =
         `🔔 አዲስ ትዕዛዝ!\n\n` +
         `🔢 ትዕዛዝ: ${order.orderId}\n` +
+        `🛍️ ምርት: ${order.productName || config.productName}\n` +
         `👤 ስም: ${rawFullName}\n` +
         `🔗 ዩዘርኔም: ${username}\n` +
         `🆔 Telegram ID: ${order.userId}\n` +
-        `📦 ብዛት: ${order.quantity} ሊንክ\n` +
-        `💰 መጠን: ${order.amount} ብር\n` +
+        `📦 ብዛት: ${order.quantity}\n` +
+        `💰 መጠን: ${order.amount} ${order.currency || 'ብር'}\n` +
         `💳 ክፍያ: ${order.paymentMethod}\n\n` +
         `📄 ደረሰኝ ከላይ ተላኳል\n` +
         `⬇️ ምርጫ ያድርጉ:`;
 
       if (isDocument) {
-        await ctx.telegram.sendDocument(config.adminId, fileId, {
+        sentAdminMsg = await ctx.telegram.sendDocument(config.adminId, fileId, {
           caption: plainCaption,
           ...keyboards.adminApproval(orderId),
         });
       } else {
-        await ctx.telegram.sendPhoto(config.adminId, fileId, {
+        sentAdminMsg = await ctx.telegram.sendPhoto(config.adminId, fileId, {
           caption: plainCaption,
           ...keyboards.adminApproval(orderId),
         });
@@ -1063,6 +1076,22 @@ async function handleReceipt(ctx) {
       console.error('Fallback notification to admin also failed:', err2.message);
     }
   }
+
+  if (sentAdminMsg && sentAdminMsg.message_id) {
+    await Order.updateOne(
+      { _id: order._id },
+      { $set: { adminNotificationMessageId: sentAdminMsg.message_id } }
+    ).catch(() => {});
+  }
+
+  // Broadcast live new-order event to Web Admin Portal immediately!
+  realtimeEvents.emitAdminEvent('order_created', {
+    orderId,
+    productName: order.productName || config.productName,
+    amount: order.amount,
+    currency: order.currency || 'ETB',
+    source: 'bot',
+  });
 }
 
 const handlePhotoReceipt = handleReceipt;
@@ -1075,8 +1104,9 @@ async function callbackCancel(ctx) {
   const reservationService = require('../services/reservationService');
   await reservationService.releaseReservation(ctx.from.id);
 
-  // Mark active checkout attempt as cancelled
+  // Mark active checkout attempt as cancelled & clear stale admin checkout alert
   try {
+    const activeAttempts = await CheckoutAttempt.find({ userId: ctx.from.id, status: 'awaiting_receipt' });
     await CheckoutAttempt.updateMany(
       { userId: ctx.from.id, status: 'awaiting_receipt' },
       {
@@ -1086,6 +1116,12 @@ async function callbackCancel(ctx) {
         },
       }
     );
+    for (const att of activeAttempts) {
+      if (att.adminAlertMessageId) {
+        realtimeEvents.syncAdminCheckoutAlert(ctx.telegram, att, 'cancelled').catch(() => {});
+      }
+    }
+    realtimeEvents.emitAdminEvent('checkout_updated', { status: 'cancelled', source: 'bot' });
   } catch (errAttempt) {
     console.error('Failed to update CheckoutAttempt to cancelled:', errAttempt.message);
   }

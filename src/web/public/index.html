@@ -208,8 +208,8 @@
           </div>
           <div class="truncate">
             <div id="sidebarUsername" class="text-xs font-bold truncate text-slate-800 dark:text-slate-200">admin</div>
-            <div class="text-[10px] text-emerald-500 font-semibold flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span> Online
+            <div id="liveSyncStatus" class="text-[10px] text-emerald-500 font-semibold flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span> Live Sync
             </div>
           </div>
         </div>
@@ -1675,6 +1675,7 @@
     }
 
     function handleLogout() {
+      disconnectRealtimeSync();
       api('/logout', { method: 'POST' }).catch(() => {});
       state.token = '';
       localStorage.removeItem('admin_token');
@@ -2986,11 +2987,149 @@
       }
     }
 
+    // ─── REAL-TIME BIDIRECTIONAL SYNC (BOT <-> WEB SSE) ───────
+    let sseSource = null;
+    let sseReconnectTimer = null;
+    let liveRefreshTimer = null;
+
+    function disconnectRealtimeSync() {
+      if (sseReconnectTimer) {
+        clearTimeout(sseReconnectTimer);
+        sseReconnectTimer = null;
+      }
+      if (sseSource) {
+        try { sseSource.close(); } catch {}
+        sseSource = null;
+      }
+    }
+
+    async function syncSidebarBadges() {
+      if (!state.token) return;
+      try {
+        const data = await api('/overview');
+        updateStoreStatusUI(data.store.isOpen);
+        const pendingBadge = document.getElementById('sidebarPendingBadge');
+        if (pendingBadge) {
+          if (data.counts.pendingOrders > 0) {
+            pendingBadge.textContent = data.counts.pendingOrders;
+            pendingBadge.classList.remove('hidden');
+          } else {
+            pendingBadge.classList.add('hidden');
+          }
+        }
+        const stockBadge = document.getElementById('sidebarStockBadge');
+        if (stockBadge) stockBadge.textContent = data.counts.availableStock;
+      } catch {}
+    }
+
+    function scheduleLiveViewSync(eventType, evt = {}) {
+      if (liveRefreshTimer) clearTimeout(liveRefreshTimer);
+      liveRefreshTimer = setTimeout(() => {
+        syncSidebarBadges();
+        const v = state.currentView;
+        if (eventType === 'order_created' || eventType === 'order_updated') {
+          if (v === 'overview') loadOverviewData();
+          else if (v === 'orders') loadOrdersData();
+          else if (v === 'stats') loadStatsData();
+          else if (v === 'checkouts') loadCheckoutsData();
+          else if (v === 'stock') loadStockData();
+        } else if (eventType === 'checkout_updated') {
+          if (v === 'checkouts') loadCheckoutsData();
+          else if (v === 'overview') loadOverviewData();
+          else if (v === 'stats') loadStatsData();
+        } else if (eventType === 'stock_updated') {
+          if (v === 'stock') loadStockData();
+          else if (v === 'overview') loadOverviewData();
+          else if (v === 'stats') loadStatsData();
+          else if (v === 'products') loadProductsData();
+        } else if (eventType === 'settings_updated') {
+          if (v === 'overview') loadOverviewData();
+          else if (v === 'settings') loadSettingsData();
+        } else if (eventType === 'products_updated') {
+          if (v === 'products') loadProductsData();
+        }
+      }, 250);
+    }
+
+    function handleRealtimeEvent(evt) {
+      if (!evt || !evt.type || evt.type === 'connected') return;
+
+      if (evt.type === 'order_created') {
+        const msgText = state.lang === 'en'
+          ? `🔔 New order ${evt.orderId} (${evt.amount} ${evt.currency || 'ETB'})!`
+          : `🔔 አዲስ ትዕዛዝ ${evt.orderId} (${evt.amount} ${evt.currency || 'ብር'}) መጥቷል!`;
+        showToast(msgText);
+        scheduleLiveViewSync('order_created', evt);
+        return;
+      }
+
+      if (evt.type === 'order_updated') {
+        // If order was approved/rejected from the Telegram Bot, close any open modal for it immediately!
+        if (evt.source === 'bot') {
+          if (state.currentOrder && state.currentOrder.orderId === evt.orderId) {
+            closeModal('modalReject');
+            closeModal('modalOrder');
+            state.currentOrder = null;
+          }
+          const stWord = evt.status === 'approved'
+            ? (state.lang === 'en' ? 'approved' : 'ጸድቋል')
+            : (state.lang === 'en' ? 'rejected' : 'ውድቅ ተደርጓል');
+          const msgText = state.lang === 'en'
+            ? `⚡ Order ${evt.orderId} was ${stWord} via Telegram Bot`
+            : `⚡ ትዕዛዝ ${evt.orderId} በቴሌግራም ቦቱ ${stWord}`;
+          showToast(msgText);
+        }
+        scheduleLiveViewSync('order_updated', evt);
+        return;
+      }
+
+      scheduleLiveViewSync(evt.type, evt);
+    }
+
+    function connectRealtimeSync() {
+      disconnectRealtimeSync();
+      if (!state.token || typeof EventSource === 'undefined') return;
+
+      try {
+        sseSource = new EventSource(`/api/admin/events?token=${encodeURIComponent(state.token)}`);
+        sseSource.onmessage = (event) => {
+          try {
+            const evt = JSON.parse(event.data);
+            handleRealtimeEvent(evt);
+          } catch {}
+        };
+        sseSource.onerror = () => {
+          if (sseSource) {
+            try { sseSource.close(); } catch {}
+            sseSource = null;
+          }
+          if (state.token && !sseReconnectTimer) {
+            sseReconnectTimer = setTimeout(() => {
+              sseReconnectTimer = null;
+              connectRealtimeSync();
+            }, 4000);
+          }
+        };
+      } catch {}
+    }
+
+    // Also sync immediately when returning to the browser tab or Telegram Mini App
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && state.token) {
+        if (!sseSource) connectRealtimeSync();
+        syncSidebarBadges();
+        if (['overview', 'orders', 'checkouts', 'stats'].includes(state.currentView)) {
+          refreshCurrentView();
+        }
+      }
+    });
+
     // ─── BOOTSTRAP APP ────────────────────────────────────────
     async function initDashboard() {
       try {
         const me = await api('/auth/me');
         document.getElementById('sidebarUsername').textContent = me.username || 'admin';
+        connectRealtimeSync();
         api('/products').then((pRes) => {
           state.productsList = pRes.products || [];
           state.usdtRate = pRes.usdtRate || 195;
@@ -2999,6 +3138,7 @@
         }).catch(() => {});
         navigateView('overview');
       } catch {
+        disconnectRealtimeSync();
         showAuthScreen();
       }
     }

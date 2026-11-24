@@ -10,6 +10,7 @@ const CheckoutAttempt = require('../models/CheckoutAttempt');
 const settingsService = require('../services/settingsService');
 const otpService = require('../services/otpService');
 const productService = require('../services/productService');
+const realtimeEvents = require('../services/realtimeEvents');
 const msg = require('../utils/messages');
 const keyboards = require('../utils/keyboard');
 
@@ -123,6 +124,46 @@ function createAdminRouter(bot) {
     const token = req.headers.authorization?.split(' ')[1];
     otpService.destroySession(token);
     return res.json({ success: true });
+  });
+
+  // ─── 1B. Real-Time Server-Sent Events Stream (Bot -> Web Sync) ──
+  router.get('/events', (req, res) => {
+    const token =
+      (req.query && req.query.token) ||
+      (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
+        ? req.headers.authorization.split(' ')[1]
+        : null);
+
+    if (!token || !otpService.verifySession(token)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+    res.write(`data: ${JSON.stringify({ type: 'connected', ts: Date.now() })}\n\n`);
+
+    const onEvent = (evt) => {
+      try {
+        res.write(`data: ${JSON.stringify(evt)}\n\n`);
+      } catch {}
+    };
+
+    realtimeEvents.on('admin_event', onEvent);
+
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(': ping\n\n');
+      } catch {}
+    }, 25000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      realtimeEvents.off('admin_event', onEvent);
+    });
   });
 
   // ─── 2. Dashboard / Overview ─────────────────────────────
@@ -536,6 +577,7 @@ function createAdminRouter(bot) {
       const status = typeof isOpen === 'boolean'
         ? await settingsService.setAcceptingOrders(isOpen)
         : await settingsService.toggleAcceptingOrders();
+      realtimeEvents.emitAdminEvent('settings_updated', { isOpen: status, source: 'web' });
       return res.json({ success: true, isOpen: status });
     } catch (err) {
       return res.status(500).json({ error: err.message });
@@ -546,6 +588,7 @@ function createAdminRouter(bot) {
     try {
       const { price } = req.body;
       const newPrice = await settingsService.setProductPrice(price);
+      realtimeEvents.emitAdminEvent('settings_updated', { price: newPrice, source: 'web' });
       return res.json({ success: true, price: newPrice });
     } catch (err) {
       return res.status(400).json({ error: err.message });
@@ -556,6 +599,7 @@ function createAdminRouter(bot) {
     try {
       const { rate } = req.body;
       const newRate = await settingsService.setUsdtRate(rate);
+      realtimeEvents.emitAdminEvent('settings_updated', { rate: newRate, source: 'web' });
       return res.json({ success: true, rate: newRate });
     } catch (err) {
       return res.status(400).json({ error: err.message });
@@ -736,15 +780,9 @@ function createAdminRouter(bot) {
           });
         }
 
-        // Mark stocks sold
+        // Archive sold stocks and remove from active Stock collection (consistent with bot)
         linksToDeliver = stocks.map((s) => s.link);
         for (const stock of stocks) {
-          stock.isSold = true;
-          stock.isReserved = false;
-          stock.soldAt = new Date();
-          stock.orderId = order._id;
-          await stock.save();
-
           await SoldStock.create({
             link: stock.link,
             productSlug: orderSlug,
@@ -758,6 +796,12 @@ function createAdminRouter(bot) {
             processedBy: config.adminId,
           });
         }
+        await Stock.deleteMany({
+          $or: [
+            { _id: { $in: stocks.map((s) => s._id) } },
+            { orderId: order._id },
+          ],
+        });
       }
 
       // Update Order
@@ -767,13 +811,6 @@ function createAdminRouter(bot) {
       order.processedAt = new Date();
       order.processedBy = config.adminId;
       await order.save();
-
-      // Update user order count
-      await User.findOneAndUpdate(
-        { telegramId: order.userId },
-        { $inc: { totalOrders: 1 } },
-        { upsert: true }
-      );
 
       // Send activation notification to customer via bot
       try {
@@ -791,6 +828,17 @@ function createAdminRouter(bot) {
       } catch (sendErr) {
         console.error('Failed to send Telegram message to customer:', sendErr.message);
       }
+
+      // Sync back to Admin's Telegram Bot message (clear pending Approve/Reject buttons!)
+      await realtimeEvents.syncAdminOrderNotification(bot.telegram, order, {
+        status: 'approved',
+        source: 'web',
+      });
+      realtimeEvents.emitAdminEvent('order_updated', {
+        orderId: order.orderId,
+        status: 'approved',
+        source: 'web',
+      });
 
       return res.json({
         success: true,
@@ -850,6 +898,18 @@ function createAdminRouter(bot) {
       } catch (sendErr) {
         console.error('Failed to notify customer on rejection:', sendErr.message);
       }
+
+      // Sync back to Admin's Telegram Bot message (clear pending Approve/Reject buttons!)
+      await realtimeEvents.syncAdminOrderNotification(bot.telegram, order, {
+        status: 'rejected',
+        reason,
+        source: 'web',
+      });
+      realtimeEvents.emitAdminEvent('order_updated', {
+        orderId: order.orderId,
+        status: 'rejected',
+        source: 'web',
+      });
 
       return res.json({ success: true, message: `Order ${order.orderId} rejected.` });
     } catch (err) {
@@ -976,6 +1036,8 @@ function createAdminRouter(bot) {
         }
       }
 
+      realtimeEvents.emitAdminEvent('stock_updated', { added, source: 'web' });
+
       return res.json({
         success: true,
         added,
@@ -991,6 +1053,7 @@ function createAdminRouter(bot) {
     try {
       const deleted = await Stock.findByIdAndDelete(req.params.id);
       if (!deleted) return res.status(404).json({ error: 'Stock item not found' });
+      realtimeEvents.emitAdminEvent('stock_updated', { deleted: true, source: 'web' });
       return res.json({ success: true, message: 'Stock item deleted.' });
     } catch (err) {
       return res.status(500).json({ error: err.message });

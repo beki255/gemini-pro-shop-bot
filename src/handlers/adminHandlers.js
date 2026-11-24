@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Stock = require('../models/Stock');
 const Order = require('../models/Order');
 const CheckoutAttempt = require('../models/CheckoutAttempt');
+const realtimeEvents = require('../services/realtimeEvents');
 const keyboards = require('../utils/keyboard');
 const msg = require('../utils/messages');
 
@@ -122,6 +123,7 @@ const callbackToggleStoreStatus = adminOnly(async (ctx) => {
   const isEn = lang === 'en';
 
   const newStatus = await settingsService.toggleAcceptingOrders();
+  realtimeEvents.emitAdminEvent('settings_updated', { isOpen: newStatus, source: 'bot' });
 
   const alertMsg = newStatus
     ? (isEn
@@ -1198,6 +1200,7 @@ const callbackRemindCheckout = adminOnly(async (ctx) => {
     attempt.lastReminderAt = new Date();
     attempt.remindersCount = (attempt.remindersCount || 0) + 1;
     await attempt.save();
+    realtimeEvents.emitAdminEvent('checkout_updated', { status: 'reminded', source: 'bot' });
 
     const custName = attempt.userInfo?.firstName || `User ${attempt.userId}`;
     console.log(`🔔 Admin sent checkout reminder to customer ${attempt.userId} (${custName})`);
@@ -1832,34 +1835,16 @@ async function callbackApprove(ctx) {
     const order = await Order.findOne({ orderId });
     if (!order) return ctx.reply(`❌ ትዕዛዝ ${orderId} አልተገኘም።`);
     if (order.status !== 'pending') {
-    if (order.status === 'approved') {
-      const links =
-        order.deliveredLinks && order.deliveredLinks.length > 0
-          ? order.deliveredLinks
-          : order.deliveredLink
-          ? [order.deliveredLink]
-          : [];
-      if (links.length > 0) {
-        try {
-          const customer = await User.findOne({ telegramId: order.userId });
-          const custLang = customer && customer.language ? customer.language : 'am';
-          await ctx.telegram.sendMessage(
-            order.userId,
-            msg.orderApproved(links, orderId, custLang),
-            {
-              parse_mode: 'HTML',
-              disable_web_page_preview: true,
-              ...keyboards.deliveredLinksKeyboard(links, custLang),
-            }
-          );
-          return ctx.reply(`✅ ትዕዛዝ ${orderId} አስቀድሞ የጸደቀ ነበር። ሊንኩ ዳግም ወደ ደንበኛው (${order.userId}) በተሳካ ሁኔታ ተልኳል!`);
-        } catch (err) {
-          return ctx.reply(`❌ ወደ ደንበኛው ዳግም መላክ አልተቻለም: ${err.message}`);
-        }
-      }
+      // Clear stale Approve/Reject buttons if this order was already processed (e.g. via Web Admin!)
+      await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+      await realtimeEvents.syncAdminOrderNotification(ctx.telegram, order, {
+        status: order.status,
+        reason: order.adminNote,
+        source: 'web',
+      }).catch(() => {});
+      const statusLabel = order.status === 'approved' ? 'ጸድቋል (Approved)' : 'ውድቅ ተደርጓል (Rejected)';
+      return ctx.answerCbQuery(`⚠️ ትዕዛዝ ${orderId} አስቀድሞ ${statusLabel}!`, { show_alert: true }).catch(() => {});
     }
-    return ctx.reply(`⚠️ ትዕዛዝ ${orderId} አስቀድሞ ${order.status} ነው።`);
-  }
 
   const neededQty = order.quantity || 1;
   const stockIds =
@@ -1999,7 +1984,7 @@ async function callbackApprove(ctx) {
     const custLang = customer && customer.language ? customer.language : 'am';
     await ctx.telegram.sendMessage(
       order.userId,
-      msg.orderApproved(deliveredLinks, orderId, custLang),
+      msg.orderApproved(deliveredLinks, orderId, custLang, order.productName),
       {
         parse_mode: 'HTML',
         disable_web_page_preview: true,
@@ -2063,6 +2048,13 @@ async function callbackApprove(ctx) {
       }
     );
   } catch {}
+
+  // Also clear the original receipt notification if approved from /orders list, and sync Web Admin live!
+  const refreshedOrder = await Order.findById(order._id).lean().catch(() => null);
+  if (refreshedOrder && refreshedOrder.adminNotificationMessageId && ctx.callbackQuery?.message?.message_id !== refreshedOrder.adminNotificationMessageId) {
+    await realtimeEvents.syncAdminOrderNotification(ctx.telegram, refreshedOrder, { status: 'approved', source: 'bot' });
+  }
+  realtimeEvents.emitAdminEvent('order_updated', { orderId, status: 'approved', source: 'bot' });
   } finally {
     processingOrders.delete(orderId);
   }
@@ -2077,7 +2069,13 @@ async function callbackReject(ctx) {
   const order = await Order.findOne({ orderId });
   if (!order) return ctx.reply(`❌ ትዕዛዝ ${orderId} አልተገኘም።`);
   if (order.status !== 'pending') {
-    return ctx.reply(`⚠️ ትዕዛዝ ${orderId} አስቀድሞ ${order.status} ነው።`);
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+    await realtimeEvents.syncAdminOrderNotification(ctx.telegram, order, {
+      status: order.status,
+      reason: order.adminNote,
+      source: 'web',
+    }).catch(() => {});
+    return ctx.reply(`⚠️ ትዕዛዝ ${orderId} አስቀድሞ ${order.status} ሆኗል።`);
   }
 
   // Ask admin for rejection reason with quick one-tap buttons
@@ -2215,7 +2213,7 @@ async function processOrderRejection(ctx, orderId, reason) {
     notifyError = err.message;
   }
 
-  // Update admin message
+  // Update admin message & clear original receipt photo notification, then sync Web Admin live!
   try {
     const cust = await getCustomerDetails(order.userId, order.userInfo);
     await ctx.editMessageCaption(
@@ -2227,9 +2225,18 @@ async function processOrderRejection(ctx, orderId, reason) {
         `💰 መጠን: <b>${order.amount} ${order.currency || 'ብር'}</b>\n` +
         `📝 ምክንያት: <i>${escapeHtml(reason)}</i>` +
         (!userNotified ? `\n\n⚠️ (ማስታወሻ፦ ለደንበኛው ማሳወቅ አልተቻለም)` : ''),
-      { parse_mode: 'HTML' }
+      { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } }
     );
   } catch {}
+  const refreshedRejOrder = await Order.findById(order._id).lean().catch(() => null);
+  if (refreshedRejOrder) {
+    await realtimeEvents.syncAdminOrderNotification(ctx.telegram, refreshedRejOrder, {
+      status: 'rejected',
+      reason,
+      source: 'bot',
+    });
+  }
+  realtimeEvents.emitAdminEvent('order_updated', { orderId, status: 'rejected', source: 'bot' });
   } finally {
     processingOrders.delete(orderId);
     if (ctx.session) ctx.session.pendingRejection = null;
@@ -2954,7 +2961,7 @@ async function executeDirectDelivery(ctx, orderId) {
     const custLang = customer && customer.language ? customer.language : 'am';
     await ctx.telegram.sendMessage(
       order.userId,
-      msg.orderApproved(deliveredLinks, orderId, custLang),
+      msg.orderApproved(deliveredLinks, orderId, custLang, order.productName),
       {
         parse_mode: 'HTML',
         disable_web_page_preview: true,
@@ -3001,6 +3008,16 @@ async function executeDirectDelivery(ctx, orderId) {
     parse_mode: 'HTML',
     ...keyboards.adminOrderReceiptView(updatedOrder, 'all', 1, adminLang),
   });
+
+  // Also clear the original receipt notification buttons in Telegram & sync Web Admin live!
+  const refreshedDirectOrder = await Order.findById(order._id).lean().catch(() => null);
+  if (refreshedDirectOrder) {
+    await realtimeEvents.syncAdminOrderNotification(ctx.telegram, refreshedDirectOrder, {
+      status: 'approved',
+      source: 'bot',
+    });
+  }
+  realtimeEvents.emitAdminEvent('order_updated', { orderId, status: 'approved', source: 'bot' });
 
   return true;
   } finally {

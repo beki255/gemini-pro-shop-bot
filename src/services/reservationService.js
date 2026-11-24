@@ -139,21 +139,33 @@ class ReservationService {
         }
       }
 
-      // Expire stale checkout attempts older than 30 minutes
+      // Expire stale checkout attempts older than 30 minutes & clear their Telegram alerts
       try {
         const CheckoutAttempt = require('../models/CheckoutAttempt');
-        await CheckoutAttempt.updateMany(
-          {
-            status: 'awaiting_receipt',
-            createdAt: { $lt: cutoff },
-          },
-          {
-            $set: {
-              status: 'expired',
-              expiredAt: new Date(),
-            },
+        const realtimeEvents = require('./realtimeEvents');
+        const staleAttempts = await CheckoutAttempt.find({
+          status: 'awaiting_receipt',
+          createdAt: { $lt: cutoff },
+        });
+        if (staleAttempts.length > 0) {
+          await CheckoutAttempt.updateMany(
+            { _id: { $in: staleAttempts.map((a) => a._id) } },
+            {
+              $set: {
+                status: 'expired',
+                expiredAt: new Date(),
+              },
+            }
+          );
+          if (bot && bot.telegram) {
+            for (const att of staleAttempts) {
+              if (att.adminAlertMessageId) {
+                realtimeEvents.syncAdminCheckoutAlert(bot.telegram, att, 'expired').catch(() => {});
+              }
+            }
           }
-        );
+          realtimeEvents.emitAdminEvent('checkout_updated', { status: 'expired', source: 'system' });
+        }
       } catch (errAtt) {
         console.error('Error expiring stale checkout attempts:', errAtt.message);
       }

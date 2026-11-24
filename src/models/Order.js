@@ -36,6 +36,7 @@ const orderSchema = new mongoose.Schema(
       default: 'pending',
     },
     adminNote: { type: String, default: null },
+    adminNotificationMessageId: { type: Number, default: null },
     processedAt: { type: Date, default: null },
     processedBy: { type: Number, default: null }, // Admin telegram ID
   },
