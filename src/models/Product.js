@@ -48,6 +48,14 @@ const productSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    imageData: {
+      type: String,
+      default: null,
+    },
+    imageRemoved: {
+      type: Boolean,
+      default: false,
+    },
     isActive: {
       type: Boolean,
       default: true,

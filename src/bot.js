@@ -481,8 +481,41 @@ async function main() {
 
   // Start Express server for Web Admin & Render health checks
   const app = express();
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Serve Product Images (uploaded base64 in MongoDB, custom URL, or default local asset)
+  app.get('/product-image/:slug', async (req, res) => {
+    try {
+      const prod = await productService.getProductBySlug(req.params.slug);
+      if (!prod) return res.status(404).end();
+
+      if (prod.imageData && typeof prod.imageData === 'string') {
+        const match = prod.imageData.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+        if (match) {
+          const buf = Buffer.from(match[2], 'base64');
+          res.setHeader('Content-Type', match[1]);
+          res.setHeader('Cache-Control', 'public, max-age=60');
+          return res.send(buf);
+        }
+      }
+
+      if (prod.imageUrl) {
+        return res.redirect(prod.imageUrl);
+      }
+
+      const fsSync = require('fs');
+      const defaultPath = productService.getDefaultImagePath();
+      if ((prod.isDefault || prod.slug === 'gemini-pro-18m') && !prod.imageRemoved && fsSync.existsSync(defaultPath)) {
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        return res.sendFile(defaultPath);
+      }
+
+      return res.status(404).end();
+    } catch {
+      return res.status(404).end();
+    }
+  });
 
   // Mount Admin Web API
   const { createAdminRouter } = require('./web/adminApi');

@@ -1284,11 +1284,16 @@ function createAdminRouter(bot) {
       ]);
       const stockMap = new Map(stockCountsAgg.map((s) => [s._id, s.count]));
 
-      const enriched = products.map((p) => ({
-        ...p,
-        usdtPrice: productService.getUsdtPrice(p),
-        availableStock: stockMap.get(p.slug) || 0,
-      }));
+      const enriched = products.map((p) => {
+        const { imageData, ...rest } = p;
+        return {
+          ...rest,
+          hasUploadedImage: Boolean(imageData),
+          previewImageUrl: productService.getProductImagePreviewUrl(p),
+          usdtPrice: productService.getUsdtPrice(p),
+          availableStock: stockMap.get(p.slug) || 0,
+        };
+      });
 
       return res.json({
         products: enriched,
@@ -1302,10 +1307,13 @@ function createAdminRouter(bot) {
   router.post('/products', requireAuth, async (req, res) => {
     try {
       const created = await productService.createProduct(req.body || {});
+      const { imageData, ...rest } = created;
       return res.json({
         success: true,
         product: {
-          ...created,
+          ...rest,
+          hasUploadedImage: Boolean(imageData),
+          previewImageUrl: productService.getProductImagePreviewUrl(created),
           usdtPrice: productService.getUsdtPrice(created),
           availableStock: 0,
         },
@@ -1318,10 +1326,13 @@ function createAdminRouter(bot) {
   router.put('/products/:id', requireAuth, async (req, res) => {
     try {
       const updated = await productService.updateProduct(req.params.id, req.body || {});
+      const { imageData, ...rest } = updated;
       return res.json({
         success: true,
         product: {
-          ...updated,
+          ...rest,
+          hasUploadedImage: Boolean(imageData),
+          previewImageUrl: productService.getProductImagePreviewUrl(updated),
           usdtPrice: productService.getUsdtPrice(updated),
         },
       });

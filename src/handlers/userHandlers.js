@@ -243,34 +243,36 @@ async function showProductDetails(ctx, product, lang = 'am') {
   const available = await reservationService.getAvailableStockCount(prod.slug);
   const caption = msg.productDetails(available, lang, prod);
   const kb = keyboards.quantitySelection(available, lang, prod);
+  const visibleLen = caption.replace(/<[^>]*>/g, '').length;
 
-  // Send with photo when available and within Telegram's 1024-char caption limit
-  if (caption.length <= 1020) {
-    if (prod.imageUrl) {
+  const photoSource = productService.getProductPhotoSource(prod);
+
+  // Send with photo (uploaded image from Web Admin, custom URL, or default gemini_product.png)
+  if (photoSource) {
+    if (visibleLen <= 1020) {
       try {
-        return await ctx.replyWithPhoto(prod.imageUrl, {
+        return await ctx.replyWithPhoto(photoSource, {
           caption,
           parse_mode: 'HTML',
           ...kb,
         });
       } catch (err) {
-        console.error('Failed to send custom product image:', err.message);
-      }
-    } else if (prod.isDefault || prod.slug === 'gemini-pro-18m') {
-      const productPhotoPath = path.join(__dirname, '../../assets/gemini_product.png');
-      if (fs.existsSync(productPhotoPath)) {
+        console.error('Failed to send product photo with HTML caption:', err.message);
         try {
-          return await ctx.replyWithPhoto(
-            { source: productPhotoPath },
-            {
-              caption,
-              parse_mode: 'HTML',
-              ...kb,
-            }
-          );
-        } catch (err) {
-          console.error('Failed to send default product photo:', err.message);
+          return await ctx.replyWithPhoto(photoSource, {
+            caption: caption.replace(/<[^>]*>/g, ''),
+            ...kb,
+          });
+        } catch (err2) {
+          console.error('Failed to send product photo fallback:', err2.message);
         }
+      }
+    } else {
+      // Description exceeds Telegram's 1024-char photo caption limit: send photo first, then full text
+      try {
+        await ctx.replyWithPhoto(photoSource);
+      } catch (err) {
+        console.error('Failed to send standalone product photo:', err.message);
       }
     }
   }

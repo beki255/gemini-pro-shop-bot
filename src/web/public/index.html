@@ -1059,15 +1059,35 @@
           <textarea id="prodDescEnInput" rows="4" placeholder="✨ Detailed product description shown when customer selects this product..." class="w-full text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
         </div>
 
-        <!-- Image URL + Sort Order + Toggles -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div class="sm:col-span-2">
-            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodImageUrlLabel">Photo URL (Optional)</label>
-            <input type="url" id="prodImageUrlInput" placeholder="https://..." class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <!-- Product Description Image Uploader & Preview -->
+        <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <label class="block text-xs font-bold text-slate-700 dark:text-slate-200" data-i18n="prodImageSectionLabel">Product Description Image</label>
+            <div class="flex items-center gap-1.5">
+              <label for="prodImageFileInput" class="cursor-pointer px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition inline-flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <span data-i18n="prodUploadImageBtn">Upload Image</span>
+              </label>
+              <button type="button" id="btnRemoveProdImage" onclick="clearProdImage()" class="hidden px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-semibold transition" data-i18n="prodRemoveImageBtn">Remove</button>
+            </div>
+            <input type="file" id="prodImageFileInput" accept="image/*" onchange="handleProdImageFileSelect(event)" class="hidden">
           </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodSortOrderLabel">Menu Order</label>
-            <input type="number" id="prodSortOrderInput" placeholder="Auto" class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+
+          <!-- Image Preview Box -->
+          <div id="prodImagePreviewBox" onclick="document.getElementById('prodImageFileInput').click()" class="cursor-pointer rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/60 min-h-[130px] flex items-center justify-center overflow-hidden hover:border-brand-500 transition">
+            <span class="text-xs text-slate-400" data-i18n="prodNoImageYet">No image selected — click to upload from Gallery / PC</span>
+          </div>
+
+          <!-- Optional URL + Menu Order -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div class="sm:col-span-2">
+              <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodImageUrlOrLabel">Or paste Image URL (Optional)</label>
+              <input type="url" id="prodImageUrlInput" oninput="handleProdImageUrlInput()" placeholder="https://..." class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodSortOrderLabel">Menu Order</label>
+              <input type="number" id="prodSortOrderInput" placeholder="Auto" class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+            </div>
           </div>
         </div>
 
@@ -1114,6 +1134,8 @@
       checkoutsLimit: '25',
       statsRange: '7d',
       productsList: [],
+      prodPendingImageData: null,
+      prodRemoveImage: false,
       usdtRate: 195,
       usersPage: 1,
       usersSearch: '',
@@ -1274,6 +1296,11 @@
         prodDescAmLabel: 'Description — Amharic (HTML Supported)',
         prodDescEnLabel: 'Description — English (HTML Supported)',
         prodImageUrlLabel: 'Photo URL (Optional)',
+        prodImageSectionLabel: 'Product Description Image',
+        prodUploadImageBtn: 'Upload Image',
+        prodRemoveImageBtn: 'Remove',
+        prodNoImageYet: 'No image selected — click to upload from Gallery / PC',
+        prodImageUrlOrLabel: 'Or paste Image URL (Optional)',
         prodSortOrderLabel: 'Menu Order',
         prodVisibleToggle: 'Show in Bot Menu',
         prodInStockToggle: 'In Stock (Accepting Orders)',
@@ -1440,6 +1467,11 @@
         prodDescAmLabel: 'የምርቱ መግለጫ — በአማርኛ (HTML ይቻላል)',
         prodDescEnLabel: 'የምርቱ መግለጫ — በእንግሊዝኛ (HTML ይቻላል)',
         prodImageUrlLabel: 'የፎቶ ሊንክ (አማራጭ)',
+        prodImageSectionLabel: 'የምርቱ መግለጫ ፎቶ (Description Image)',
+        prodUploadImageBtn: 'ፎቶ ምረጥ / ስቀል',
+        prodRemoveImageBtn: 'ፎቶ አንሳ',
+        prodNoImageYet: 'ፎቶ አልተመረጠም — ከስልክ ወይም ኮምፒውተር ለመምረጥ እዚህ ይጫኑ',
+        prodImageUrlOrLabel: 'ወይም የፎቶ ሊንክ ያስገቡ (አማራጭ)',
         prodSortOrderLabel: 'የማውጫ ቅደም ተከተል',
         prodVisibleToggle: 'በቦቱ ማውጫ ላይ ይታይ',
         prodInStockToggle: 'በስቶክ አለ (ትዕዛዝ ይቀበላል)',
@@ -2298,9 +2330,16 @@
             ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-brand-500/10 text-brand-600 dark:text-brand-400">${t('prodBadgeDefault')}</span>`
             : '';
 
+          const cardImgHtml = p.previewImageUrl
+            ? `<div class="w-full h-36 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700/70">
+                 <img src="${escapeHtml(p.previewImageUrl)}" alt="${escapeHtml(p.nameEn)}" class="w-full h-full object-cover">
+               </div>`
+            : '';
+
           return `
             <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between gap-4">
               <div class="space-y-3">
+                ${cardImgHtml}
                 <div class="flex items-start justify-between gap-3">
                   <div class="flex items-center gap-3 min-w-0">
                     <div class="w-11 h-11 rounded-xl bg-brand-500/10 flex items-center justify-center text-xl flex-shrink-0">${escapeHtml(p.emoji || '🛍️')}</div>
@@ -2357,10 +2396,94 @@
       }
     }
 
+    function renderProdImagePreview(srcUrl) {
+      const box = document.getElementById('prodImagePreviewBox');
+      const removeBtn = document.getElementById('btnRemoveProdImage');
+      if (!box) return;
+      if (srcUrl) {
+        box.innerHTML = `<img src="${escapeHtml(srcUrl)}" alt="Preview" class="max-h-48 w-full object-contain rounded-lg p-1">`;
+        if (removeBtn) removeBtn.classList.remove('hidden');
+      } else {
+        box.innerHTML = `<span class="text-xs text-slate-400 px-4 text-center">${t('prodNoImageYet')}</span>`;
+        if (removeBtn) removeBtn.classList.add('hidden');
+      }
+    }
+
+    function handleProdImageFileSelect(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast('Please select a valid image file.', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          // Compress & resize cleanly to max 1280px so Telegram & MongoDB stay super fast
+          const maxDim = 1280;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w >= h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx2d = canvas.getContext('2d');
+          ctx2d.drawImage(img, 0, 0, w, h);
+
+          // Keep PNG for transparency if small, otherwise crisp JPEG 0.86
+          let dataUrl = file.type === 'image/png' && file.size < 450000
+            ? canvas.toDataURL('image/png')
+            : canvas.toDataURL('image/jpeg', 0.86);
+
+          state.prodPendingImageData = dataUrl;
+          state.prodRemoveImage = false;
+          document.getElementById('prodImageUrlInput').value = '';
+          renderProdImagePreview(dataUrl);
+        };
+        img.onerror = () => showToast('Could not read selected image.', 'error');
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleProdImageUrlInput() {
+      const url = document.getElementById('prodImageUrlInput').value.trim();
+      if (url) {
+        state.prodPendingImageData = null;
+        state.prodRemoveImage = false;
+        renderProdImagePreview(url);
+      } else if (!state.prodPendingImageData) {
+        renderProdImagePreview(null);
+      }
+    }
+
+    function clearProdImage() {
+      state.prodPendingImageData = null;
+      state.prodRemoveImage = true;
+      document.getElementById('prodImageUrlInput').value = '';
+      const fileInput = document.getElementById('prodImageFileInput');
+      if (fileInput) fileInput.value = '';
+      renderProdImagePreview(null);
+    }
+
     function openProductModal(productId = null) {
       const form = document.getElementById('productForm');
       form.reset();
       document.getElementById('prodEditId').value = '';
+      state.prodPendingImageData = null;
+      state.prodRemoveImage = false;
+      const fileInput = document.getElementById('prodImageFileInput');
+      if (fileInput) fileInput.value = '';
 
       if (productId) {
         const p = (state.productsList || []).find((x) => String(x._id) === String(productId));
@@ -2378,11 +2501,13 @@
         document.getElementById('prodSortOrderInput').value = p.sortOrder !== undefined ? p.sortOrder : '';
         document.getElementById('prodIsActiveInput').checked = p.isActive !== false;
         document.getElementById('prodIsInStockInput').checked = p.isInStock !== false;
+        renderProdImagePreview(p.previewImageUrl || null);
       } else {
         document.getElementById('modalProductTitle').textContent = t('btnNewProduct');
         document.getElementById('prodEmojiInput').value = '🛍️';
         document.getElementById('prodIsActiveInput').checked = true;
         document.getElementById('prodIsInStockInput').checked = true;
+        renderProdImagePreview(null);
       }
 
       updateProdUsdtPreview();
@@ -2392,6 +2517,7 @@
     async function submitProductForm(e) {
       e.preventDefault();
       const editId = document.getElementById('prodEditId').value.trim();
+      const urlVal = document.getElementById('prodImageUrlInput').value.trim();
       const payload = {
         emoji: document.getElementById('prodEmojiInput').value.trim() || '🛍️',
         nameEn: document.getElementById('prodNameEnInput').value.trim(),
@@ -2400,11 +2526,18 @@
         customUsdtPrice: document.getElementById('prodCustomUsdtInput').value.trim() === '' ? null : Number(document.getElementById('prodCustomUsdtInput').value),
         descriptionAm: document.getElementById('prodDescAmInput').value,
         descriptionEn: document.getElementById('prodDescEnInput').value,
-        imageUrl: document.getElementById('prodImageUrlInput').value.trim() || null,
         sortOrder: document.getElementById('prodSortOrderInput').value.trim() === '' ? undefined : Number(document.getElementById('prodSortOrderInput').value),
         isActive: document.getElementById('prodIsActiveInput').checked,
         isInStock: document.getElementById('prodIsInStockInput').checked,
       };
+
+      if (state.prodRemoveImage) {
+        payload.removeImage = true;
+      } else if (state.prodPendingImageData) {
+        payload.imageData = state.prodPendingImageData;
+      } else if (urlVal) {
+        payload.imageUrl = urlVal;
+      }
 
       const btn = document.getElementById('btnSubmitProduct');
       btn.disabled = true;

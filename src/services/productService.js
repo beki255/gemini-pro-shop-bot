@@ -1,9 +1,12 @@
 // src/services/productService.js - Dynamic Product Catalog Manager (Web Admin + Bot Sync)
+const path = require('path');
+const fs = require('fs');
 const Product = require('../models/Product');
 const Setting = require('../models/Setting');
 const config = require('../config');
 
 const DEFAULT_SLUG = 'gemini-pro-18m';
+const DEFAULT_IMAGE_PATH = path.join(__dirname, '../../assets/gemini_product.png');
 
 const DEFAULT_DESC_EN =
   `✨ <b>Key Features:</b>\n` +
@@ -156,6 +159,47 @@ class ProductService {
     return product.nameAm || product.nameEn || config.productName;
   }
 
+  getProductImagePreviewUrl(product) {
+    if (!product) return null;
+    const ver = product.updatedAt ? new Date(product.updatedAt).getTime() : Date.now();
+    if (product.imageData) {
+      return `/product-image/${encodeURIComponent(product.slug)}?v=${ver}`;
+    }
+    if (product.imageUrl) {
+      return product.imageUrl;
+    }
+    if ((product.isDefault || product.slug === DEFAULT_SLUG) && !product.imageRemoved && fs.existsSync(DEFAULT_IMAGE_PATH)) {
+      return `/product-image/${encodeURIComponent(product.slug)}?v=default-${ver}`;
+    }
+    return null;
+  }
+
+  getProductPhotoSource(product) {
+    if (!product) return null;
+    if (product.imageData && typeof product.imageData === 'string') {
+      const match = product.imageData.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (match) {
+        const mime = match[1];
+        const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+        return {
+          source: Buffer.from(match[2], 'base64'),
+          filename: `${product.slug || 'product'}.${ext}`,
+        };
+      }
+    }
+    if (product.imageUrl) {
+      return product.imageUrl;
+    }
+    if ((product.isDefault || product.slug === DEFAULT_SLUG) && !product.imageRemoved && fs.existsSync(DEFAULT_IMAGE_PATH)) {
+      return { source: DEFAULT_IMAGE_PATH };
+    }
+    return null;
+  }
+
+  getDefaultImagePath() {
+    return DEFAULT_IMAGE_PATH;
+  }
+
   async createProduct(payload) {
     const nameEn = String(payload.nameEn || '').trim();
     const nameAm = String(payload.nameAm || nameEn).trim();
@@ -194,6 +238,8 @@ class ProductService {
       descriptionEn: String(payload.descriptionEn || '').trim(),
       descriptionAm: String(payload.descriptionAm || '').trim(),
       imageUrl: payload.imageUrl ? String(payload.imageUrl).trim() : null,
+      imageData: payload.imageData && String(payload.imageData).startsWith('data:image/') ? String(payload.imageData) : null,
+      imageRemoved: false,
       isActive: payload.isActive !== undefined ? Boolean(payload.isActive) : true,
       isInStock: payload.isInStock !== undefined ? Boolean(payload.isInStock) : true,
       isDefault: false,
@@ -238,8 +284,25 @@ class ProductService {
     if (payload.descriptionAm !== undefined) {
       product.descriptionAm = String(payload.descriptionAm);
     }
-    if (payload.imageUrl !== undefined) {
-      product.imageUrl = payload.imageUrl ? String(payload.imageUrl).trim() : null;
+    if (payload.removeImage === true) {
+      product.imageData = null;
+      product.imageUrl = null;
+      product.imageRemoved = true;
+    } else {
+      if (payload.imageData && String(payload.imageData).startsWith('data:image/')) {
+        product.imageData = String(payload.imageData);
+        product.imageUrl = null;
+        product.imageRemoved = false;
+      } else if (payload.imageUrl !== undefined) {
+        const cleanedUrl = payload.imageUrl ? String(payload.imageUrl).trim() : null;
+        if (cleanedUrl) {
+          product.imageUrl = cleanedUrl;
+          product.imageData = null;
+          product.imageRemoved = false;
+        } else if (!product.imageData) {
+          product.imageUrl = null;
+        }
+      }
     }
     if (payload.isActive !== undefined) {
       product.isActive = Boolean(payload.isActive);
