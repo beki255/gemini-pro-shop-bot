@@ -919,10 +919,16 @@
       </div>
 
       <!-- Action Footer -->
-      <div id="modalOrderFooter" class="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
-        <button onclick="closeModal('modalOrder')" class="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition" data-i18n="btnClose">Close</button>
-        <button id="btnModalReject" onclick="openRejectModal()" class="px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition border border-rose-300 dark:border-rose-800" data-i18n="btnReject">Reject</button>
-        <button id="btnModalApprove" onclick="handleApproveOrder()" class="px-5 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md shadow-emerald-600/20 transition" data-i18n="btnApprove">Approve & Deliver</button>
+      <div id="modalOrderFooter" class="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+        <button id="btnModalDeleteOrder" onclick="handleDeleteOrder()" class="px-3.5 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 rounded-xl transition inline-flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          <span data-i18n="btnDeleteOrder">Delete Order</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="closeModal('modalOrder')" class="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition" data-i18n="btnClose">Close</button>
+          <button id="btnModalReject" onclick="openRejectModal()" class="px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition border border-rose-300 dark:border-rose-800" data-i18n="btnReject">Reject</button>
+          <button id="btnModalApprove" onclick="handleApproveOrder()" class="px-5 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md shadow-emerald-600/20 transition" data-i18n="btnApprove">Approve & Deliver</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1314,6 +1320,8 @@
         btnHide: 'Hide',
         btnShow: 'Show',
         btnDelete: 'Delete',
+        btnDeleteOrder: 'Delete Order',
+        toastOrderDeleted: 'Order permanently deleted from database!',
       },
       am: {
         loginTitle: 'የአስተዳዳሪ ፖርታል',
@@ -1485,6 +1493,8 @@
         btnHide: 'ደብቅ',
         btnShow: 'አሳይ',
         btnDelete: 'ሰርዝ',
+        btnDeleteOrder: 'ትዕዛዝ አጥፋ',
+        toastOrderDeleted: 'ትዕዛዙ ከዳታቤዝ ሙሉ በሙሉ ተሰርዟል!',
       }
     };
 
@@ -2060,7 +2070,12 @@
               <td class="p-3.5">${getStatusBadgeHtml(o.status)}</td>
               <td class="p-3.5 text-xs text-slate-400 whitespace-nowrap">${dateStr}</td>
               <td class="p-3.5 pr-5 text-right whitespace-nowrap">
-                <button onclick="openOrderDetail('${o.orderId}')" class="px-3 py-1.5 text-xs font-semibold rounded-xl bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 hover:bg-brand-100 transition">View</button>
+                <div class="inline-flex items-center gap-1.5">
+                  <button onclick="openOrderDetail('${o.orderId}')" class="px-3 py-1.5 text-xs font-semibold rounded-xl bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 hover:bg-brand-100 transition">View</button>
+                  <button onclick="handleDeleteOrder('${o.orderId}')" class="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition" title="Delete Order">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </div>
               </td>
             </tr>
           `;
@@ -2186,6 +2201,29 @@
         showToast(t('toastRejected'));
         closeModal('modalReject');
         closeModal('modalOrder');
+        refreshCurrentView();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleDeleteOrder(orderIdArg = null) {
+      const targetId = orderIdArg || (state.currentOrder ? state.currentOrder.orderId : null);
+      if (!targetId) return;
+
+      const confirmText = state.lang === 'en'
+        ? `Permanently delete order ${targetId} from the database? This cannot be undone.`
+        : `ትዕዛዝ ${targetId} ከዳታቤዝ ሙሉ በሙሉ ይጥፋ? ይህን መመለስ አይቻልም።`;
+      if (!confirm(confirmText)) return;
+
+      try {
+        await api(`/orders/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
+        showToast(t('toastOrderDeleted'));
+        if (state.currentOrder && state.currentOrder.orderId === targetId) {
+          closeModal('modalOrder');
+          state.currentOrder = null;
+        }
+        syncSidebarBadges();
         refreshCurrentView();
       } catch (err) {
         showToast(err.message, 'error');

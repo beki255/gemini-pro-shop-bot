@@ -951,6 +951,83 @@ function createAdminRouter(bot) {
     }
   });
 
+  // Permanently Delete Order from Database
+  router.delete('/orders/:orderId', requireAuth, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      let order = await Order.findOne({ orderId });
+      if (!order && mongoose.Types.ObjectId.isValid(orderId)) {
+        order = await Order.findById(orderId);
+      }
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      // 1. Release any reserved stocks linked to this order so nothing stays stuck
+      const stockIds =
+        order.stockIds && order.stockIds.length > 0
+          ? order.stockIds
+          : order.stockId
+          ? [order.stockId]
+          : [];
+      await Stock.updateMany(
+        {
+          $or: [
+            ...(stockIds.length > 0 ? [{ _id: { $in: stockIds } }] : []),
+            { orderId: order._id },
+          ],
+          isSold: false,
+        },
+        {
+          $set: {
+            isReserved: false,
+            reservedAt: null,
+            reservedBy: null,
+            reservedMethod: null,
+            orderId: null,
+          },
+        }
+      );
+
+      // 2. Delete any SoldStock archive records tied to this orderId
+      await SoldStock.deleteMany({ orderId: order.orderId });
+
+      // 3. Safely decrement user's totalOrders counter (never below 0)
+      await User.updateOne(
+        { telegramId: order.userId, totalOrders: { $gt: 0 } },
+        { $inc: { totalOrders: -1 } }
+      ).catch(() => {});
+
+      // 4. Permanently delete the Order from MongoDB
+      await Order.deleteOne({ _id: order._id });
+
+      // 5. Remove/clear the order's notification message in Admin's Telegram Bot chat
+      if (order.adminNotificationMessageId && config.adminId) {
+        try {
+          await bot.telegram.deleteMessage(config.adminId, order.adminNotificationMessageId);
+        } catch {
+          await bot.telegram
+            .editMessageReplyMarkup(config.adminId, order.adminNotificationMessageId, undefined, {
+              inline_keyboard: [],
+            })
+            .catch(() => {});
+        }
+      }
+
+      // 6. Broadcast live update to Web Admin clients
+      realtimeEvents.emitAdminEvent('order_updated', {
+        orderId: order.orderId,
+        status: 'deleted',
+        source: 'web',
+      });
+
+      return res.json({
+        success: true,
+        message: `Order ${order.orderId} permanently deleted from database.`,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ─── 5. Stock Management ─────────────────────────────────
   router.get('/stocks', requireAuth, async (req, res) => {
     try {
