@@ -452,15 +452,26 @@
             </div>
           </div>
 
-          <!-- 7-Day Sales Trend + Payment Method Breakdown -->
+          <!-- Sales Trend + Payment Method Breakdown -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- 7-Day Daily Trend -->
+            <!-- Filterable Approved Sales Trend -->
             <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-              <div>
-                <h3 class="font-bold text-sm text-slate-900 dark:text-white" data-i18n="stats7dTrendTitle">Last 7 Days Approved Sales</h3>
-                <p class="text-xs text-slate-500 mt-0.5" data-i18n="stats7dTrendSub">Daily approved orders & revenue</p>
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 class="font-bold text-sm text-slate-900 dark:text-white" data-i18n="statsTrendTitle">Approved Sales Trend</h3>
+                  <p id="stTrendSummary" class="text-xs text-slate-500 mt-0.5" data-i18n="statsTrendSub">Approved orders & revenue by period</p>
+                </div>
+                <div class="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-[11px] font-semibold">
+                  <button onclick="setStatsRange('today')" id="btnStatsRangeToday" class="px-2.5 py-1 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white" data-i18n="rangeToday">Today</button>
+                  <button onclick="setStatsRange('7d')" id="btnStatsRange7d" class="px-2.5 py-1 rounded-lg transition bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" data-i18n="range7d">7D</button>
+                  <button onclick="setStatsRange('30d')" id="btnStatsRange30d" class="px-2.5 py-1 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white" data-i18n="range30d">30D</button>
+                  <button onclick="setStatsRange('90d')" id="btnStatsRange90d" class="px-2.5 py-1 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white" data-i18n="range90d">3M</button>
+                  <button onclick="setStatsRange('all')" id="btnStatsRangeAll" class="px-2.5 py-1 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white" data-i18n="rangeAll">All</button>
+                </div>
               </div>
-              <div id="stDailyChart" class="h-44 flex items-end justify-between gap-2 pt-4"></div>
+              <div class="overflow-x-auto pb-1">
+                <div id="stDailyChart" class="h-44 flex items-end justify-between gap-1.5 pt-4 min-w-full"></div>
+              </div>
             </div>
 
             <!-- Payment Methods Table -->
@@ -975,6 +986,7 @@
       checkoutsPage: 1,
       checkoutsSearch: '',
       checkoutsLimit: '25',
+      statsRange: '7d',
       usersPage: 1,
       usersSearch: '',
       activeDmTelegramId: null,
@@ -1110,8 +1122,13 @@
         statsOrdersBreakdown: 'Orders Breakdown',
         statsCheckoutsBreakdown: 'Checkout Attempts',
         statsStockBreakdown: 'Stock Inventory',
-        stats7dTrendTitle: 'Last 7 Days Approved Sales',
-        stats7dTrendSub: 'Daily approved orders & revenue',
+        statsTrendTitle: 'Approved Sales Trend',
+        statsTrendSub: 'Approved orders & revenue by period',
+        rangeToday: 'Today',
+        range7d: '7D',
+        range30d: '30D',
+        range90d: '3M',
+        rangeAll: 'All',
         statsByMethodTitle: 'Revenue by Payment Method',
         statsByMethodSub: 'Approved orders grouped by payment provider',
         statsActiveStock: 'Active Inventory',
@@ -1245,8 +1262,13 @@
         statsOrdersBreakdown: 'የትዕዛዞች ዝርዝር',
         statsCheckoutsBreakdown: 'የክፍያ ሂደት ሙከራዎች',
         statsStockBreakdown: 'የስቶክ ዝርዝር',
-        stats7dTrendTitle: 'ያለፉት 7 ቀናት የጸደቁ ሽያጮች',
-        stats7dTrendSub: 'የየቀኑ ሽያጭ እና ገቢ',
+        statsTrendTitle: 'የጸደቁ ሽያጮች ግራፍ',
+        statsTrendSub: 'በተመረጠው ጊዜ የጸደቁ ትዕዛዞችና ገቢ',
+        rangeToday: 'ዛሬ',
+        range7d: '7 ቀን',
+        range30d: '30 ቀን',
+        range90d: '3 ወር',
+        rangeAll: 'ሁሉም',
         statsByMethodTitle: 'ገቢ በክፍያ መንገድ',
         statsByMethodSub: 'በእያንዳንዱ የክፍያ አማራጭ የጸደቁ ትዕዛዞች',
         statsActiveStock: 'አሁን ያለ ስቶክ',
@@ -1519,9 +1541,30 @@
       `;
     }
 
+    function setStatsRange(range) {
+      state.statsRange = range;
+      const btnMap = {
+        today: 'btnStatsRangeToday',
+        '7d': 'btnStatsRange7d',
+        '30d': 'btnStatsRange30d',
+        '90d': 'btnStatsRange90d',
+        all: 'btnStatsRangeAll',
+      };
+      Object.entries(btnMap).forEach(([k, id]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (k === range) {
+          el.className = 'px-2.5 py-1 rounded-lg transition bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm';
+        } else {
+          el.className = 'px-2.5 py-1 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white';
+        }
+      });
+      loadStatsData();
+    }
+
     async function loadStatsData() {
       try {
-        const d = await api('/stats');
+        const d = await api(`/stats?range=${encodeURIComponent(state.statsRange)}`);
 
         // KPI Cards
         document.getElementById('stUsersTotal').textContent = d.users.total.toLocaleString();
@@ -1575,22 +1618,34 @@
           </div>`,
         ].join('');
 
-        // 4. 7-Day Daily Trend Bar Chart
+        // 4. Filterable Sales Trend Bar Chart
+        const trend = d.trend || { buckets: [], totalOrders: 0, totalLinks: 0, totalEtb: 0, totalUsdt: 0 };
+        const summaryEl = document.getElementById('stTrendSummary');
+        if (summaryEl) {
+          const revParts = [];
+          if (trend.totalEtb > 0 || trend.totalUsdt === 0) revParts.push(`${trend.totalEtb.toLocaleString()} ETB`);
+          if (trend.totalUsdt > 0) revParts.push(`${trend.totalUsdt.toFixed(2)} USDT`);
+          summaryEl.textContent = `${trend.totalOrders} ${t('navOrders')} · ${trend.totalLinks} ${t('statsLinksSold')} · ${revParts.join(' + ')}`;
+        }
+
         const chartEl = document.getElementById('stDailyChart');
-        const maxOrders = Math.max(1, ...d.daily7d.map((x) => x.orders));
-        chartEl.innerHTML = d.daily7d.map((day) => {
-          const pct = Math.max(6, Math.round((day.orders / maxOrders) * 100));
-          const shortDate = day.date.slice(5); // MM-DD
-          const revLabel = day.usdt > 0
-            ? `${day.etb} ETB + ${day.usdt} USDT`
-            : `${day.etb} ETB`;
+        const buckets = trend.buckets || [];
+        const maxOrders = Math.max(1, ...buckets.map((x) => x.orders));
+        const isDense = buckets.length > 14;
+        chartEl.innerHTML = buckets.map((b, idx) => {
+          const pct = Math.max(6, Math.round((b.orders / maxOrders) * 100));
+          const revLabel = b.usdt > 0
+            ? `${b.etb} ETB + ${b.usdt} USDT`
+            : `${b.etb} ETB`;
+          const showLabel = !isDense || idx % 3 === 0 || idx === buckets.length - 1;
+          const colClass = isDense ? 'min-w-[20px] flex-1' : 'flex-1 min-w-[32px]';
           return `
-            <div class="flex-1 flex flex-col items-center justify-end h-full gap-1.5 group" title="${day.date}: ${day.orders} orders (${revLabel})">
-              <div class="text-[11px] font-bold ${day.orders > 0 ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400'}">${day.orders}</div>
-              <div class="w-full max-w-[36px] flex items-end justify-center h-28 bg-slate-100 dark:bg-slate-800/70 rounded-xl overflow-hidden p-0.5">
-                <div class="w-full rounded-lg transition-all duration-300 ${day.orders > 0 ? 'bg-gradient-to-t from-brand-600 to-indigo-400 group-hover:from-brand-500 group-hover:to-cyan-400' : 'bg-slate-300/40 dark:bg-slate-700/40'}" style="height: ${day.orders > 0 ? pct : 6}%"></div>
+            <div class="${colClass} flex flex-col items-center justify-end h-full gap-1.5 group" title="${escapeHtml(b.fullLabel)}: ${b.orders} orders, ${b.links} links (${revLabel})">
+              <div class="text-[10px] font-bold ${b.orders > 0 ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400'}">${b.orders > 0 || !isDense ? b.orders : ''}</div>
+              <div class="w-full ${isDense ? 'max-w-[18px]' : 'max-w-[36px]'} flex items-end justify-center h-28 bg-slate-100 dark:bg-slate-800/70 rounded-xl overflow-hidden p-0.5">
+                <div class="w-full rounded-lg transition-all duration-300 ${b.orders > 0 ? 'bg-gradient-to-t from-brand-600 to-indigo-400 group-hover:from-brand-500 group-hover:to-cyan-400' : 'bg-slate-300/40 dark:bg-slate-700/40'}" style="height: ${b.orders > 0 ? pct : 6}%"></div>
               </div>
-              <div class="text-[10px] font-mono text-slate-400">${shortDate}</div>
+              <div class="text-[10px] font-mono text-slate-400 whitespace-nowrap">${showLabel ? escapeHtml(b.label) : '&nbsp;'}</div>
             </div>
           `;
         }).join('');

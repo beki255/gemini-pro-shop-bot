@@ -341,34 +341,141 @@ function createAdminRouter(bot) {
         else todayRevenueEtb += r.total || 0;
       });
 
-      // Last 7 days daily sales trend
-      const recentApproved = await Order.find({
-        status: 'approved',
-        createdAt: { $gte: sevenDaysAgo },
-      })
+      // Sales trend with configurable time range: today, 7d, 30d, 90d, all
+      const rawRange = String(req.query.range || '7d').toLowerCase();
+      const range = ['today', '7d', '30d', '90d', 'all'].includes(rawRange) ? rawRange : '7d';
+
+      const trendFilter = { status: 'approved' };
+      let rangeStart = new Date(startOfToday);
+      if (range === 'today') {
+        trendFilter.createdAt = { $gte: startOfToday };
+      } else if (range === '7d') {
+        rangeStart.setDate(rangeStart.getDate() - 6);
+        trendFilter.createdAt = { $gte: rangeStart };
+      } else if (range === '30d') {
+        rangeStart.setDate(rangeStart.getDate() - 29);
+        trendFilter.createdAt = { $gte: rangeStart };
+      } else if (range === '90d') {
+        rangeStart.setDate(rangeStart.getDate() - 89);
+        trendFilter.createdAt = { $gte: rangeStart };
+      }
+
+      const rangeApproved = await Order.find(trendFilter)
         .select('amount currency paymentMethod quantity createdAt')
+        .sort({ createdAt: 1 })
         .lean();
 
-      const dailyMap = new Map();
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(sevenDaysAgo);
-        d.setDate(sevenDaysAgo.getDate() + i);
-        const key = d.toISOString().slice(0, 10);
-        dailyMap.set(key, { date: key, orders: 0, links: 0, etb: 0, usdt: 0 });
-      }
-      recentApproved.forEach((o) => {
-        const key = new Date(o.createdAt).toISOString().slice(0, 10);
-        const bucket = dailyMap.get(key);
-        if (bucket) {
-          bucket.orders += 1;
-          bucket.links += o.quantity || 1;
-          const isUsdt = o.currency === 'USDT' || ['Binance', 'Bybit', 'BEP20'].includes(o.paymentMethod);
-          if (isUsdt) bucket.usdt = Number((bucket.usdt + (o.amount || 0)).toFixed(2));
-          else bucket.etb += o.amount || 0;
-        }
-      });
+      const bucketsMap = new Map();
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const localDateKey = (dt) => `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
 
-      const daily7d = Array.from(dailyMap.values());
+      if (range === 'today') {
+        for (let h = 0; h < 24; h += 4) {
+          const key = `${pad2(h)}`;
+          const fullLabel = `${pad2(h)}:00 - ${pad2(h + 4)}:00`;
+          bucketsMap.set(key, { label: `${pad2(h)}h`, fullLabel, orders: 0, links: 0, etb: 0, usdt: 0 });
+        }
+        rangeApproved.forEach((o) => {
+          const dt = new Date(o.createdAt);
+          const block = Math.floor(dt.getHours() / 4) * 4;
+          const bucket = bucketsMap.get(pad2(block));
+          if (bucket) {
+            bucket.orders += 1;
+            bucket.links += o.quantity || 1;
+            const isUsdt = o.currency === 'USDT' || ['Binance', 'Bybit', 'BEP20'].includes(o.paymentMethod);
+            if (isUsdt) bucket.usdt = Number((bucket.usdt + (o.amount || 0)).toFixed(2));
+            else bucket.etb += o.amount || 0;
+          }
+        });
+      } else if (range === '7d' || range === '30d') {
+        const totalDays = range === '7d' ? 7 : 30;
+        for (let i = 0; i < totalDays; i++) {
+          const d = new Date(rangeStart);
+          d.setDate(rangeStart.getDate() + i);
+          const key = localDateKey(d);
+          bucketsMap.set(key, { label: key.slice(5), fullLabel: key, orders: 0, links: 0, etb: 0, usdt: 0 });
+        }
+        rangeApproved.forEach((o) => {
+          const key = localDateKey(new Date(o.createdAt));
+          const bucket = bucketsMap.get(key);
+          if (bucket) {
+            bucket.orders += 1;
+            bucket.links += o.quantity || 1;
+            const isUsdt = o.currency === 'USDT' || ['Binance', 'Bybit', 'BEP20'].includes(o.paymentMethod);
+            if (isUsdt) bucket.usdt = Number((bucket.usdt + (o.amount || 0)).toFixed(2));
+            else bucket.etb += o.amount || 0;
+          }
+        });
+      } else if (range === '90d') {
+        // Group into 13 weekly buckets (~90 days)
+        const numWeeks = 13;
+        const weekStarts = [];
+        for (let w = 0; w < numWeeks; w++) {
+          const ws = new Date(rangeStart);
+          ws.setDate(rangeStart.getDate() + w * 7);
+          const we = new Date(ws);
+          we.setDate(ws.getDate() + 6);
+          const key = localDateKey(ws);
+          weekStarts.push({ ws, key });
+          bucketsMap.set(key, {
+            label: key.slice(5),
+            fullLabel: `${key} → ${localDateKey(we)}`,
+            orders: 0,
+            links: 0,
+            etb: 0,
+            usdt: 0,
+          });
+        }
+        rangeApproved.forEach((o) => {
+          const dt = new Date(o.createdAt);
+          const diffDays = Math.floor((dt - rangeStart) / (24 * 60 * 60 * 1000));
+          const wIdx = Math.max(0, Math.min(numWeeks - 1, Math.floor(diffDays / 7)));
+          const bucket = bucketsMap.get(weekStarts[wIdx].key);
+          if (bucket) {
+            bucket.orders += 1;
+            bucket.links += o.quantity || 1;
+            const isUsdt = o.currency === 'USDT' || ['Binance', 'Bybit', 'BEP20'].includes(o.paymentMethod);
+            if (isUsdt) bucket.usdt = Number((bucket.usdt + (o.amount || 0)).toFixed(2));
+            else bucket.etb += o.amount || 0;
+          }
+        });
+      } else {
+        // 'all' — group by month from first approved order to current month
+        const now = new Date();
+        const firstDate = rangeApproved.length > 0 ? new Date(rangeApproved[0].createdAt) : now;
+        const cur = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
+        const endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        while (cur <= endMonth) {
+          const key = `${cur.getFullYear()}-${pad2(cur.getMonth() + 1)}`;
+          bucketsMap.set(key, { label: key, fullLabel: key, orders: 0, links: 0, etb: 0, usdt: 0 });
+          cur.setMonth(cur.getMonth() + 1);
+        }
+        rangeApproved.forEach((o) => {
+          const dt = new Date(o.createdAt);
+          const key = `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}`;
+          const bucket = bucketsMap.get(key);
+          if (bucket) {
+            bucket.orders += 1;
+            bucket.links += o.quantity || 1;
+            const isUsdt = o.currency === 'USDT' || ['Binance', 'Bybit', 'BEP20'].includes(o.paymentMethod);
+            if (isUsdt) bucket.usdt = Number((bucket.usdt + (o.amount || 0)).toFixed(2));
+            else bucket.etb += o.amount || 0;
+          }
+        });
+      }
+
+      const trendBuckets = Array.from(bucketsMap.values());
+      const trendTotals = trendBuckets.reduce(
+        (acc, b) => {
+          acc.totalOrders += b.orders;
+          acc.totalLinks += b.links;
+          acc.totalEtb += b.etb;
+          acc.totalUsdt = Number((acc.totalUsdt + b.usdt).toFixed(2));
+          return acc;
+        },
+        { totalOrders: 0, totalLinks: 0, totalEtb: 0, totalUsdt: 0 }
+      );
+
       const cancelledCheckouts = cancelledCheckoutsOnly + expiredCheckouts;
       const approvalRate = totalOrders > 0 ? Math.round((approvedOrders / totalOrders) * 100) : 0;
       const checkoutConversionRate = totalCheckouts > 0 ? Math.round((completedCheckouts / totalCheckouts) * 100) : 0;
@@ -410,7 +517,11 @@ function createAdminRouter(bot) {
           todayUsdt: todayRevenueUsdt,
           byMethod,
         },
-        daily7d,
+        trend: {
+          range,
+          ...trendTotals,
+          buckets: trendBuckets,
+        },
       });
     } catch (err) {
       return res.status(500).json({ error: err.message });
