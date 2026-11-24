@@ -138,6 +138,11 @@
           <span data-i18n="navDashboard">Dashboard</span>
         </button>
 
+        <button onclick="navigateView('stats')" id="nav-stats" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <span data-i18n="navStats">Statistics</span>
+        </button>
+
         <button onclick="navigateView('orders')" id="nav-orders" class="nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
           <div class="flex items-center gap-3">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
@@ -360,6 +365,125 @@
                   <tr><td colspan="6" class="p-8 text-center text-slate-400" data-i18n="loading">Loading...</td></tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== VIEW 1B: STATISTICS ==================== -->
+        <section id="view-stats" class="view-panel space-y-6 hidden">
+          <!-- Top KPI Summary Cards -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400" data-i18n="statsTotalCustomers">Total Customers</span>
+                <span class="p-2 rounded-xl bg-blue-500/10 text-blue-500">👥</span>
+              </div>
+              <div id="stUsersTotal" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">0</div>
+              <div class="mt-2 text-xs text-slate-500 flex items-center gap-2">
+                <span><span data-i18n="statsToday">Today:</span> <b id="stUsersToday" class="text-blue-500">+0</b></span>
+                <span>·</span>
+                <span><span data-i18n="statsLast7d">7d:</span> <b id="stUsers7d" class="text-slate-700 dark:text-slate-300">+0</b></span>
+              </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400" data-i18n="statRevenue">Total Revenue</span>
+                <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">💰</span>
+              </div>
+              <div id="stRevEtb" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">0 ETB</div>
+              <div class="mt-2 text-xs text-slate-500 flex flex-wrap items-center gap-x-2">
+                <b id="stRevUsdt" class="text-emerald-500">0.00 USDT</b>
+                <span>·</span>
+                <span><span data-i18n="statsToday">Today:</span> <b id="stRevToday" class="text-slate-700 dark:text-slate-300">0</b></span>
+              </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400" data-i18n="statsTotalOrders">Total Orders</span>
+                <span class="p-2 rounded-xl bg-brand-500/10 text-brand-500">📦</span>
+              </div>
+              <div id="stOrdersTotal" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">0</div>
+              <div class="mt-2 text-xs text-slate-500 flex items-center gap-2">
+                <span><span data-i18n="statsApprovalRate">Approval Rate:</span> <b id="stApprovalRate" class="text-emerald-500">0%</b></span>
+              </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400" data-i18n="statsCheckoutConversion">Checkout Conversion</span>
+                <span class="p-2 rounded-xl bg-purple-500/10 text-purple-500">📈</span>
+              </div>
+              <div id="stCheckoutConv" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">0%</div>
+              <div class="mt-2 text-xs text-slate-500">
+                <span><span data-i18n="statsLinksSold">Links Sold:</span> <b id="stLinksSold" class="text-purple-500">0</b></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detailed Breakdown Cards (Matching Bot /stats 100%) -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Orders Breakdown -->
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-sm text-slate-900 dark:text-white" data-i18n="statsOrdersBreakdown">Orders Breakdown</h3>
+                <button onclick="navigateView('orders')" class="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline" data-i18n="navOrders">Orders</button>
+              </div>
+              <div id="stOrdersBreakdownList" class="space-y-3 text-xs"></div>
+            </div>
+
+            <!-- Checkouts Breakdown -->
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-sm text-slate-900 dark:text-white" data-i18n="statsCheckoutsBreakdown">Checkout Attempts</h3>
+                <button onclick="navigateView('checkouts')" class="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline" data-i18n="navCheckouts">Checkouts</button>
+              </div>
+              <div id="stCheckoutsBreakdownList" class="space-y-3 text-xs"></div>
+            </div>
+
+            <!-- Stock Inventory Breakdown -->
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-sm text-slate-900 dark:text-white" data-i18n="statsStockBreakdown">Stock Inventory</h3>
+                <button onclick="navigateView('stock')" class="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline" data-i18n="navStock">Stock Links</button>
+              </div>
+              <div id="stStockBreakdownList" class="space-y-3 text-xs"></div>
+            </div>
+          </div>
+
+          <!-- 7-Day Sales Trend + Payment Method Breakdown -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- 7-Day Daily Trend -->
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div>
+                <h3 class="font-bold text-sm text-slate-900 dark:text-white" data-i18n="stats7dTrendTitle">Last 7 Days Approved Sales</h3>
+                <p class="text-xs text-slate-500 mt-0.5" data-i18n="stats7dTrendSub">Daily approved orders & revenue</p>
+              </div>
+              <div id="stDailyChart" class="h-44 flex items-end justify-between gap-2 pt-4"></div>
+            </div>
+
+            <!-- Payment Methods Table -->
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div>
+                <h3 class="font-bold text-sm text-slate-900 dark:text-white" data-i18n="statsByMethodTitle">Revenue by Payment Method</h3>
+                <p class="text-xs text-slate-500 mt-0.5" data-i18n="statsByMethodSub">Approved orders grouped by payment provider</p>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="text-slate-400 uppercase font-bold border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th class="py-2" data-i18n="thMethod">Method</th>
+                      <th class="py-2 text-right" data-i18n="navOrders">Orders</th>
+                      <th class="py-2 text-right" data-i18n="statsLinksSold">Links</th>
+                      <th class="py-2 text-right" data-i18n="thAmount">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody id="stPaymentMethodsBody" class="divide-y divide-slate-200 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                    <tr><td colspan="4" class="py-6 text-center text-slate-400" data-i18n="loading">Loading...</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
@@ -870,6 +994,7 @@
         passLabel: 'Password',
         portalBadge: 'Admin Portal',
         navDashboard: 'Dashboard',
+        navStats: 'Statistics',
         navOrders: 'Orders',
         navStock: 'Stock Links',
         navCheckouts: 'Checkouts',
@@ -975,6 +1100,22 @@
         toastStockAdded: 'Stock links added successfully.',
         toastDmSent: 'Direct message sent to customer via bot!',
         btnCloseApp: 'Close Mini App',
+        statsTotalCustomers: 'Total Customers',
+        statsToday: 'Today:',
+        statsLast7d: '7d:',
+        statsTotalOrders: 'Total Orders',
+        statsApprovalRate: 'Approval Rate:',
+        statsCheckoutConversion: 'Checkout Conversion',
+        statsLinksSold: 'Links Sold',
+        statsOrdersBreakdown: 'Orders Breakdown',
+        statsCheckoutsBreakdown: 'Checkout Attempts',
+        statsStockBreakdown: 'Stock Inventory',
+        stats7dTrendTitle: 'Last 7 Days Approved Sales',
+        stats7dTrendSub: 'Daily approved orders & revenue',
+        statsByMethodTitle: 'Revenue by Payment Method',
+        statsByMethodSub: 'Approved orders grouped by payment provider',
+        statsActiveStock: 'Active Inventory',
+        statsNoSalesYet: 'No approved sales data yet.',
       },
       am: {
         loginTitle: 'የአስተዳዳሪ ፖርታል',
@@ -988,6 +1129,7 @@
         passLabel: 'የይለፍ ቃል',
         portalBadge: 'የአስተዳዳሪ ፖርታል',
         navDashboard: 'ዳሽቦርድ',
+        navStats: 'ስታቲስቲክስ',
         navOrders: 'ትዕዛዞች',
         navStock: 'የስቶክ ሊንኮች',
         navCheckouts: 'በክፍያ ላይ ያሉ',
@@ -1093,6 +1235,22 @@
         toastStockAdded: 'የስቶክ ሊንኮች በተሳካ ሁኔታ ተጨምረዋል።',
         toastDmSent: 'መልዕክቱ ለደንበኛው በቦቱ ተልኳል!',
         btnCloseApp: 'ሚኒ አፑን ዝጋ',
+        statsTotalCustomers: 'ጠቅላላ ደንበኞች',
+        statsToday: 'ዛሬ:',
+        statsLast7d: '7 ቀን:',
+        statsTotalOrders: 'ጠቅላላ ትዕዛዞች',
+        statsApprovalRate: 'የማጽደቅ ምጣኔ:',
+        statsCheckoutConversion: 'የክፍያ ማጠናቀቂያ ምጣኔ',
+        statsLinksSold: 'የተሸጡ ሊንኮች',
+        statsOrdersBreakdown: 'የትዕዛዞች ዝርዝር',
+        statsCheckoutsBreakdown: 'የክፍያ ሂደት ሙከራዎች',
+        statsStockBreakdown: 'የስቶክ ዝርዝር',
+        stats7dTrendTitle: 'ያለፉት 7 ቀናት የጸደቁ ሽያጮች',
+        stats7dTrendSub: 'የየቀኑ ሽያጭ እና ገቢ',
+        statsByMethodTitle: 'ገቢ በክፍያ መንገድ',
+        statsByMethodSub: 'በእያንዳንዱ የክፍያ አማራጭ የጸደቁ ትዕዛዞች',
+        statsActiveStock: 'አሁን ያለ ስቶክ',
+        statsNoSalesYet: 'እስካሁን የጸደቀ ሽያጭ መረጃ የለም።',
       }
     };
 
@@ -1319,6 +1477,7 @@
 
       // Load view data
       if (viewName === 'overview') loadOverviewData();
+      else if (viewName === 'stats') loadStatsData();
       else if (viewName === 'orders') {
         if (params.status) state.ordersFilter = params.status;
         loadOrdersData();
@@ -1332,6 +1491,7 @@
     function updateHeaderTitle() {
       const titles = {
         overview: t('navDashboard'),
+        stats: t('navStats'),
         orders: t('navOrders'),
         stock: t('navStock'),
         checkouts: t('navCheckouts'),
@@ -1341,6 +1501,117 @@
       };
       const titleEl = document.getElementById('headerTitle');
       if (titleEl) titleEl.textContent = titles[state.currentView] || 'Dashboard';
+    }
+
+    // ─── STATISTICS DATA ──────────────────────────────────────
+    function renderBreakdownRow(label, value, total, barClass, badgeClass) {
+      const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+      return `
+        <div class="space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="font-medium text-slate-600 dark:text-slate-300">${label}</span>
+            <span class="font-bold ${badgeClass}">${value} <span class="text-[11px] font-normal text-slate-400">(${pct}%)</span></span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full ${barClass} rounded-full transition-all duration-300" style="width: ${pct}%"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadStatsData() {
+      try {
+        const d = await api('/stats');
+
+        // KPI Cards
+        document.getElementById('stUsersTotal').textContent = d.users.total.toLocaleString();
+        document.getElementById('stUsersToday').textContent = `+${d.users.today}`;
+        document.getElementById('stUsers7d').textContent = `+${d.users.last7d}`;
+
+        document.getElementById('stRevEtb').textContent = `${d.revenue.etb.toLocaleString()} ETB`;
+        document.getElementById('stRevUsdt').textContent = `${d.revenue.usdt.toFixed(2)} USDT`;
+        const todayRevParts = [];
+        if (d.revenue.todayEtb > 0 || d.revenue.todayUsdt === 0) todayRevParts.push(`${d.revenue.todayEtb.toLocaleString()} ETB`);
+        if (d.revenue.todayUsdt > 0) todayRevParts.push(`${d.revenue.todayUsdt.toFixed(2)} USDT`);
+        document.getElementById('stRevToday').textContent = todayRevParts.join(' + ');
+
+        document.getElementById('stOrdersTotal').textContent = d.orders.total.toLocaleString();
+        document.getElementById('stApprovalRate').textContent = `${d.orders.approvalRate}%`;
+
+        document.getElementById('stCheckoutConv').textContent = `${d.checkouts.conversionRate}%`;
+        document.getElementById('stLinksSold').textContent = d.orders.totalLinksSold.toLocaleString();
+
+        // 1. Orders Breakdown
+        const oTotal = d.orders.total || 0;
+        document.getElementById('stOrdersBreakdownList').innerHTML = [
+          renderBreakdownRow(`✅ ${t('filterApproved')}`, d.orders.approved, oTotal, 'bg-emerald-500', 'text-emerald-600 dark:text-emerald-400'),
+          renderBreakdownRow(`⏳ ${t('filterPending')}`, d.orders.pending, oTotal, 'bg-amber-500', 'text-amber-600 dark:text-amber-400'),
+          renderBreakdownRow(`❌ ${t('filterRejected')}`, d.orders.rejected, oTotal, 'bg-rose-500', 'text-rose-600 dark:text-rose-400'),
+          `<div class="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+            <span>${t('statsTotalOrders')}</span><span>${oTotal}</span>
+          </div>`,
+        ].join('');
+
+        // 2. Checkouts Breakdown
+        const cTotal = d.checkouts.total || 0;
+        document.getElementById('stCheckoutsBreakdownList').innerHTML = [
+          renderBreakdownRow(`⏳ ${t('statusAwaiting')}`, d.checkouts.awaiting, cTotal, 'bg-amber-500', 'text-amber-600 dark:text-amber-400'),
+          renderBreakdownRow(`✅ ${t('statusCompleted')}`, d.checkouts.completed, cTotal, 'bg-emerald-500', 'text-emerald-600 dark:text-emerald-400'),
+          renderBreakdownRow(`❌ ${t('statusCancelled')}`, d.checkouts.cancelled, cTotal, 'bg-rose-500', 'text-rose-600 dark:text-rose-400'),
+          renderBreakdownRow(`⏱️ ${t('statusExpired')}`, d.checkouts.expired, cTotal, 'bg-slate-400', 'text-slate-500 dark:text-slate-400'),
+          `<div class="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+            <span>${t('filterAll')}</span><span>${cTotal}</span>
+          </div>`,
+        ].join('');
+
+        // 3. Stock Breakdown
+        const sAll = (d.stock.available || 0) + (d.stock.reserved || 0) + (d.stock.sold || 0);
+        document.getElementById('stStockBreakdownList').innerHTML = [
+          renderBreakdownRow(`✅ ${t('filterAvailable')}`, d.stock.available, sAll, 'bg-emerald-500', 'text-emerald-600 dark:text-emerald-400'),
+          renderBreakdownRow(`🟡 ${t('filterReserved')}`, d.stock.reserved, sAll, 'bg-amber-500', 'text-amber-600 dark:text-amber-400'),
+          renderBreakdownRow(`🔴 ${t('filterSold')}`, d.stock.sold, sAll, 'bg-brand-500', 'text-brand-600 dark:text-brand-400'),
+          `<div class="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+            <span>${t('statsActiveStock')}</span><span>${d.stock.activeTotal}</span>
+          </div>`,
+        ].join('');
+
+        // 4. 7-Day Daily Trend Bar Chart
+        const chartEl = document.getElementById('stDailyChart');
+        const maxOrders = Math.max(1, ...d.daily7d.map((x) => x.orders));
+        chartEl.innerHTML = d.daily7d.map((day) => {
+          const pct = Math.max(6, Math.round((day.orders / maxOrders) * 100));
+          const shortDate = day.date.slice(5); // MM-DD
+          const revLabel = day.usdt > 0
+            ? `${day.etb} ETB + ${day.usdt} USDT`
+            : `${day.etb} ETB`;
+          return `
+            <div class="flex-1 flex flex-col items-center justify-end h-full gap-1.5 group" title="${day.date}: ${day.orders} orders (${revLabel})">
+              <div class="text-[11px] font-bold ${day.orders > 0 ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400'}">${day.orders}</div>
+              <div class="w-full max-w-[36px] flex items-end justify-center h-28 bg-slate-100 dark:bg-slate-800/70 rounded-xl overflow-hidden p-0.5">
+                <div class="w-full rounded-lg transition-all duration-300 ${day.orders > 0 ? 'bg-gradient-to-t from-brand-600 to-indigo-400 group-hover:from-brand-500 group-hover:to-cyan-400' : 'bg-slate-300/40 dark:bg-slate-700/40'}" style="height: ${day.orders > 0 ? pct : 6}%"></div>
+              </div>
+              <div class="text-[10px] font-mono text-slate-400">${shortDate}</div>
+            </div>
+          `;
+        }).join('');
+
+        // 5. Revenue by Payment Method Table
+        const pmBody = document.getElementById('stPaymentMethodsBody');
+        if (!d.revenue.byMethod || d.revenue.byMethod.length === 0) {
+          pmBody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-slate-400">${t('statsNoSalesYet')}</td></tr>`;
+        } else {
+          pmBody.innerHTML = d.revenue.byMethod.map((m) => `
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <td class="py-2.5 font-bold text-slate-800 dark:text-slate-200">${escapeHtml(m.method)}</td>
+              <td class="py-2.5 text-right font-semibold">${m.orders}</td>
+              <td class="py-2.5 text-right text-slate-500">${m.links}</td>
+              <td class="py-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">${m.currency === 'USDT' ? m.amount.toFixed(2) : m.amount.toLocaleString()} ${m.currency}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
     }
 
     function toggleMobileSidebar() {

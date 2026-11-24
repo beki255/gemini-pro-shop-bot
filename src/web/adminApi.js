@@ -145,18 +145,29 @@ function createAdminRouter(bot) {
         Order.countDocuments({ status: 'rejected' }),
         Stock.countDocuments({ isSold: false, isReserved: false }),
         Stock.countDocuments({ isSold: false, isReserved: true }),
-        Stock.countDocuments({ isSold: true }),
+        SoldStock.countDocuments(),
         User.countDocuments(),
         CheckoutAttempt.countDocuments({ status: 'awaiting_receipt' }),
         Order.find().sort({ createdAt: -1 }).limit(6).lean(),
       ]);
 
-      // Calculate total revenue from approved orders
+      // Calculate total revenue from approved orders (accurate ETB vs USDT split)
       const revenueAgg = await Order.aggregate([
         { $match: { status: 'approved' } },
         {
           $group: {
-            _id: '$currency',
+            _id: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$currency', 'USDT'] },
+                    { $in: ['$paymentMethod', ['Binance', 'Bybit', 'BEP20']] },
+                  ],
+                },
+                'USDT',
+                'ETB',
+              ],
+            },
             total: { $sum: '$amount' },
           },
         },
@@ -165,8 +176,8 @@ function createAdminRouter(bot) {
       let totalRevenueEtb = 0;
       let totalRevenueUsdt = 0;
       revenueAgg.forEach((r) => {
-        if (r._id === 'USDT') totalRevenueUsdt = r.total;
-        else totalRevenueEtb += r.total;
+        if (r._id === 'USDT') totalRevenueUsdt = Number((r.total || 0).toFixed(2));
+        else totalRevenueEtb += r.total || 0;
       });
 
       // Today's orders
@@ -204,6 +215,202 @@ function createAdminRouter(bot) {
           usdt: totalRevenueUsdt,
         },
         recentOrders,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── 2B. Detailed Statistics (Matching & Expanding Bot /stats) ──
+  router.get('/stats', requireAuth, async (req, res) => {
+    try {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const sevenDaysAgo = new Date(startOfToday);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+
+      const [
+        totalUsers,
+        newUsersToday,
+        newUsers7d,
+        totalOrders,
+        approvedOrders,
+        pendingOrders,
+        rejectedOrders,
+        todayApprovedOrders,
+        availableStock,
+        reservedStock,
+        soldStockArchive,
+        totalCheckouts,
+        awaitingCheckouts,
+        completedCheckouts,
+        cancelledCheckoutsOnly,
+        expiredCheckouts,
+      ] = await Promise.all([
+        User.countDocuments(),
+        User.countDocuments({ createdAt: { $gte: startOfToday } }),
+        User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+        Order.countDocuments(),
+        Order.countDocuments({ status: 'approved' }),
+        Order.countDocuments({ status: 'pending' }),
+        Order.countDocuments({ status: 'rejected' }),
+        Order.countDocuments({ status: 'approved', createdAt: { $gte: startOfToday } }),
+        Stock.countDocuments({ isSold: false, isReserved: false }),
+        Stock.countDocuments({ isSold: false, isReserved: true }),
+        SoldStock.countDocuments(),
+        CheckoutAttempt.countDocuments(),
+        CheckoutAttempt.countDocuments({ status: 'awaiting_receipt' }),
+        CheckoutAttempt.countDocuments({ status: 'completed' }),
+        CheckoutAttempt.countDocuments({ status: 'cancelled' }),
+        CheckoutAttempt.countDocuments({ status: 'expired' }),
+      ]);
+
+      // Revenue & links sold grouped by payment method
+      const revByMethodAgg = await Order.aggregate([
+        { $match: { status: 'approved' } },
+        {
+          $group: {
+            _id: '$paymentMethod',
+            orders: { $sum: 1 },
+            links: { $sum: { $ifNull: ['$quantity', 1] } },
+            amount: { $sum: '$amount' },
+            currency: {
+              $first: {
+                $cond: [
+                  {
+                    $or: [
+                      { $eq: ['$currency', 'USDT'] },
+                      { $in: ['$paymentMethod', ['Binance', 'Bybit', 'BEP20']] },
+                    ],
+                  },
+                  'USDT',
+                  'ETB',
+                ],
+              },
+            },
+          },
+        },
+        { $sort: { orders: -1 } },
+      ]);
+
+      let totalRevenueEtb = 0;
+      let totalRevenueUsdt = 0;
+      let totalLinksSold = 0;
+      const byMethod = revByMethodAgg.map((m) => {
+        const isUsdt = m.currency === 'USDT';
+        const amt = isUsdt ? Number((m.amount || 0).toFixed(2)) : (m.amount || 0);
+        if (isUsdt) totalRevenueUsdt += amt;
+        else totalRevenueEtb += amt;
+        totalLinksSold += m.links || 0;
+        return {
+          method: m._id || 'Other',
+          orders: m.orders || 0,
+          links: m.links || 0,
+          amount: amt,
+          currency: isUsdt ? 'USDT' : 'ETB',
+        };
+      });
+      totalRevenueUsdt = Number(totalRevenueUsdt.toFixed(2));
+
+      // Today's revenue
+      const todayRevAgg = await Order.aggregate([
+        { $match: { status: 'approved', createdAt: { $gte: startOfToday } } },
+        {
+          $group: {
+            _id: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$currency', 'USDT'] },
+                    { $in: ['$paymentMethod', ['Binance', 'Bybit', 'BEP20']] },
+                  ],
+                },
+                'USDT',
+                'ETB',
+              ],
+            },
+            total: { $sum: '$amount' },
+          },
+        },
+      ]);
+      let todayRevenueEtb = 0;
+      let todayRevenueUsdt = 0;
+      todayRevAgg.forEach((r) => {
+        if (r._id === 'USDT') todayRevenueUsdt = Number((r.total || 0).toFixed(2));
+        else todayRevenueEtb += r.total || 0;
+      });
+
+      // Last 7 days daily sales trend
+      const recentApproved = await Order.find({
+        status: 'approved',
+        createdAt: { $gte: sevenDaysAgo },
+      })
+        .select('amount currency paymentMethod quantity createdAt')
+        .lean();
+
+      const dailyMap = new Map();
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(sevenDaysAgo);
+        d.setDate(sevenDaysAgo.getDate() + i);
+        const key = d.toISOString().slice(0, 10);
+        dailyMap.set(key, { date: key, orders: 0, links: 0, etb: 0, usdt: 0 });
+      }
+      recentApproved.forEach((o) => {
+        const key = new Date(o.createdAt).toISOString().slice(0, 10);
+        const bucket = dailyMap.get(key);
+        if (bucket) {
+          bucket.orders += 1;
+          bucket.links += o.quantity || 1;
+          const isUsdt = o.currency === 'USDT' || ['Binance', 'Bybit', 'BEP20'].includes(o.paymentMethod);
+          if (isUsdt) bucket.usdt = Number((bucket.usdt + (o.amount || 0)).toFixed(2));
+          else bucket.etb += o.amount || 0;
+        }
+      });
+
+      const daily7d = Array.from(dailyMap.values());
+      const cancelledCheckouts = cancelledCheckoutsOnly + expiredCheckouts;
+      const approvalRate = totalOrders > 0 ? Math.round((approvedOrders / totalOrders) * 100) : 0;
+      const checkoutConversionRate = totalCheckouts > 0 ? Math.round((completedCheckouts / totalCheckouts) * 100) : 0;
+
+      return res.json({
+        users: {
+          total: totalUsers,
+          today: newUsersToday,
+          last7d: newUsers7d,
+        },
+        orders: {
+          total: totalOrders,
+          approved: approvedOrders,
+          pending: pendingOrders,
+          rejected: rejectedOrders,
+          todayApproved: todayApprovedOrders,
+          totalLinksSold,
+          approvalRate,
+        },
+        checkouts: {
+          total: totalCheckouts,
+          awaiting: awaitingCheckouts,
+          completed: completedCheckouts,
+          cancelled: cancelledCheckoutsOnly,
+          expired: expiredCheckouts,
+          cancelledOrExpired: cancelledCheckouts,
+          conversionRate: checkoutConversionRate,
+        },
+        stock: {
+          available: availableStock,
+          reserved: reservedStock,
+          sold: soldStockArchive,
+          activeTotal: availableStock + reservedStock,
+        },
+        revenue: {
+          etb: totalRevenueEtb,
+          usdt: totalRevenueUsdt,
+          todayEtb: todayRevenueEtb,
+          todayUsdt: todayRevenueUsdt,
+          byMethod,
+        },
+        daily7d,
       });
     } catch (err) {
       return res.status(500).json({ error: err.message });
