@@ -1101,15 +1101,44 @@ function createAdminRouter(bot) {
       const checkout = await CheckoutAttempt.findById(req.params.id);
       if (!checkout) return res.status(404).json({ error: 'Checkout not found' });
 
-      const customer = await User.findOne({ telegramId: checkout.userId });
-      const custLang = customer && customer.language ? customer.language : 'am';
-      const isEn = custLang === 'en';
+      if (checkout.status !== 'awaiting_receipt') {
+        return res.status(400).json({ error: 'This checkout is no longer active (completed or cancelled).' });
+      }
 
-      const reminderText = isEn
-        ? `👋 <b>Reminder about your pending order:</b>\n\nYou started ordering <b>${checkout.quantity}x Gemini Pro 18 Months</b> (${checkout.amount} ${checkout.currency || 'ETB'}) via <b>${checkout.paymentMethod}</b>.\n\nPlease upload your payment screenshot/receipt here so we can activate your subscription!`
-        : `👋 <b>ያላለቀ የክፍያ ማስታወሻ:</b>\n\n<b>${checkout.quantity}x የ Gemini Pro 18 Months</b> (${checkout.amount} ${checkout.currency || 'ብር'}) በ <b>${checkout.paymentMethod}</b> ለማዘዝ ጀምረው ነበር።\n\nእባክዎ ክፍያውን ፈጽመው የከፈሉበትን ደረሰኝ/ስክሪንሾት እዚህ ይላኩልን፤ ወዲያው እናረጋግጣለን!`;
+      const reminderText =
+        `⚠️ <b>ውድ ደንበኛችን፤</b>\n\n` +
+        `እባክዎን ደንበኛችን፣ ሲስተማችን እንደሚያሳየው በአክቲቭ ትዕዛዝ (active order) ላይ ለብዙ ደቂቃዎች ቆይተዋል፤ አሁንም አክቲቭ እንደሆኑ ያሳያል። ስለዚህ እባክዎ ወይ 'Cancel Order' በማለት ትዕዛዝዎን ይሰርዙ፣ ወይም ክፍያውን ከፍለው ትዕዛዝዎን ያጠናቁና አገልግሎቱ ወዲያውኑ ይላክልዎታል።\n\n` +
+        `—————————————————————\n` +
+        `Dear customer, our system shows that you've been on an active order for quite a few minutes. Please either cancel the order, or complete the payment so we can deliver it to you right away.`;
 
-      await bot.telegram.sendMessage(checkout.userId, reminderText, { parse_mode: 'HTML' });
+      const customerKeyboard = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '📸 ደረሰኝ (Screenshot) ላክ',
+                callback_data: 'prompt_send_receipt',
+              },
+              {
+                text: '❌ ትዕዛዝ ሰርዝ (Cancel Order)',
+                callback_data: 'cancel',
+              },
+            ],
+            [
+              {
+                text: `💬 አድሚኑን አግኝ (@${config.supportUsername || 'Mnbvcnvhd'})`,
+                url: `https://t.me/${String(config.supportUsername || 'Mnbvcnvhd').replace(/^@+/, '')}`,
+              },
+            ],
+          ],
+        },
+      };
+
+      await bot.telegram.sendMessage(checkout.userId, reminderText, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...customerKeyboard,
+      });
 
       checkout.remindersCount = (checkout.remindersCount || 0) + 1;
       checkout.lastReminderAt = new Date();
