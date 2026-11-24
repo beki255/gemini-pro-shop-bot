@@ -663,29 +663,99 @@ function createAdminRouter(bot) {
     }
   });
 
-  // ─── 6. Checkouts (Abandoned carts) ───────────────────────
+  // ─── 6. Checkouts (Abandoned carts & Payment Attempts) ────
   router.get('/checkouts', requireAuth, async (req, res) => {
     try {
-      const { status = 'all', page = 1, limit = 15 } = req.query;
+      const { status = 'all', search = '', page = 1, limit = 25 } = req.query;
       const query = {};
+
       if (status && status !== 'all') {
-        query.status = status;
+        if (status === 'awaiting' || status === 'awaiting_receipt') {
+          query.status = 'awaiting_receipt';
+        } else if (status === 'cancelled') {
+          query.status = { $in: ['cancelled', 'expired'] };
+        } else {
+          query.status = status;
+        }
       }
 
-      const p = Math.max(1, parseInt(page, 10) || 1);
-      const lim = Math.max(1, Math.min(100, parseInt(limit, 10) || 15));
-      const skip = (p - 1) * lim;
+      if (search && String(search).trim()) {
+        const cleanSearch = String(search).trim();
+        const searchOr = [
+          { orderId: { $regex: cleanSearch, $options: 'i' } },
+          { paymentMethod: { $regex: cleanSearch, $options: 'i' } },
+          { 'userInfo.username': { $regex: cleanSearch, $options: 'i' } },
+          { 'userInfo.firstName': { $regex: cleanSearch, $options: 'i' } },
+          { 'userInfo.lastName': { $regex: cleanSearch, $options: 'i' } },
+        ];
+        if (!isNaN(cleanSearch)) {
+          searchOr.push({ userId: Number(cleanSearch) });
+        }
 
-      const [checkouts, total] = await Promise.all([
-        CheckoutAttempt.find(query).sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
+        // Also match against fresh User profiles
+        const matchedUsers = await User.find({
+          $or: [
+            { username: { $regex: cleanSearch, $options: 'i' } },
+            { firstName: { $regex: cleanSearch, $options: 'i' } },
+            { lastName: { $regex: cleanSearch, $options: 'i' } },
+          ],
+        })
+          .select('telegramId')
+          .lean();
+        if (matchedUsers.length > 0) {
+          searchOr.push({ userId: { $in: matchedUsers.map((u) => u.telegramId) } });
+        }
+
+        query.$or = searchOr;
+      }
+
+      const showAll = String(limit).toLowerCase() === 'all';
+      const p = showAll ? 1 : Math.max(1, parseInt(page, 10) || 1);
+      const lim = showAll ? 0 : Math.max(1, Math.min(500, parseInt(limit, 10) || 25));
+      const skip = showAll ? 0 : (p - 1) * lim;
+
+      let findQuery = CheckoutAttempt.find(query).sort({ createdAt: -1 });
+      if (!showAll) {
+        findQuery = findQuery.skip(skip).limit(lim);
+      }
+
+      const [rawCheckouts, total, countAll, countAwaiting, countCompleted, countCancelled] = await Promise.all([
+        findQuery.lean(),
         CheckoutAttempt.countDocuments(query),
+        CheckoutAttempt.countDocuments(),
+        CheckoutAttempt.countDocuments({ status: 'awaiting_receipt' }),
+        CheckoutAttempt.countDocuments({ status: 'completed' }),
+        CheckoutAttempt.countDocuments({ status: { $in: ['cancelled', 'expired'] } }),
       ]);
+
+      // Enrich checkouts with fresh User DB details fallback
+      const userIds = [...new Set(rawCheckouts.map((c) => c.userId).filter(Boolean))];
+      const users = userIds.length > 0 ? await User.find({ telegramId: { $in: userIds } }).lean() : [];
+      const userMap = new Map(users.map((u) => [u.telegramId, u]));
+
+      const checkouts = rawCheckouts.map((c) => {
+        const u = userMap.get(c.userId);
+        return {
+          ...c,
+          userInfo: {
+            firstName: c.userInfo?.firstName || u?.firstName || '',
+            lastName: c.userInfo?.lastName || u?.lastName || '',
+            username: c.userInfo?.username || u?.username || null,
+          },
+        };
+      });
 
       return res.json({
         checkouts,
         total,
         page: p,
-        totalPages: Math.ceil(total / lim) || 1,
+        totalPages: showAll ? 1 : (Math.ceil(total / lim) || 1),
+        counts: {
+          all: countAll,
+          awaiting: countAwaiting,
+          completed: countCompleted,
+          cancelled: countCancelled,
+        },
       });
     } catch (err) {
       return res.status(500).json({ error: err.message });

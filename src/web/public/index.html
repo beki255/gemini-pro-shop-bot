@@ -466,6 +466,39 @@
 
         <!-- ==================== VIEW 4: CHECKOUTS ==================== -->
         <section id="view-checkouts" class="view-panel space-y-6 hidden">
+          <!-- Checkouts Filters, Search & Per-Page Selector -->
+          <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <!-- Status Filter Tabs with Counts -->
+            <div class="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-semibold">
+              <button onclick="setCheckoutsFilter('all')" id="btnCheckoutFilterAll" class="px-3 py-1.5 rounded-lg transition bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm">
+                <span data-i18n="filterAll">All</span> <span id="checkoutCountAll" class="ml-1 opacity-70">(0)</span>
+              </button>
+              <button onclick="setCheckoutsFilter('awaiting')" id="btnCheckoutFilterAwaiting" class="px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white">
+                <span data-i18n="filterAwaiting">Awaiting Receipt</span> <span id="checkoutCountAwaiting" class="ml-1 opacity-70">(0)</span>
+              </button>
+              <button onclick="setCheckoutsFilter('completed')" id="btnCheckoutFilterCompleted" class="px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white">
+                <span data-i18n="filterCompleted">Completed</span> <span id="checkoutCountCompleted" class="ml-1 opacity-70">(0)</span>
+              </button>
+              <button onclick="setCheckoutsFilter('cancelled')" id="btnCheckoutFilterCancelled" class="px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white">
+                <span data-i18n="filterCancelled">Cancelled / Expired</span> <span id="checkoutCountCancelled" class="ml-1 opacity-70">(0)</span>
+              </button>
+            </div>
+
+            <!-- Search & Rows Per Page -->
+            <div class="flex flex-wrap items-center gap-2 flex-1 sm:flex-initial justify-end">
+              <div class="relative flex-1 min-w-[180px] sm:w-56">
+                <input type="text" id="checkoutSearchInput" onkeyup="handleCheckoutsSearch(event)" placeholder="Search name, ID, method..." class="w-full text-xs py-2 pl-8 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+              <select id="checkoutsLimitSelect" onchange="changeCheckoutsLimit(this.value)" class="text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="25">25 / page</option>
+                <option value="50">50 / page</option>
+                <option value="100">100 / page</option>
+                <option value="all" data-i18n="showAllRows">Show All</option>
+              </select>
+            </div>
+          </div>
+
           <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
@@ -478,6 +511,7 @@
                 <thead class="bg-slate-50 dark:bg-slate-800/50 text-xs font-bold uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th class="p-3.5 pl-5" data-i18n="thCustomer">Customer</th>
+                    <th class="p-3.5" data-i18n="thQty">Qty</th>
                     <th class="p-3.5" data-i18n="thMethod">Method</th>
                     <th class="p-3.5" data-i18n="thAmount">Amount</th>
                     <th class="p-3.5" data-i18n="thStatus">Status</th>
@@ -487,9 +521,18 @@
                   </tr>
                 </thead>
                 <tbody id="checkoutsTableBody" class="divide-y divide-slate-200 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  <tr><td colspan="7" class="p-8 text-center text-slate-400" data-i18n="loading">Loading...</td></tr>
+                  <tr><td colspan="8" class="p-8 text-center text-slate-400" data-i18n="loading">Loading...</td></tr>
                 </tbody>
               </table>
+            </div>
+
+            <!-- Checkouts Pagination -->
+            <div id="checkoutsPagination" class="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <div id="checkoutsPageInfo">Page 1 of 1</div>
+              <div class="flex gap-2">
+                <button onclick="changeCheckoutsPage(-1)" id="btnCheckoutsPrev" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50" data-i18n="btnPrev">Previous</button>
+                <button onclick="changeCheckoutsPage(1)" id="btnCheckoutsNext" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50" data-i18n="btnNext">Next</button>
+              </div>
             </div>
           </div>
         </section>
@@ -804,6 +847,10 @@
       ordersSearch: '',
       stockFilter: 'available',
       stockPage: 1,
+      checkoutsFilter: 'all',
+      checkoutsPage: 1,
+      checkoutsSearch: '',
+      checkoutsLimit: '25',
       usersPage: 1,
       usersSearch: '',
       activeDmTelegramId: null,
@@ -869,6 +916,16 @@
         filterAvailable: 'Available',
         filterReserved: 'Reserved',
         filterSold: 'Sold',
+        filterAwaiting: 'Awaiting Receipt',
+        filterCompleted: 'Completed',
+        filterCancelled: 'Cancelled / Expired',
+        showAllRows: 'Show All',
+        statusAwaiting: 'Awaiting Receipt',
+        statusCompleted: 'Completed',
+        statusCancelled: 'Cancelled',
+        statusExpired: 'Expired',
+        btnRemind: 'Remind',
+        btnViewOrder: 'Order',
         checkoutsTitle: 'Active Checkouts & Abandoned Carts',
         checkoutsSubtitle: 'Send reminders directly to customers who started checkout',
         broadcastTitle: 'Broadcast to All Users',
@@ -977,6 +1034,16 @@
         filterAvailable: 'ያሉ',
         filterReserved: 'የተያዙ',
         filterSold: 'የተሸጡ',
+        filterAwaiting: 'ደረሰኝ በመጠበቅ ላይ',
+        filterCompleted: 'የተጠናቀቁ',
+        filterCancelled: 'የተሰረዙ / ያለፈባቸው',
+        showAllRows: 'ሁሉንም አሳይ',
+        statusAwaiting: 'ደረሰኝ በመጠበቅ ላይ',
+        statusCompleted: 'ተጠናቋል',
+        statusCancelled: 'ተሰርዟል',
+        statusExpired: 'ጊዜው አልፏል',
+        btnRemind: 'አስታውስ',
+        btnViewOrder: 'ትዕዛዝ እይ',
         checkoutsTitle: 'በክፍያ ላይ ያሉና ያልተጠናቀቁ ትዕዛዞች',
         checkoutsSubtitle: 'ክፍያ ጀምረው ላልጨረሱ ደንበኞች በቀጥታ ማስታወሻ ይላኩ',
         broadcastTitle: 'ለሁሉም ደንበኞች መልዕክት ላክ (Broadcast)',
@@ -1682,41 +1749,124 @@
       }
     }
 
-    // ─── CHECKOUTS (ABANDONED CARTS) ──────────────────────────
+    // ─── CHECKOUTS (ABANDONED CARTS & PAYMENT ATTEMPTS) ───────
+    function setCheckoutsFilter(filter) {
+      state.checkoutsFilter = filter;
+      state.checkoutsPage = 1;
+
+      const map = {
+        all: 'btnCheckoutFilterAll',
+        awaiting: 'btnCheckoutFilterAwaiting',
+        completed: 'btnCheckoutFilterCompleted',
+        cancelled: 'btnCheckoutFilterCancelled',
+      };
+      Object.entries(map).forEach(([key, btnId]) => {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        if (key === filter) {
+          btn.className = 'px-3 py-1.5 rounded-lg transition bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm';
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white';
+        }
+      });
+
+      loadCheckoutsData();
+    }
+
+    function handleCheckoutsSearch(e) {
+      state.checkoutsSearch = e.target.value.trim();
+      state.checkoutsPage = 1;
+      if (state.checkoutsSearchTimeout) clearTimeout(state.checkoutsSearchTimeout);
+      state.checkoutsSearchTimeout = setTimeout(loadCheckoutsData, 300);
+    }
+
+    function changeCheckoutsPage(delta) {
+      state.checkoutsPage = Math.max(1, state.checkoutsPage + delta);
+      loadCheckoutsData();
+    }
+
+    function changeCheckoutsLimit(limitVal) {
+      state.checkoutsLimit = limitVal;
+      state.checkoutsPage = 1;
+      loadCheckoutsData();
+    }
+
+    function getCheckoutStatusBadgeHtml(status) {
+      if (status === 'awaiting_receipt') {
+        return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-500">${t('statusAwaiting')}</span>`;
+      }
+      if (status === 'completed') {
+        return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500">${t('statusCompleted')}</span>`;
+      }
+      if (status === 'cancelled') {
+        return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-500">${t('statusCancelled')}</span>`;
+      }
+      if (status === 'expired') {
+        return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-500/15 text-slate-400">${t('statusExpired')}</span>`;
+      }
+      return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-400">${escapeHtml(status)}</span>`;
+    }
+
     async function loadCheckoutsData() {
       const tbody = document.getElementById('checkoutsTableBody');
-      tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">${t('loading')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">${t('loading')}</td></tr>`;
 
       try {
-        const res = await api('/checkouts?limit=20');
+        const res = await api(
+          `/checkouts?status=${encodeURIComponent(state.checkoutsFilter)}&search=${encodeURIComponent(state.checkoutsSearch)}&page=${state.checkoutsPage}&limit=${encodeURIComponent(state.checkoutsLimit)}`
+        );
+
+        // Update filter tab counts
+        if (res.counts) {
+          document.getElementById('checkoutCountAll').textContent = `(${res.counts.all})`;
+          document.getElementById('checkoutCountAwaiting').textContent = `(${res.counts.awaiting})`;
+          document.getElementById('checkoutCountCompleted').textContent = `(${res.counts.completed})`;
+          document.getElementById('checkoutCountCancelled').textContent = `(${res.counts.cancelled})`;
+        }
+
+        // Update pagination bar
+        const showingCount = res.checkouts ? res.checkouts.length : 0;
+        document.getElementById('checkoutsPageInfo').textContent =
+          state.checkoutsLimit === 'all'
+            ? `${res.total} / ${res.total}`
+            : `Page ${res.page} / ${res.totalPages} (${showingCount} of ${res.total})`;
+        document.getElementById('btnCheckoutsPrev').disabled = res.page <= 1;
+        document.getElementById('btnCheckoutsNext').disabled = res.page >= res.totalPages;
+
         if (!res.checkouts || res.checkouts.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">No active checkouts found.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">No matching checkouts found.</td></tr>`;
           return;
         }
 
         tbody.innerHTML = res.checkouts.map((c) => {
-          const custName = c.userInfo?.firstName || c.userInfo?.username || `User ${c.userId}`;
+          const fullName = `${c.userInfo?.firstName || ''} ${c.userInfo?.lastName || ''}`.trim() || c.userInfo?.username || `User ${c.userId}`;
+          const usernameStr = c.userInfo?.username ? `@${c.userInfo.username} · ` : '';
           const dateStr = new Date(c.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
           const isAwaiting = c.status === 'awaiting_receipt';
+
+          const actions = [];
+          if (isAwaiting) {
+            actions.push(`<button onclick="sendCheckoutReminder('${c._id}')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 hover:bg-brand-100 transition">${t('btnRemind')}</button>`);
+          }
+          if (c.orderId) {
+            actions.push(`<button onclick="openOrderDetail('${escapeHtml(c.orderId)}')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition">${escapeHtml(c.orderId)}</button>`);
+          }
+          actions.push(`<button onclick="openDmModal(${c.userId}, '${escapeHtml(fullName).replace(/'/g, "\\'")}')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 transition">DM</button>`);
 
           return `
             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
               <td class="p-3.5 pl-5">
-                <div class="font-semibold text-xs text-slate-900 dark:text-white">${escapeHtml(custName)}</div>
-                <div class="text-[11px] text-slate-400 font-mono">ID: ${c.userId}</div>
+                <div class="font-semibold text-xs text-slate-900 dark:text-white">${escapeHtml(fullName)}</div>
+                <div class="text-[11px] text-slate-400 font-mono">${escapeHtml(usernameStr)}ID: ${c.userId}</div>
               </td>
-              <td class="p-3.5 text-xs font-semibold">${c.paymentMethod}</td>
+              <td class="p-3.5 text-xs font-semibold">${c.quantity || 1}x</td>
+              <td class="p-3.5 text-xs font-semibold">${escapeHtml(c.paymentMethod)}</td>
               <td class="p-3.5 font-bold text-xs">${c.amount} ${c.currency || 'ETB'}</td>
-              <td class="p-3.5">
-                <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${isAwaiting ? 'bg-amber-500/10 text-amber-500' : 'bg-slate-500/10 text-slate-400'}">${c.status}</span>
-              </td>
+              <td class="p-3.5">${getCheckoutStatusBadgeHtml(c.status)}</td>
               <td class="p-3.5 text-xs text-slate-500">${c.remindersCount || 0}</td>
               <td class="p-3.5 text-xs text-slate-400 whitespace-nowrap">${dateStr}</td>
-              <td class="p-3.5 pr-5 text-right">
-                ${isAwaiting
-                  ? `<button onclick="sendCheckoutReminder('${c._id}')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 hover:bg-brand-100 transition">Remind</button>`
-                  : '-'
-                }
+              <td class="p-3.5 pr-5 text-right whitespace-nowrap">
+                <div class="inline-flex items-center gap-1.5">${actions.join('')}</div>
               </td>
             </tr>
           `;
@@ -1932,7 +2082,8 @@
       return String(str)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
     }
 
     function openModal(id) {
