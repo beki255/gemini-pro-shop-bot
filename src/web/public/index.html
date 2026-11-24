@@ -159,6 +159,14 @@
           <span id="sidebarStockBadge" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">0</span>
         </button>
 
+        <button onclick="navigateView('products')" id="nav-products" class="nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span data-i18n="navAddProduct">Add Product</span>
+          </div>
+          <span id="sidebarProductsBadge" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-brand-500/10 text-brand-600 dark:text-brand-400">1</span>
+        </button>
+
         <button onclick="navigateView('checkouts')" id="nav-checkouts" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
           <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
           <span data-i18n="navCheckouts">Checkouts</span>
@@ -599,6 +607,26 @@
           </div>
         </section>
 
+        <!-- ==================== VIEW 3B: ADD PRODUCT / CATALOG ==================== -->
+        <section id="view-products" class="view-panel space-y-6 hidden">
+          <!-- Top Header Bar -->
+          <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 class="font-bold text-base text-slate-900 dark:text-white" data-i18n="productsPageTitle">Products & Services</h3>
+              <p class="text-xs text-slate-500 mt-0.5" data-i18n="productsPageSubtitle">Edit existing Gemini Pro or add new products — they appear directly in the customer bot menu</p>
+            </div>
+            <button onclick="openProductModal()" class="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs shadow-md shadow-brand-500/20 transition flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span data-i18n="btnNewProduct">Add New Product</span>
+            </button>
+          </div>
+
+          <!-- Products Grid -->
+          <div id="productsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="col-span-full bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 text-center text-slate-400 text-sm" data-i18n="loading">Loading...</div>
+          </div>
+        </section>
+
         <!-- ==================== VIEW 4: CHECKOUTS ==================== -->
         <section id="view-checkouts" class="view-panel space-y-6 hidden">
           <!-- Checkouts Filters, Search & Per-Page Selector -->
@@ -931,6 +959,10 @@
         </button>
       </div>
       <div>
+        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="thProduct">Product</label>
+        <select id="addStockProductSelect" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 mb-3">
+          <option value="gemini-pro-18m">💎 Gemini Pro 18 Months</option>
+        </select>
         <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="addStockLabel">Paste Links (One URL per line)</label>
         <textarea id="addStockTextarea" rows="6" placeholder="https://one.google.com/redeem/...\nhttps://one.google.com/redeem/..." class="w-full font-mono text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" required></textarea>
         <div class="text-[11px] text-slate-400 mt-1" data-i18n="addStockHint">Duplicates will be skipped automatically.</div>
@@ -964,6 +996,100 @@
     </div>
   </div>
 
+  <!-- 5. ADD / EDIT PRODUCT MODAL -->
+  <div id="modalProduct" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 glass hidden">
+    <div class="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
+      <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <h3 id="modalProductTitle" class="font-bold text-base text-slate-900 dark:text-white" data-i18n="btnNewProduct">Add New Product</h3>
+        <button onclick="closeModal('modalProduct')" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <form id="productForm" onsubmit="submitProductForm(event)" class="p-6 overflow-y-auto space-y-4">
+        <input type="hidden" id="prodEditId">
+
+        <!-- Emoji + Sort Order -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodEmojiLabel">Icon / Emoji</label>
+            <div class="flex items-center gap-1.5">
+              <input type="text" id="prodEmojiInput" value="🛍️" maxlength="6" class="w-16 text-center text-base py-2 px-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <div class="flex flex-wrap gap-1">
+                <button type="button" onclick="document.getElementById('prodEmojiInput').value='💎'" class="px-1.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs">💎</button>
+                <button type="button" onclick="document.getElementById('prodEmojiInput').value='🛡️'" class="px-1.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs">🛡️</button>
+                <button type="button" onclick="document.getElementById('prodEmojiInput').value='📱'" class="px-1.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs">📱</button>
+                <button type="button" onclick="document.getElementById('prodEmojiInput').value='🤖'" class="px-1.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs">🤖</button>
+                <button type="button" onclick="document.getElementById('prodEmojiInput').value='🎬'" class="px-1.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs">🎬</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodPriceEtbLabel">Price (ETB)</label>
+            <input type="number" id="prodPriceEtbInput" min="1" step="1" oninput="updateProdUsdtPreview()" placeholder="500" class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" required>
+            <div id="prodUsdtPreview" class="text-[11px] text-slate-400 mt-0.5">Auto: 0.00 USDT</div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodCustomUsdtLabel">Custom USDT (Optional)</label>
+            <input type="number" id="prodCustomUsdtInput" min="0.05" step="0.05" placeholder="Auto" class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+        </div>
+
+        <!-- Names (English & Amharic) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodNameEnLabel">Product Name (English)</label>
+            <input type="text" id="prodNameEnInput" placeholder="e.g. NordVPN 3 Months" class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" required>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodNameAmLabel">Product Name (Amharic)</label>
+            <input type="text" id="prodNameAmInput" placeholder="ምሳሌ: NordVPN 3 ወራት" class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+        </div>
+
+        <!-- Amharic Description -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodDescAmLabel">Description — Amharic (HTML Supported)</label>
+          <textarea id="prodDescAmInput" rows="4" placeholder="✨ የምርቱ ዝርዝር መግለጫ (ደንበኛው ምርቱን ሲነካ የሚታየው ጽሑፍ)..." class="w-full text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+        </div>
+
+        <!-- English Description -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodDescEnLabel">Description — English (HTML Supported)</label>
+          <textarea id="prodDescEnInput" rows="4" placeholder="✨ Detailed product description shown when customer selects this product..." class="w-full text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+        </div>
+
+        <!-- Image URL + Sort Order + Toggles -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodImageUrlLabel">Photo URL (Optional)</label>
+            <input type="url" id="prodImageUrlInput" placeholder="https://..." class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="prodSortOrderLabel">Menu Order</label>
+            <input type="number" id="prodSortOrderInput" placeholder="Auto" class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-6 pt-1">
+          <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+            <input type="checkbox" id="prodIsActiveInput" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500">
+            <span data-i18n="prodVisibleToggle">Show in Bot Menu</span>
+          </label>
+          <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+            <input type="checkbox" id="prodIsInStockInput" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
+            <span data-i18n="prodInStockToggle">In Stock (Accepting Orders)</span>
+          </label>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+          <button type="button" onclick="closeModal('modalProduct')" class="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl" data-i18n="btnCancel">Cancel</button>
+          <button type="submit" id="btnSubmitProduct" class="px-5 py-2 text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white rounded-xl shadow-md shadow-brand-500/20" data-i18n="btnSaveProduct">Save Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
@@ -987,6 +1113,8 @@
       checkoutsSearch: '',
       checkoutsLimit: '25',
       statsRange: '7d',
+      productsList: [],
+      usdtRate: 195,
       usersPage: 1,
       usersSearch: '',
       activeDmTelegramId: null,
@@ -1009,6 +1137,7 @@
         navStats: 'Statistics',
         navOrders: 'Orders',
         navStock: 'Stock Links',
+        navAddProduct: 'Add Product',
         navCheckouts: 'Checkouts',
         navUsers: 'Customers',
         navMarketing: 'Broadcast & Channel',
@@ -1133,6 +1262,31 @@
         statsByMethodSub: 'Approved orders grouped by payment provider',
         statsActiveStock: 'Active Inventory',
         statsNoSalesYet: 'No approved sales data yet.',
+        productsPageTitle: 'Products & Services',
+        productsPageSubtitle: 'Edit existing Gemini Pro or add new products — they appear directly in the customer bot menu',
+        btnNewProduct: 'Add New Product',
+        btnEditProduct: 'Edit Product',
+        prodEmojiLabel: 'Icon / Emoji',
+        prodPriceEtbLabel: 'Price (ETB)',
+        prodCustomUsdtLabel: 'Custom USDT (Optional)',
+        prodNameEnLabel: 'Product Name (English)',
+        prodNameAmLabel: 'Product Name (Amharic)',
+        prodDescAmLabel: 'Description — Amharic (HTML Supported)',
+        prodDescEnLabel: 'Description — English (HTML Supported)',
+        prodImageUrlLabel: 'Photo URL (Optional)',
+        prodSortOrderLabel: 'Menu Order',
+        prodVisibleToggle: 'Show in Bot Menu',
+        prodInStockToggle: 'In Stock (Accepting Orders)',
+        btnSaveProduct: 'Save Product',
+        prodBadgeDefault: 'Main Product',
+        prodBadgeVisible: 'Visible in Bot',
+        prodBadgeHidden: 'Hidden',
+        prodBadgeInStock: 'In Stock',
+        prodBadgePaused: 'Out of Stock',
+        btnEdit: 'Edit',
+        btnHide: 'Hide',
+        btnShow: 'Show',
+        btnDelete: 'Delete',
       },
       am: {
         loginTitle: 'የአስተዳዳሪ ፖርታል',
@@ -1149,6 +1303,7 @@
         navStats: 'ስታቲስቲክስ',
         navOrders: 'ትዕዛዞች',
         navStock: 'የስቶክ ሊንኮች',
+        navAddProduct: 'ምርት ጨምር',
         navCheckouts: 'በክፍያ ላይ ያሉ',
         navUsers: 'ደንበኞች',
         navMarketing: 'ማስታወቂያና ቻናል',
@@ -1273,6 +1428,31 @@
         statsByMethodSub: 'በእያንዳንዱ የክፍያ አማራጭ የጸደቁ ትዕዛዞች',
         statsActiveStock: 'አሁን ያለ ስቶክ',
         statsNoSalesYet: 'እስካሁን የጸደቀ ሽያጭ መረጃ የለም።',
+        productsPageTitle: 'ምርቶች እና አገልግሎቶች',
+        productsPageSubtitle: 'ነባሩን Gemini Pro ያስተካክሉ ወይም አዳዲስ ምርቶችን ይጨምሩ — ወዲያውኑ በደንበኞች ቦት ማውጫ ላይ ይታያሉ',
+        btnNewProduct: 'አዲስ ምርት ጨምር',
+        btnEditProduct: 'ምርት አስተካክል',
+        prodEmojiLabel: 'አይከን / ኢሞጂ',
+        prodPriceEtbLabel: 'ዋጋ (በብር)',
+        prodCustomUsdtLabel: 'የ USDT ዋጋ (አማራጭ)',
+        prodNameEnLabel: 'የምርት ስም (በእንግሊዝኛ)',
+        prodNameAmLabel: 'የምርት ስም (በአማርኛ)',
+        prodDescAmLabel: 'የምርቱ መግለጫ — በአማርኛ (HTML ይቻላል)',
+        prodDescEnLabel: 'የምርቱ መግለጫ — በእንግሊዝኛ (HTML ይቻላል)',
+        prodImageUrlLabel: 'የፎቶ ሊንክ (አማራጭ)',
+        prodSortOrderLabel: 'የማውጫ ቅደም ተከተል',
+        prodVisibleToggle: 'በቦቱ ማውጫ ላይ ይታይ',
+        prodInStockToggle: 'በስቶክ አለ (ትዕዛዝ ይቀበላል)',
+        btnSaveProduct: 'ምርቱን አስቀምጥ',
+        prodBadgeDefault: 'ዋና ምርት',
+        prodBadgeVisible: 'በቦቱ ይታያል',
+        prodBadgeHidden: 'ተደብቋል',
+        prodBadgeInStock: 'በስቶክ አለ',
+        prodBadgePaused: 'ስቶክ አልቋል',
+        btnEdit: 'አስተካክል',
+        btnHide: 'ደብቅ',
+        btnShow: 'አሳይ',
+        btnDelete: 'ሰርዝ',
       }
     };
 
@@ -1505,6 +1685,7 @@
         loadOrdersData();
       }
       else if (viewName === 'stock') loadStockData();
+      else if (viewName === 'products') loadProductsData();
       else if (viewName === 'checkouts') loadCheckoutsData();
       else if (viewName === 'users') loadUsersData();
       else if (viewName === 'settings') loadSettingsData();
@@ -1516,6 +1697,7 @@
         stats: t('navStats'),
         orders: t('navOrders'),
         stock: t('navStock'),
+        products: t('navAddProduct'),
         checkouts: t('navCheckouts'),
         users: t('navUsers'),
         marketing: t('navMarketing'),
@@ -1725,7 +1907,10 @@
           const statusBadge = getStatusBadgeHtml(o.status);
           return `
             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-              <td class="p-3.5 pl-5 font-mono font-bold text-xs text-brand-600 dark:text-brand-400">${o.orderId}</td>
+              <td class="p-3.5 pl-5">
+                <div class="font-mono font-bold text-xs text-brand-600 dark:text-brand-400">${o.orderId}</div>
+                <div class="text-[11px] text-slate-400 truncate max-w-[160px]">${escapeHtml(o.productName || 'Gemini Pro')}</div>
+              </td>
               <td class="p-3.5 font-medium text-xs">${escapeHtml(custName)}</td>
               <td class="p-3.5 text-xs font-semibold">${o.paymentMethod}</td>
               <td class="p-3.5 font-bold text-xs">${o.amount} ${o.currency || 'ETB'}</td>
@@ -1822,7 +2007,10 @@
 
           return `
             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-              <td class="p-3.5 pl-5 font-mono font-bold text-xs text-brand-600 dark:text-brand-400">${o.orderId}</td>
+              <td class="p-3.5 pl-5">
+                <div class="font-mono font-bold text-xs text-brand-600 dark:text-brand-400">${o.orderId}</div>
+                <div class="text-[11px] text-slate-400 truncate max-w-[160px]">${escapeHtml(o.productName || 'Gemini Pro')}</div>
+              </td>
               <td class="p-3.5">
                 <div class="font-semibold text-xs text-slate-900 dark:text-white">${escapeHtml(custName)}</div>
                 <div class="text-[11px] text-slate-400 font-mono">ID: ${o.userId}</div>
@@ -1861,7 +2049,7 @@
         document.getElementById('modalCustomerName').textContent = fullName;
         document.getElementById('modalCustomerUser').textContent = o.userInfo?.username ? `@${o.userInfo.username}` : `ID: ${o.userId}`;
         document.getElementById('modalOrderAmount').textContent = `${o.amount} ${o.currency || 'ETB'}`;
-        document.getElementById('modalOrderQty').textContent = `Qty: ${o.quantity || 1}`;
+        document.getElementById('modalOrderQty').textContent = `${o.productName || 'Gemini Pro'} · Qty: ${o.quantity || 1}`;
         document.getElementById('modalOrderMethod').textContent = o.paymentMethod;
         document.getElementById('modalOrderStatusBadge').innerHTML = getStatusBadgeHtml(o.status);
 
@@ -2042,23 +2230,223 @@
       }
     }
 
-    function openAddStockModal() {
+    async function openAddStockModal(preselectSlug = null) {
       document.getElementById('addStockTextarea').value = '';
+      try {
+        if (!state.productsList || state.productsList.length === 0) {
+          const pRes = await api('/products');
+          state.productsList = pRes.products || [];
+          state.usdtRate = pRes.usdtRate || 195;
+        }
+        const sel = document.getElementById('addStockProductSelect');
+        if (sel && state.productsList.length > 0) {
+          sel.innerHTML = state.productsList
+            .map((p) => `<option value="${escapeHtml(p.slug)}">${escapeHtml(p.emoji || '🛍️')} ${escapeHtml(p.nameEn)}</option>`)
+            .join('');
+          if (preselectSlug) sel.value = preselectSlug;
+        }
+      } catch {}
       openModal('modalAddStock');
     }
 
     async function submitAddStock() {
       const links = document.getElementById('addStockTextarea').value.trim();
+      const productSlug = document.getElementById('addStockProductSelect')?.value || 'gemini-pro-18m';
       if (!links) return;
 
       try {
         const res = await api('/stocks', {
           method: 'POST',
-          body: JSON.stringify({ links }),
+          body: JSON.stringify({ links, productSlug }),
         });
         showToast(`Added ${res.added} stock links!`);
         closeModal('modalAddStock');
         refreshCurrentView();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ─── PRODUCTS / ADD PRODUCT MANAGEMENT ────────────────────
+    async function loadProductsData() {
+      const grid = document.getElementById('productsGrid');
+      grid.innerHTML = `<div class="col-span-full bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 text-center text-slate-400 text-sm">${t('loading')}</div>`;
+
+      try {
+        const res = await api('/products');
+        state.productsList = res.products || [];
+        state.usdtRate = res.usdtRate || 195;
+
+        const badge = document.getElementById('sidebarProductsBadge');
+        if (badge) badge.textContent = state.productsList.length;
+
+        if (state.productsList.length === 0) {
+          grid.innerHTML = `<div class="col-span-full bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 text-center text-slate-400 text-sm">No products yet. Click "Add New Product" to create one.</div>`;
+          return;
+        }
+
+        grid.innerHTML = state.productsList.map((p) => {
+          const descPreviewRaw = (state.lang === 'en' ? (p.descriptionEn || p.descriptionAm) : (p.descriptionAm || p.descriptionEn)) || '';
+          const descPreview = descPreviewRaw.replace(/<[^>]*>/g, '').slice(0, 140) || '—';
+          const visBadge = p.isActive
+            ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-500">${t('prodBadgeVisible')}</span>`
+            : `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-500/15 text-slate-400">${t('prodBadgeHidden')}</span>`;
+          const stockBadge = p.isInStock
+            ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/10 text-blue-500">${t('prodBadgeInStock')} (${p.availableStock || 0})</span>`
+            : `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-500/10 text-rose-500">${t('prodBadgePaused')}</span>`;
+          const defaultBadge = p.isDefault
+            ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-brand-500/10 text-brand-600 dark:text-brand-400">${t('prodBadgeDefault')}</span>`
+            : '';
+
+          return `
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between gap-4">
+              <div class="space-y-3">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-11 h-11 rounded-xl bg-brand-500/10 flex items-center justify-center text-xl flex-shrink-0">${escapeHtml(p.emoji || '🛍️')}</div>
+                    <div class="min-w-0">
+                      <div class="font-bold text-sm text-slate-900 dark:text-white truncate">${escapeHtml(p.nameEn)}</div>
+                      ${p.nameAm && p.nameAm !== p.nameEn ? `<div class="text-xs text-slate-500 truncate">${escapeHtml(p.nameAm)}</div>` : ''}
+                      <div class="text-[11px] font-mono text-slate-400">#${p.sortOrder ?? 0} · ${escapeHtml(p.slug)}</div>
+                    </div>
+                  </div>
+                  <div class="text-right flex-shrink-0">
+                    <div class="font-extrabold text-sm text-slate-900 dark:text-white">${Number(p.priceEtb).toLocaleString()} ETB</div>
+                    <div class="text-[11px] font-semibold text-emerald-500">${Number(p.usdtPrice || 0).toFixed(2)} USDT</div>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap gap-1.5">
+                  ${defaultBadge}
+                  ${visBadge}
+                  ${stockBadge}
+                </div>
+
+                <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-3 leading-relaxed bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl">${escapeHtml(descPreview)}</p>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <div class="flex flex-wrap gap-1.5">
+                  <button onclick="openProductModal('${p._id}')" class="px-3 py-1.5 rounded-xl bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 hover:bg-brand-100 text-xs font-semibold transition">✏️ ${t('btnEdit')}</button>
+                  <button onclick="openAddStockModal('${escapeHtml(p.slug)}')" class="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition">+ Stock</button>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                  <button onclick="toggleProductField('${p._id}', 'isActive')" class="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold transition">${p.isActive ? t('btnHide') : t('btnShow')}</button>
+                  <button onclick="toggleProductField('${p._id}', 'isInStock')" class="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold transition">${p.isInStock ? '⏸️' : '▶️'}</button>
+                  ${!p.isDefault ? `<button onclick="handleDeleteProduct('${p._id}', '${escapeHtml(p.nameEn).replace(/'/g, "\\'")}')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-semibold transition">${t('btnDelete')}</button>` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function updateProdUsdtPreview() {
+      const etb = Number(document.getElementById('prodPriceEtbInput')?.value || 0);
+      const el = document.getElementById('prodUsdtPreview');
+      if (!el) return;
+      if (etb > 0) {
+        const raw = etb / (state.usdtRate || 195);
+        const rounded = (Math.ceil(raw * 20) / 20).toFixed(2);
+        el.textContent = `Auto: ${rounded} USDT`;
+      } else {
+        el.textContent = 'Auto: 0.00 USDT';
+      }
+    }
+
+    function openProductModal(productId = null) {
+      const form = document.getElementById('productForm');
+      form.reset();
+      document.getElementById('prodEditId').value = '';
+
+      if (productId) {
+        const p = (state.productsList || []).find((x) => String(x._id) === String(productId));
+        if (!p) return;
+        document.getElementById('modalProductTitle').textContent = t('btnEditProduct');
+        document.getElementById('prodEditId').value = p._id;
+        document.getElementById('prodEmojiInput').value = p.emoji || '💎';
+        document.getElementById('prodNameEnInput').value = p.nameEn || '';
+        document.getElementById('prodNameAmInput').value = p.nameAm || '';
+        document.getElementById('prodPriceEtbInput').value = p.priceEtb || '';
+        document.getElementById('prodCustomUsdtInput').value = p.customUsdtPrice || '';
+        document.getElementById('prodDescAmInput').value = p.descriptionAm || '';
+        document.getElementById('prodDescEnInput').value = p.descriptionEn || '';
+        document.getElementById('prodImageUrlInput').value = p.imageUrl || '';
+        document.getElementById('prodSortOrderInput').value = p.sortOrder !== undefined ? p.sortOrder : '';
+        document.getElementById('prodIsActiveInput').checked = p.isActive !== false;
+        document.getElementById('prodIsInStockInput').checked = p.isInStock !== false;
+      } else {
+        document.getElementById('modalProductTitle').textContent = t('btnNewProduct');
+        document.getElementById('prodEmojiInput').value = '🛍️';
+        document.getElementById('prodIsActiveInput').checked = true;
+        document.getElementById('prodIsInStockInput').checked = true;
+      }
+
+      updateProdUsdtPreview();
+      openModal('modalProduct');
+    }
+
+    async function submitProductForm(e) {
+      e.preventDefault();
+      const editId = document.getElementById('prodEditId').value.trim();
+      const payload = {
+        emoji: document.getElementById('prodEmojiInput').value.trim() || '🛍️',
+        nameEn: document.getElementById('prodNameEnInput').value.trim(),
+        nameAm: document.getElementById('prodNameAmInput').value.trim(),
+        priceEtb: Number(document.getElementById('prodPriceEtbInput').value),
+        customUsdtPrice: document.getElementById('prodCustomUsdtInput').value.trim() === '' ? null : Number(document.getElementById('prodCustomUsdtInput').value),
+        descriptionAm: document.getElementById('prodDescAmInput').value,
+        descriptionEn: document.getElementById('prodDescEnInput').value,
+        imageUrl: document.getElementById('prodImageUrlInput').value.trim() || null,
+        sortOrder: document.getElementById('prodSortOrderInput').value.trim() === '' ? undefined : Number(document.getElementById('prodSortOrderInput').value),
+        isActive: document.getElementById('prodIsActiveInput').checked,
+        isInStock: document.getElementById('prodIsInStockInput').checked,
+      };
+
+      const btn = document.getElementById('btnSubmitProduct');
+      btn.disabled = true;
+      btn.textContent = t('loading');
+
+      try {
+        if (editId) {
+          await api(`/products/${editId}`, { method: 'PUT', body: JSON.stringify(payload) });
+          showToast('Product updated!');
+        } else {
+          await api('/products', { method: 'POST', body: JSON.stringify(payload) });
+          showToast('New product added to bot menu!');
+        }
+        closeModal('modalProduct');
+        loadProductsData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t('btnSaveProduct');
+      }
+    }
+
+    async function toggleProductField(id, field) {
+      try {
+        await api(`/products/${id}/toggle`, {
+          method: 'PATCH',
+          body: JSON.stringify({ field }),
+        });
+        showToast('Product status updated!');
+        loadProductsData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleDeleteProduct(id, name) {
+      if (!confirm(`Delete "${name}"? Customers will no longer see it in the bot menu.`)) return;
+      try {
+        await api(`/products/${id}`, { method: 'DELETE' });
+        showToast('Product deleted.');
+        loadProductsData();
       } catch (err) {
         showToast(err.message, 'error');
       }
@@ -2470,6 +2858,12 @@
       try {
         const me = await api('/auth/me');
         document.getElementById('sidebarUsername').textContent = me.username || 'admin';
+        api('/products').then((pRes) => {
+          state.productsList = pRes.products || [];
+          state.usdtRate = pRes.usdtRate || 195;
+          const badge = document.getElementById('sidebarProductsBadge');
+          if (badge) badge.textContent = state.productsList.length;
+        }).catch(() => {});
         navigateView('overview');
       } catch {
         showAuthScreen();

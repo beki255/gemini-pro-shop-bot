@@ -51,6 +51,11 @@ class SettingsService {
       { value: price, updatedAt: new Date() },
       { upsert: true }
     );
+    // Keep default product price in sync
+    try {
+      const productService = require('./productService');
+      await productService.syncDefaultProductPrice(price);
+    } catch {}
     return price;
   }
 

@@ -112,6 +112,7 @@ bot.on('callback_query', async (ctx) => {
 
   // User callbacks
   if (data === 'verify_channel_joined') return subscriptionService.handleVerifyChannelJoined(ctx);
+  if (data.startsWith('product_')) return userHandlers.callbackSelectProduct(ctx, data.replace('product_', ''));
   if (data === 'buy') return userHandlers.callbackBuy(ctx);
   if (data === 'refresh_menu') return userHandlers.callbackRefreshMenu(ctx);
   if (data === 'refresh_qty') return userHandlers.callbackRefreshQty(ctx);
@@ -471,6 +472,9 @@ async function main() {
   // Initialize dynamic settings (product price, etc.)
   const settingsService = require('./services/settingsService');
   await settingsService.init();
+
+  const productService = require('./services/productService');
+  await productService.init();
 
   const otpService = require('./services/otpService');
   await otpService.init();

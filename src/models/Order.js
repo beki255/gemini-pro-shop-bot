@@ -12,6 +12,8 @@ const orderSchema = new mongoose.Schema(
     },
     stockId: { type: mongoose.Schema.Types.ObjectId, ref: 'Stock', default: null },
     stockIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Stock' }],
+    productSlug: { type: String, default: 'gemini-pro-18m', index: true },
+    productName: { type: String, default: 'Gemini Pro 18 Months' },
     quantity: { type: Number, default: 1 },
     amount: { type: Number, required: true },
     currency: {

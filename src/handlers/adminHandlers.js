@@ -1878,14 +1878,19 @@ async function callbackApprove(ctx) {
     }
   }
 
-  // 2. If not enough reserved stocks, grab any newly added unreserved stocks from DB
+  // 2. If not enough reserved stocks, grab any newly added unreserved stocks from DB for this product
   if (stocks.length < neededQty) {
     const remainingNeeded = neededQty - stocks.length;
     const existingIds = stocks.map((s) => s._id);
+    const orderSlug = order.productSlug || 'gemini-pro-18m';
+    const productStockFilter = orderSlug === 'gemini-pro-18m'
+      ? { $or: [{ productSlug: 'gemini-pro-18m' }, { productSlug: { $exists: false } }, { productSlug: null }] }
+      : { productSlug: orderSlug };
     const availableStocks = await Stock.find({
       _id: { $nin: existingIds },
       isSold: false,
       isReserved: false,
+      ...productStockFilter,
     }).limit(remainingNeeded);
 
     stocks = stocks.concat(availableStocks);

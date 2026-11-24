@@ -6,8 +6,15 @@ const User = require('../models/User');
 const Stock = require('../models/Stock');
 const Order = require('../models/Order');
 const CheckoutAttempt = require('../models/CheckoutAttempt');
+const productService = require('../services/productService');
 const keyboards = require('../utils/keyboard');
 const msg = require('../utils/messages');
+
+// ─── Helper: Get currently selected product from session ───
+async function getSelectedProduct(ctx) {
+  const slug = ctx.session?.selectedProductSlug || ctx.session?.pendingOrder?.productSlug;
+  return await productService.getProductBySlug(slug);
+}
 
 // ─── Get or save user and return user record ────────────────
 async function getOrSaveUser(from) {
@@ -221,6 +228,81 @@ async function sendOutOfStockMessage(ctx, lang = 'am') {
   });
 }
 
+// ─── Helper: Show specific product details & quantity picker ─
+async function showProductDetails(ctx, product, lang = 'am') {
+  const settingsService = require('../services/settingsService');
+  if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
+    return sendOutOfStockMessage(ctx, lang);
+  }
+
+  const prod = product || productService.getDefaultProductSync();
+  ctx.session = ctx.session || {};
+  ctx.session.selectedProductSlug = prod.slug;
+
+  const reservationService = require('../services/reservationService');
+  const available = await reservationService.getAvailableStockCount(prod.slug);
+  const caption = msg.productDetails(available, lang, prod);
+  const kb = keyboards.quantitySelection(available, lang, prod);
+
+  // Send with photo when available and within Telegram's 1024-char caption limit
+  if (caption.length <= 1020) {
+    if (prod.imageUrl) {
+      try {
+        return await ctx.replyWithPhoto(prod.imageUrl, {
+          caption,
+          parse_mode: 'HTML',
+          ...kb,
+        });
+      } catch (err) {
+        console.error('Failed to send custom product image:', err.message);
+      }
+    } else if (prod.isDefault || prod.slug === 'gemini-pro-18m') {
+      const productPhotoPath = path.join(__dirname, '../../assets/gemini_product.png');
+      if (fs.existsSync(productPhotoPath)) {
+        try {
+          return await ctx.replyWithPhoto(
+            { source: productPhotoPath },
+            {
+              caption,
+              parse_mode: 'HTML',
+              ...kb,
+            }
+          );
+        } catch (err) {
+          console.error('Failed to send default product photo:', err.message);
+        }
+      }
+    }
+  }
+
+  try {
+    return await ctx.reply(caption, {
+      parse_mode: 'HTML',
+      ...kb,
+    });
+  } catch (err) {
+    // Fallback to plain text if admin entered invalid HTML tags in description
+    console.error('Failed to send HTML product details, falling back to plain:', err.message);
+    return await ctx.reply(caption.replace(/<[^>]*>/g, ''), {
+      ...kb,
+    });
+  }
+}
+
+// ─── Callback: Select Product from Main Menu ("product_<slug>") ───
+async function callbackSelectProduct(ctx, slug) {
+  await ctx.answerCbQuery().catch(() => {});
+  const user = await getOrSaveUser(ctx.from);
+  if (!user.language) {
+    return ctx.reply(msg.chooseLanguage(), {
+      parse_mode: 'HTML',
+      ...keyboards.languageSelection(),
+    });
+  }
+  const product = await productService.getProductBySlug(slug);
+  return showProductDetails(ctx, product, user.language);
+}
+
 // ─── /buy Command ──────────────────────────────────────────
 async function handleBuy(ctx) {
   const user = await getOrSaveUser(ctx.from);
@@ -232,35 +314,22 @@ async function handleBuy(ctx) {
   }
   const lang = user.language;
 
-  // Check if store is accepting orders (Admin stock pause toggle)
   const settingsService = require('../services/settingsService');
   if (!settingsService.getIsAcceptingOrders()) {
     return sendOutOfStockMessage(ctx, lang);
   }
 
-  // Check live available stock
-  const reservationService = require('../services/reservationService');
-  const available = await reservationService.getAvailableStockCount();
-
-  const productPhotoPath = path.join(__dirname, '../../assets/gemini_product.png');
-  if (fs.existsSync(productPhotoPath)) {
-    try {
-      return await ctx.replyWithPhoto(
-        { source: productPhotoPath },
-        {
-          caption: msg.productDetails(available, lang),
-          parse_mode: 'HTML',
-          ...keyboards.quantitySelection(available, lang),
-        }
-      );
-    } catch (err) {
-      console.error('Failed to send product photo:', err.message);
-    }
+  const activeProducts = await productService.getActiveProducts();
+  if (activeProducts.length <= 1) {
+    return showProductDetails(ctx, activeProducts[0] || productService.getDefaultProductSync(), lang);
   }
 
-  await ctx.reply(msg.productDetails(available, lang), {
+  // Multiple products exist — show main menu with all active product buttons
+  const reservationService = require('../services/reservationService');
+  const stockCount = await reservationService.getAvailableStockCount();
+  return ctx.reply(msg.welcome(ctx.from.first_name, lang), {
     parse_mode: 'HTML',
-    ...keyboards.quantitySelection(available, lang),
+    ...keyboards.mainMenu(lang, false, stockCount),
   });
 }
 
@@ -340,11 +409,12 @@ async function callbackRefreshMenu(ctx) {
   const user = await getOrSaveUser(ctx.from);
   const lang = user && user.language ? user.language : 'am';
   const isAdminUser = ctx.from && ctx.from.id === config.adminId;
+  await productService.refreshCache().catch(() => {});
   const reservationService = require('../services/reservationService');
   const count = await reservationService.getAvailableStockCount();
   const alertText = lang === 'en'
-    ? `🔄 Stock updated: ${count} available`
-    : `🔄 ስቶክ ታድሷል፡ ${count} በስቶክ ይገኛል`;
+    ? `🔄 Menu updated!`
+    : `🔄 ማውጫው ታድሷል!`;
   await ctx.answerCbQuery(alertText);
 
   try {
@@ -358,32 +428,29 @@ async function callbackRefreshMenu(ctx) {
 async function callbackRefreshQty(ctx) {
   const lang = await getUserLang(ctx.from.id);
   const settingsService = require('../services/settingsService');
-  if (!settingsService.getIsAcceptingOrders()) {
+  const product = await getSelectedProduct(ctx);
+  if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
     const alertText = lang === 'en' ? '🔴 Out of stock' : '🔴 ስቶክ አልቋል';
     await ctx.answerCbQuery(alertText).catch(() => {});
     return sendOutOfStockMessage(ctx, lang);
   }
 
   const reservationService = require('../services/reservationService');
-  const count = await reservationService.getAvailableStockCount();
+  const count = await reservationService.getAvailableStockCount(product.slug);
   const alertText = lang === 'en'
     ? `🔄 Stock updated: ${count} available`
     : `🔄 ስቶክ ታድሷል፡ ${count} በስቶክ ይገኛል`;
   await ctx.answerCbQuery(alertText);
 
-  if (count === 0) {
-    return sendOutOfStockMessage(ctx, lang);
-  }
-
   try {
-    await ctx.editMessageCaption(msg.productDetails(count, lang), {
+    await ctx.editMessageCaption(msg.productDetails(count, lang, product), {
       parse_mode: 'HTML',
-      ...keyboards.quantitySelection(count, lang),
+      ...keyboards.quantitySelection(count, lang, product),
     });
   } catch {
-    await ctx.editMessageText(msg.productDetails(count, lang), {
+    await ctx.editMessageText(msg.productDetails(count, lang, product), {
       parse_mode: 'HTML',
-      ...keyboards.quantitySelection(count, lang),
+      ...keyboards.quantitySelection(count, lang, product),
     }).catch(() => {});
   }
 }
@@ -395,31 +462,33 @@ async function callbackSelectQty(ctx, qty) {
   }
   const lang = await getUserLang(ctx.from.id);
   const settingsService = require('../services/settingsService');
-  if (!settingsService.getIsAcceptingOrders()) {
+  const product = await getSelectedProduct(ctx);
+  if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
     return sendOutOfStockMessage(ctx, lang);
   }
 
   const quantity = Math.max(1, parseInt(qty) || 1);
-  const unitPrice = config.productPrice || 250;
+  const unitPrice = product.priceEtb || config.productPrice || 250;
   const total = quantity * unitPrice;
+  const prodName = escapeHtml(productService.getDisplayName(product, lang));
 
   const prompt = lang === 'en'
-    ? `💳 *Choose Payment Method:*\n\n` +
-      `📦 *Product:* ${config.productName}\n` +
-      `🔢 *Quantity:* *${quantity} item(s)*\n` +
-      `💵 *Unit Price:* *${unitPrice} ETB*\n` +
-      `💰 *Total Amount:* *${quantity} × ${unitPrice} = ${total} ETB*\n\n` +
+    ? `💳 <b>Choose Payment Method:</b>\n\n` +
+      `📦 <b>Product:</b> ${prodName}\n` +
+      `🔢 <b>Quantity:</b> <b>${quantity} item(s)</b>\n` +
+      `💵 <b>Unit Price:</b> <b>${unitPrice} ETB</b>\n` +
+      `💰 <b>Total Amount:</b> <b>${quantity} × ${unitPrice} = ${total} ETB</b>\n\n` +
       `👇 Select payment method below:`
-    : `💳 *የክፍያ መንገድ ይምረጡ:*\n\n` +
-      `📦 *ምርት:* ${config.productName}\n` +
-      `🔢 *የተመረጠው ብዛት:* *${quantity} ሊንክ*\n` +
-      `💵 *የነጠላ ዋጋ:* *${unitPrice} ብር*\n` +
-      `💰 *ጠቅላላ ክፍያ:* *${quantity} × ${unitPrice} = ${total} ብር*\n\n` +
+    : `💳 <b>የክፍያ መንገድ ይምረጡ:</b>\n\n` +
+      `📦 <b>ምርት:</b> ${prodName}\n` +
+      `🔢 <b>የተመረጠው ብዛት:</b> <b>${quantity}</b>\n` +
+      `💵 <b>የነጠላ ዋጋ:</b> <b>${unitPrice} ብር</b>\n` +
+      `💰 <b>ጠቅላላ ክፍያ:</b> <b>${quantity} × ${unitPrice} = ${total} ብር</b>\n\n` +
       `👇 ለመክፈል ከታች አንዱን ይምረጡ:`;
 
   await ctx.reply(prompt, {
-    parse_mode: 'Markdown',
-    ...keyboards.paymentMethod(lang, quantity),
+    parse_mode: 'HTML',
+    ...keyboards.paymentMethod(lang, quantity, product),
   });
 }
 
@@ -428,11 +497,12 @@ async function callbackCustomQty(ctx) {
   await ctx.answerCbQuery();
   const lang = await getUserLang(ctx.from.id);
   const settingsService = require('../services/settingsService');
-  if (!settingsService.getIsAcceptingOrders()) {
+  const product = await getSelectedProduct(ctx);
+  if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
     return sendOutOfStockMessage(ctx, lang);
   }
 
-  const unitPrice = config.productPrice || 250;
+  const unitPrice = product.priceEtb || config.productPrice || 250;
 
   ctx.session = ctx.session || {};
   ctx.session.awaitingCustomQty = true;
@@ -444,7 +514,7 @@ async function callbackCustomQty(ctx) {
       `🔢 *Type the quantity number you want to buy (1 - 50):*\n` +
       `_(Total will be calculated as Quantity × ${unitPrice} ETB)_`
     : `✏️ *የሚፈልጉትን ብዛት ያስገቡ*\n\n` +
-      `💵 የአንድ ሊንክ ዋጋ: *${unitPrice} ብር*\n` +
+      `💵 የአንድ ዕቃ ዋጋ: *${unitPrice} ብር*\n` +
       `📦 ሁኔታ: *🟢 በስቶክ ይገኛል*\n\n` +
       `🔢 *የሚፈልጉትን ብዛት በቁጥር ጽፈው ይላኩ (ከ 1 እስከ 50):*\n` +
       `_(ጠቅላላ ክፍያው በ ${unitPrice} ብር ተባዝቶ ይሰላል)_`;
@@ -507,21 +577,24 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
   }
   const lang = await getUserLang(ctx.from.id);
   const settingsService = require('../services/settingsService');
-  if (!settingsService.getIsAcceptingOrders()) {
+  const product = await getSelectedProduct(ctx);
+  if (!settingsService.getIsAcceptingOrders() || (product && product.isInStock === false)) {
     return sendOutOfStockMessage(ctx, lang);
   }
 
   const qty = Math.max(1, parseInt(quantity) || 1);
+  const prodSlug = product.slug || 'gemini-pro-18m';
+  const prodName = product.nameEn || config.productName;
 
-  // Attempt to reserve stock if available in DB (supports on-demand when 0)
+  // Attempt to reserve stock for this product if available in DB (supports on-demand when 0)
   const reservationService = require('../services/reservationService');
-  const stocks = await reservationService.reserveStock(ctx.from.id, method, qty).catch(() => null);
+  const stocks = await reservationService.reserveStock(ctx.from.id, method, qty, prodSlug).catch(() => null);
   const stockIds = stocks && stocks.length > 0 ? stocks.map((s) => s._id) : [];
 
   const isCrypto = ['Binance', 'Bybit', 'BEP20'].includes(method);
   const unitPrice = isCrypto
-    ? config.calculateUsdtPrice(config.productPrice)
-    : (config.productPrice || 250);
+    ? productService.getUsdtPrice(product)
+    : (product.priceEtb || config.productPrice || 250);
   const totalAmount = isCrypto
     ? Number((qty * unitPrice).toFixed(2))
     : (qty * unitPrice);
@@ -530,6 +603,8 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
   // Store pending info in session
   ctx.session = ctx.session || {};
   ctx.session.pendingOrder = {
+    productSlug: prodSlug,
+    productName: prodName,
     stockIds,
     stockId: stockIds[0] || null,
     quantity: qty,
@@ -554,6 +629,8 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
         firstName: ctx.from.first_name || '',
         lastName: ctx.from.last_name || '',
       },
+      productSlug: prodSlug,
+      productName: prodName,
       quantity: qty,
       amount: totalAmount,
       currency,
@@ -593,10 +670,11 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
         const alertMsg =
           `🔔 <b>በክፍያ ሂደት ላይ ያለ ደንበኛ (Checkout Started)</b>\n` +
           `━━━━━━━━━━━━━━━━━━━━\n` +
+          `🛍️ <b>ምርት:</b> <b>${escape(prodName)}</b>\n` +
           `👤 <b>ደንበኛ:</b> ${userLink} (${escape(usernameText)})\n` +
           `🆔 <b>Telegram ID:</b> <code>${ctx.from.id}</code>\n` +
           `💳 <b>የክፍያ መንገድ:</b> <b>${escape(method)}</b>\n` +
-          `📦 <b>ብዛት:</b> <b>${qty} ሊንክ</b>\n` +
+          `📦 <b>ብዛት:</b> <b>${qty}</b>\n` +
           `💰 <b>የሚከፍለው:</b> <b>${totalAmount} ${currLabel}</b>\n` +
           `⏰ <b>ሰዓት:</b> ${new Date().toLocaleTimeString('am-ET')}\n\n` +
           `⏳ <i>ደንበኛው የክፍያ ስክሪንሾት እስኪያያይዝ እየተጠበቀ ነው። ክፍያ ወደ ሂሳብዎ ከገባና ደንበኛው ደረሰኝ ካዘገየ ከታች ባለው ቁልፍ በቦቱ ማሳሰቢያ መላክ ወይም በ inbox ማናገር ይችላሉ!</i>`;
@@ -639,13 +717,13 @@ async function callbackPaymentMethod(ctx, method, quantity = 1) {
   }
 
   try {
-    await ctx.reply(msg.paymentInstructions(method, lang, qty, totalAmount), {
+    await ctx.reply(msg.paymentInstructions(method, lang, qty, totalAmount, product), {
       parse_mode: 'HTML',
       ...keyboards.paymentDetails(method, lang),
     });
   } catch (err) {
     console.error('Failed to send HTML payment instructions, falling back to plain:', err.message);
-    const plainText = msg.paymentInstructions(method, lang, qty, totalAmount).replace(/<[^>]*>/g, '');
+    const plainText = msg.paymentInstructions(method, lang, qty, totalAmount, product).replace(/<[^>]*>/g, '');
     await ctx.reply(plainText, {
       ...keyboards.paymentDetails(method, lang),
     });
@@ -793,6 +871,8 @@ async function handleReceipt(ctx) {
           firstName: from.first_name || '',
           lastName: from.last_name || '',
         },
+        productSlug: pending.productSlug || 'gemini-pro-18m',
+        productName: pending.productName || config.productName,
         stockId: targetStockIds[0],
         stockIds: targetStockIds,
         quantity: finalQty,
@@ -1163,6 +1243,7 @@ module.exports = {
   handleReceipt,
   handlePhotoReceipt,
   handleCustomQtyInput,
+  callbackSelectProduct,
   callbackBuy,
   callbackRefreshMenu,
   callbackRefreshQty,

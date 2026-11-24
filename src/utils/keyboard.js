@@ -12,9 +12,10 @@ function sanitizeButtonText(text, maxLength = 60) {
   if (!text) return '';
   let str = String(text);
   if (typeof str.toWellFormed === 'function') {
-    str = str.toWellFormed();
+    str = str.toWellFormed().replace(/\uFFFD/g, '');
+  } else {
+    str = str.replace(/([\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF])/g, '');
   }
-  str = str.replace(/[\uD800-\uDFFF]/g, '');
   str = str.replace(/[\x00-\x1F\x7F]/g, '');
   const codePoints = Array.from(str);
   if (codePoints.length > maxLength) {
@@ -55,58 +56,64 @@ const keyboards = {
     ]);
   },
 
-  // ─── CUSTOMER MAIN INLINE MENU (Mobile-optimized, never truncated)
+  // ─── CUSTOMER MAIN INLINE MENU (Dynamic Products from Web Admin) ───
   mainMenu(lang = 'am', isAdmin = false, stockCount = null) {
     const isEn = lang === 'en';
-    const price = config.productPrice || 250;
-    const usdt = config.calculateUsdtPrice(price);
+    const productService = require('../services/productService');
+    const activeProducts = productService.getActiveProductsSync();
+    const productsToShow = activeProducts.length > 0
+      ? activeProducts
+      : [productService.getDefaultProductSync()];
 
-    const buttons = [
-      // Product Name & Price (Full-width headline button)
-      [
+    const buttons = [];
+
+    // Dynamic Product Buttons (Gemini Pro 18M first, then any newly added products directly below!)
+    for (const p of productsToShow) {
+      const displayName = productService.getDisplayName(p, lang);
+      const price = p.priceEtb || config.productPrice || 250;
+      const usdt = productService.getUsdtPrice(p);
+      const emoji = p.emoji || '💎';
+      const pausedTag = p.isInStock === false ? (isEn ? ' [Out]' : ' [አልቋል]') : '';
+      const label = isEn
+        ? `${emoji} ${displayName} · ${price} ETB (${usdt} USDT)${pausedTag}`
+        : `${emoji} ${displayName} · ${price} ብር (${usdt} USDT)${pausedTag}`;
+
+      buttons.push([
         {
-          text: isEn
-            ? `💎 Gemini Pro 18M · ${price} ETB (${usdt} USDT)`
-            : `💎 Gemini Pro 18 ወራት · ${price} ብር (${usdt} USDT)`,
-          callback_data: 'buy',
-          style: 'primary',
+          text: sanitizeButtonText(label, 58),
+          callback_data: `product_${p.slug}`,
+          style: p.isInStock === false ? 'danger' : 'primary',
         },
-      ],
-      // Full-width Buy Now button
-      [
-        {
-          text: isEn ? '🛍️ Buy Now' : '🛍️ አሁን ግዛ',
-          callback_data: 'buy',
-          style: 'success',
-        },
-      ],
-      // Navigation: My Orders & Refresh
-      [
-        {
-          text: isEn ? '📦 My Orders' : '📦 የኔ ትዕዛዞች',
-          callback_data: 'my_orders',
-          style: 'primary',
-        },
-        {
-          text: isEn ? '🔄 Refresh' : '🔄 አድስ',
-          callback_data: 'refresh_menu',
-          style: 'primary',
-        },
-      ],
-      // Language & Support
-      [
-        {
-          text: isEn ? '🌐 Language' : '🌐 ቋንቋ / Language',
-          callback_data: 'change_language',
-          style: 'primary',
-        },
-        {
-          text: isEn ? '💬 Support' : '💬 እርዳታ እና ድጋፍ',
-          callback_data: 'contact',
-          style: 'primary',
-        },
-      ],
-    ];
+      ]);
+    }
+
+    // Navigation: My Orders & Refresh
+    buttons.push([
+      {
+        text: isEn ? '📦 My Orders' : '📦 የኔ ትዕዛዞች',
+        callback_data: 'my_orders',
+        style: 'primary',
+      },
+      {
+        text: isEn ? '🔄 Refresh' : '🔄 አድስ',
+        callback_data: 'refresh_menu',
+        style: 'primary',
+      },
+    ]);
+
+    // Language & Support
+    buttons.push([
+      {
+        text: isEn ? '🌐 Language' : '🌐 ቋንቋ / Language',
+        callback_data: 'change_language',
+        style: 'primary',
+      },
+      {
+        text: isEn ? '💬 Support' : '💬 እርዳታ እና ድጋፍ',
+        callback_data: 'contact',
+        style: 'primary',
+      },
+    ]);
 
     if (isAdmin) {
       buttons.unshift([
@@ -122,10 +129,8 @@ const keyboards = {
   },
 
   // ─── QUANTITY SELECTION KEYBOARD ───────────────────────────
-  quantitySelection(availableCount = 1, lang = 'am') {
+  quantitySelection(availableCount = 1, lang = 'am', product = null) {
     const isEn = lang === 'en';
-    const unitPrice = config.productPrice || 250;
-    // Always provide 1 to 5 quick selection buttons so on-demand ordering is never blocked
     const maxQuick = 5;
     const quickButtons = [];
 
@@ -150,6 +155,11 @@ const keyboards = {
 
     rows.push([
       {
+        text: isEn ? '⬅️ Products Menu' : '⬅️ ወደ ምርቶች ተመለስ',
+        callback_data: 'main_menu',
+        style: 'primary',
+      },
+      {
         text: isEn ? '❌ Cancel' : '❌ ሰርዝ',
         callback_data: 'cancel',
         style: 'danger',
@@ -160,12 +170,15 @@ const keyboards = {
   },
 
   // ─── PAYMENT METHOD SELECTION (With Multiplication & Total Price)
-  paymentMethod(lang = 'am', quantity = 1) {
+  paymentMethod(lang = 'am', quantity = 1, product = null) {
     const isEn = lang === 'en';
-    const unitEtb = config.productPrice || 250;
+    const productService = require('../services/productService');
+    const prod = product || productService.getDefaultProductSync();
+    const unitEtb = prod.priceEtb || config.productPrice || 250;
     const totalEtb = quantity * unitEtb;
-    const unitUsdt = config.calculateUsdtPrice(unitEtb);
+    const unitUsdt = productService.getUsdtPrice(prod);
     const totalUsdt = Number((quantity * unitUsdt).toFixed(2));
+    const backCb = prod && prod.slug ? `product_${prod.slug}` : 'buy';
 
     return Markup.inlineKeyboard([
       [
@@ -210,7 +223,7 @@ const keyboards = {
       [
         {
           text: isEn ? '✏️ Change Quantity' : '✏️ ብዛት ቀይር',
-          callback_data: 'buy',
+          callback_data: backCb,
           style: 'primary',
         },
         {
@@ -433,6 +446,7 @@ const keyboards = {
     const buttons = [];
 
     linkArray.forEach((lnk, idx) => {
+      if (!/^https?:\/\//i.test(String(lnk || '').trim())) return;
       const label =
         linkArray.length > 1
           ? isEn
@@ -444,7 +458,7 @@ const keyboards = {
       buttons.push([
         {
           text: label,
-          url: lnk,
+          url: String(lnk).trim(),
         },
       ]);
     });

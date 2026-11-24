@@ -7,17 +7,38 @@ const EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 
 class ReservationService {
   /**
-   * Get current available (unreserved) stock count
+   * Build MongoDB filter for product stock (backward compatible with legacy stock docs)
    */
-  async getAvailableStockCount() {
-    await this.expireStaleReservations();
-    return await Stock.countDocuments({ isSold: false, isReserved: false });
+  getProductStockFilter(productSlug = null) {
+    if (!productSlug) return {};
+    if (productSlug === 'gemini-pro-18m') {
+      return {
+        $or: [
+          { productSlug: 'gemini-pro-18m' },
+          { productSlug: { $exists: false } },
+          { productSlug: null },
+        ],
+      };
+    }
+    return { productSlug };
   }
 
   /**
-   * Atomically reserve multiple available stock items for a user for 5 minutes
+   * Get current available (unreserved) stock count
    */
-  async reserveStock(userId, method, quantity = 1) {
+  async getAvailableStockCount(productSlug = null) {
+    await this.expireStaleReservations();
+    return await Stock.countDocuments({
+      isSold: false,
+      isReserved: false,
+      ...this.getProductStockFilter(productSlug),
+    });
+  }
+
+  /**
+   * Atomically reserve multiple available stock items for a user for 30 minutes
+   */
+  async reserveStock(userId, method, quantity = 1, productSlug = 'gemini-pro-18m') {
     // 1. Release any prior abandoned reservation by this user
     await this.releaseReservation(userId);
 
@@ -26,8 +47,12 @@ class ReservationService {
 
     const qty = Math.max(1, parseInt(quantity) || 1);
 
-    // 3. Find available items
-    const availableItems = await Stock.find({ isSold: false, isReserved: false }).limit(qty);
+    // 3. Find available items for the requested product
+    const availableItems = await Stock.find({
+      isSold: false,
+      isReserved: false,
+      ...this.getProductStockFilter(productSlug),
+    }).limit(qty);
     if (availableItems.length < qty) {
       return null;
     }

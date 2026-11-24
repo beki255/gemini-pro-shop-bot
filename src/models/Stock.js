@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const stockSchema = new mongoose.Schema(
   {
     link: { type: String, required: true, index: true },
+    productSlug: { type: String, default: 'gemini-pro-18m', index: true },
     description: { type: String, default: 'Gemini Pro 18 Months' },
     isSold: { type: Boolean, default: false },
     isReserved: { type: Boolean, default: false }, // reserved while order pending

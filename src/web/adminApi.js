@@ -9,6 +9,7 @@ const Order = require('../models/Order');
 const CheckoutAttempt = require('../models/CheckoutAttempt');
 const settingsService = require('../services/settingsService');
 const otpService = require('../services/otpService');
+const productService = require('../services/productService');
 const msg = require('../utils/messages');
 const keyboards = require('../utils/keyboard');
 
@@ -675,13 +676,17 @@ function createAdminRouter(bot) {
         linksToDeliver = manualLinks.split('\n').map((l) => l.trim()).filter(Boolean);
       }
 
+      const orderSlug = order.productSlug || 'gemini-pro-18m';
+      const orderProductName = order.productName || config.productName;
+
       // If manual links were provided and meet the quantity
       if (linksToDeliver.length >= neededQty) {
         // Record as SoldStock
         for (const link of linksToDeliver) {
           await SoldStock.create({
             link,
-            description: config.productName,
+            productSlug: orderSlug,
+            description: orderProductName,
             orderId: order.orderId,
             userId: order.userId,
             buyerUsername: order.userInfo?.username || null,
@@ -692,7 +697,7 @@ function createAdminRouter(bot) {
           });
         }
       } else {
-        // Find reserved or available stock from database
+        // Find reserved or available stock from database for this product
         let stocks = [];
         const stockIds = order.stockIds && order.stockIds.length > 0
           ? order.stockIds
@@ -710,17 +715,21 @@ function createAdminRouter(bot) {
         if (stocks.length < neededQty) {
           const remaining = neededQty - stocks.length;
           const existingIds = stocks.map((s) => s._id);
+          const productStockFilter = orderSlug === 'gemini-pro-18m'
+            ? { $or: [{ productSlug: 'gemini-pro-18m' }, { productSlug: { $exists: false } }, { productSlug: null }] }
+            : { productSlug: orderSlug };
           const available = await Stock.find({
             _id: { $nin: existingIds },
             isSold: false,
             isReserved: false,
+            ...productStockFilter,
           }).limit(remaining);
           stocks = stocks.concat(available);
         }
 
         if (stocks.length < neededQty) {
           return res.status(400).json({
-            error: `Not enough stock in database (${stocks.length}/${neededQty} available). Please provide manual activation links or add stock first.`,
+            error: `Not enough stock in database (${stocks.length}/${neededQty} available for ${orderProductName}). Please provide manual activation links or add stock first.`,
             requiresManualLinks: true,
             availableInDb: stocks.length,
             needed: neededQty,
@@ -738,7 +747,8 @@ function createAdminRouter(bot) {
 
           await SoldStock.create({
             link: stock.link,
-            description: config.productName,
+            productSlug: orderSlug,
+            description: orderProductName,
             orderId: order.orderId,
             userId: order.userId,
             buyerUsername: order.userInfo?.username || null,
@@ -771,7 +781,7 @@ function createAdminRouter(bot) {
         const custLang = customer && customer.language ? customer.language : 'am';
         await bot.telegram.sendMessage(
           order.userId,
-          msg.orderApproved(linksToDeliver, order.orderId, custLang),
+          msg.orderApproved(linksToDeliver, order.orderId, custLang, order.productName),
           {
             parse_mode: 'HTML',
             disable_web_page_preview: true,
@@ -834,7 +844,7 @@ function createAdminRouter(bot) {
         const custLang = customer && customer.language ? customer.language : 'am';
         await bot.telegram.sendMessage(
           order.userId,
-          msg.orderRejected(order.orderId, reason, custLang),
+          msg.orderRejected(reason, order.orderId, custLang, order.amount, order.quantity),
           { parse_mode: 'HTML' }
         );
       } catch (sendErr) {
@@ -867,7 +877,7 @@ function createAdminRouter(bot) {
 
       await bot.telegram.sendMessage(
         order.userId,
-        msg.orderApproved(links, order.orderId, custLang),
+        msg.orderApproved(links, order.orderId, custLang, order.productName),
         {
           parse_mode: 'HTML',
           disable_web_page_preview: true,
@@ -932,8 +942,13 @@ function createAdminRouter(bot) {
 
   router.post('/stocks', requireAuth, async (req, res) => {
     try {
-      const { links } = req.body;
+      const { links, productSlug } = req.body;
       if (!links) return res.status(400).json({ error: 'No links provided.' });
+
+      const productService = require('../services/productService');
+      const prod = await productService.getProductBySlug(productSlug || 'gemini-pro-18m');
+      const targetSlug = prod ? prod.slug : 'gemini-pro-18m';
+      const targetName = prod ? prod.nameEn : config.productName;
 
       let list = [];
       if (Array.isArray(links)) {
@@ -949,7 +964,8 @@ function createAdminRouter(bot) {
         try {
           await Stock.create({
             link,
-            description: config.productName,
+            productSlug: targetSlug,
+            description: targetName,
             addedBy: config.adminId,
           });
           added++;
@@ -1250,6 +1266,93 @@ function createAdminRouter(bot) {
       return res.json({ success: true, message: `Post published to channel ${channel}!` });
     } catch (err) {
       return res.status(500).json({ error: `Failed to post to channel: ${err.message}` });
+    }
+  });
+
+  // ─── 9. Products / Services Management (Web-Only Admin) ───
+  router.get('/products', requireAuth, async (req, res) => {
+    try {
+      const products = await productService.getAllProducts();
+      const stockCountsAgg = await Stock.aggregate([
+        { $match: { isSold: false, isReserved: false } },
+        {
+          $group: {
+            _id: { $ifNull: ['$productSlug', 'gemini-pro-18m'] },
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+      const stockMap = new Map(stockCountsAgg.map((s) => [s._id, s.count]));
+
+      const enriched = products.map((p) => ({
+        ...p,
+        usdtPrice: productService.getUsdtPrice(p),
+        availableStock: stockMap.get(p.slug) || 0,
+      }));
+
+      return res.json({
+        products: enriched,
+        usdtRate: config.payment.usdtRate || 195,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/products', requireAuth, async (req, res) => {
+    try {
+      const created = await productService.createProduct(req.body || {});
+      return res.json({
+        success: true,
+        product: {
+          ...created,
+          usdtPrice: productService.getUsdtPrice(created),
+          availableStock: 0,
+        },
+      });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  });
+
+  router.put('/products/:id', requireAuth, async (req, res) => {
+    try {
+      const updated = await productService.updateProduct(req.params.id, req.body || {});
+      return res.json({
+        success: true,
+        product: {
+          ...updated,
+          usdtPrice: productService.getUsdtPrice(updated),
+        },
+      });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  });
+
+  router.patch('/products/:id/toggle', requireAuth, async (req, res) => {
+    try {
+      const { field } = req.body || {};
+      const products = await productService.getAllProducts();
+      const target = products.find((p) => String(p._id) === String(req.params.id));
+      if (!target) return res.status(404).json({ error: 'Product not found.' });
+
+      const key = field === 'isInStock' ? 'isInStock' : 'isActive';
+      const updated = await productService.updateProduct(req.params.id, {
+        [key]: !target[key],
+      });
+      return res.json({ success: true, product: updated });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  });
+
+  router.delete('/products/:id', requireAuth, async (req, res) => {
+    try {
+      await productService.deleteProduct(req.params.id);
+      return res.json({ success: true, message: 'Product deleted.' });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
     }
   });
 

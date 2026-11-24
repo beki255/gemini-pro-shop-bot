@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const soldStockSchema = new mongoose.Schema(
   {
     link: { type: String, required: true },
+    productSlug: { type: String, default: 'gemini-pro-18m' },
     description: { type: String, default: 'Gemini Pro 18 Months' },
     orderId: { type: String, required: true },
     userId: { type: Number, required: true },

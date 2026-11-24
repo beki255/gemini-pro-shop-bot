@@ -98,67 +98,48 @@ const msg = {
   },
 
 
-  // ─── PRODUCT DETAILS ───────────────────────────────────────
-  productDetails(availableCount = 1, lang = 'am') {
-    const price = config.productPrice || 250;
-    const usdt = config.calculateUsdtPrice(price);
+  // ─── PRODUCT DETAILS (Dynamic per Product from Web Admin) ───
+  productDetails(availableCount = 1, lang = 'am', product = null) {
+    const productService = require('../services/productService');
+    const prod = product || productService.getDefaultProductSync();
+    const price = prod.priceEtb || config.productPrice || 250;
+    const usdt = productService.getUsdtPrice(prod);
+    const emoji = esc(prod.emoji || '🛍️');
+    const displayName = esc(productService.getDisplayName(prod, lang));
+    const customDesc = lang === 'en'
+      ? (prod.descriptionEn || prod.descriptionAm || '').trim()
+      : (prod.descriptionAm || prod.descriptionEn || '').trim();
+
     if (lang === 'en') {
       return (
-        `🛍️ <b>Gemini Pro 18 Month Link</b>\n` +
+        `${emoji} <b>${displayName}</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━━\n` +
-        `📌 <b>Product:</b> Google Gemini Advanced (18 Months)\n` +
         `💰 <b>Price:</b> ${price} ETB (${usdt} USDT) / item\n` +
-        `📦 <b>Status:</b> 🟢 In Stock (Instant Delivery)\n\n` +
-        `✨ <b>Key Features:</b>\n` +
-        `✅ 18-Month AI Pro Plan\n` +
-        `✅ 5 TB Cloud Storage\n` +
-        `✅ Up to 5 User Accounts\n` +
-        `✅ Veo 3 Video · Imagen 4 Image\n` +
-        `✅ Antigravity, Jules, Deep Research & NotebookLM\n\n` +
-        `📜 <b>Terms & Policy (የግዢ ፖሊሲ):</b>\n` +
-        `<blockquote>⚠️ <b>No Warranty Notice:</b>\n` +
-        `• No warranty if any problem happens after it's activated.\n` +
-        `• <i>(Rarely ever causes any issues)</i>\n` +
-        `⏰ <b>5-Hour Activation Window:</b>\n` +
-        `• You must activate the link within <b>5 hours</b> of delivery.\n` +
-        `• If the link expires after 5 hours, we are not responsible or liable.\n` +
-        `• By purchasing, you accept these terms.</blockquote>\n\n` +
-        `🚀 <b>Automatic delivery right after payment confirmation.</b>\n\n` +
-        `🔢 <b>Choose the quantity you want to purchase below:</b>`
+        `📦 <b>Status:</b> 🟢 In Stock (Fast Delivery)\n` +
+        (customDesc ? `\n${customDesc}\n` : '') +
+        `\n🔢 <b>Choose the quantity you want to purchase below:</b>`
       );
     }
 
     return (
-      `🛍️ <b>Gemini Pro 18 Month Link</b>\n` +
+      `${emoji} <b>${displayName}</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
-      `📌 <b>ምርት:</b> Google Gemini Advanced (18 ወራት)\n` +
-      `💰 <b>ዋጋ:</b> ${price} ብር (${usdt} USDT) / በአንድ ሊንክ\n` +
-      `📦 <b>ሁኔታ:</b> 🟢 በስቶክ ይገኛል (ፈጣን አቅርቦት)\n\n` +
-      `✨ <b>ዋና ዋና ጥቅሞች (Features):</b>\n` +
-      `✅ የ 18 ወራት AI Pro Plan\n` +
-      `✅ 5 TB Cloud Storage\n` +
-      `✅ እስከ 5 ሰው መጋራት የሚያስችል\n` +
-      `✅ Veo 3 Video · Imagen 4 Image\n` +
-      `✅ Antigravity፣ Jules፣ Deep Research እና NotebookLM\n\n` +
-      `📜 <b>የግዢ ፖሊሲ እና ማስጠንቀቂያ (Terms & Policy):</b>\n` +
-      `<blockquote>⚠️ <b>ዋስትና የለውም (No Warranty)</b>\n` +
-      `• ሊንኩ አንዴ አክቲቭ ከተደረገ በኋላ ለሚፈጠር ማንኛውም ችግር ዋስትና የለውም።\n` +
-      `• <i>(ሆኖም በአብዛኛው ምንም አይነት ችግር አያጋጥምም)</i>\n` +
-      `⏰ <b>የአክቲቬሽን ጊዜ ገደብ (5 ሰዓት):</b>\n` +
-      `• ሊንኩ እንደደረሰዎት በ <b>5 ሰዓት (within 5 hours)</b> ውስጥ አክቲቭ ማድረግ አለብዎት።\n` +
-      `• 5 ሰዓት አልፎ ሊንኩ ኤክስፓየር (expire) ቢያደርግ ኃላፊነት አንወስድም።\n` +
-      `• በመግዛትዎ ይህንን ፖሊሲ ተቀብለዋል።</blockquote>\n\n` +
-      `🚀 <b>ክፍያዎ እንደተረጋገጠ ሊንኩ ወዲያውኑ ይላካል!</b>\n\n` +
-      `🔢 <b>የሚፈልጉትን ብዛት ከታች ይምረጡ፦</b>`
+      `💰 <b>ዋጋ:</b> ${price} ብር (${usdt} USDT) / በአንድ ዕቃ\n` +
+      `📦 <b>ሁኔታ:</b> 🟢 በስቶክ ይገኛል (ፈጣን አቅርቦት)\n` +
+      (customDesc ? `\n${customDesc}\n` : '') +
+      `\n🔢 <b>የሚፈልጉትን ብዛት ከታች ይምረጡ፦</b>`
     );
   },
 
   // ─── PAYMENT INSTRUCTIONS ──────────────────────────────────
-  paymentInstructions(method, lang = 'am', quantity = 1, amount = null) {
+  paymentInstructions(method, lang = 'am', quantity = 1, amount = null, product = null) {
+    const productService = require('../services/productService');
+    const prod = product || productService.getDefaultProductSync();
+    const prodName = esc(productService.getDisplayName(prod, lang));
     const isCrypto = ['Binance', 'Bybit', 'BEP20'].includes(method);
     const unitPrice = isCrypto
-      ? config.calculateUsdtPrice(config.productPrice)
-      : (config.productPrice || 250);
+      ? productService.getUsdtPrice(prod)
+      : (prod.priceEtb || config.productPrice || 250);
     const totalAmount = amount !== null
       ? amount
       : (isCrypto ? Number((quantity * unitPrice).toFixed(2)) : quantity * unitPrice);
@@ -167,7 +148,7 @@ const msg = {
       const baseEn =
         `💳 <b>Payment Details</b>\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `📦 <b>Product:</b> ${config.productName}\n` +
+        `📦 <b>Product:</b> ${prodName}\n` +
         `🔢 <b>Quantity:</b> <b>${quantity} item(s)</b>\n` +
         `💵 <b>Unit Price:</b> <b>${unitPrice} ${isCrypto ? 'USDT' : 'ETB'}</b>\n` +
         `💰 <b>Total Amount:</b> <b>${quantity} × ${unitPrice} = ${totalAmount} ${isCrypto ? 'USDT' : 'ETB'}</b>\n\n`;
@@ -271,8 +252,8 @@ const msg = {
     const baseAm =
       `💳 <b>የክፍያ መረጃ</b>\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
-      `📦 <b>ምርት:</b> ${config.productName}\n` +
-      `🔢 <b>የተመረጠው ብዛት:</b> <b>${quantity} ሊንክ</b>\n` +
+      `📦 <b>ምርት:</b> ${prodName}\n` +
+      `🔢 <b>የተመረጠው ብዛት:</b> <b>${quantity}</b>\n` +
       `💵 <b>የነጠላ ዋጋ:</b> <b>${unitPrice} ${isCrypto ? 'USDT' : 'ብር'}</b>\n` +
       `💰 <b>ጠቅላላ ክፍያ:</b> <b>${quantity} × ${unitPrice} = ${totalAmount} ${isCrypto ? 'USDT' : 'ብር'}</b>\n\n`;
 
@@ -401,36 +382,49 @@ const msg = {
     );
   },
 
-  // ─── ORDER APPROVED (HTML formatted for safe URL handling) ──
-  orderApproved(links, orderId, lang = 'am') {
+  // ─── ORDER APPROVED (HTML formatted for safe URL & Account handling) ──
+  orderApproved(links, orderId, lang = 'am', productName = null) {
     const linkArray = Array.isArray(links) ? links : [links];
     const supportUser = config.supportUsername || 'Mnbvcnvhd';
+    const isGeminiDefault = !productName || /gemini pro 18/i.test(productName);
+    const displayProdEn = esc(productName || 'Gemini Pro 18M');
+    const displayProdAm = esc(productName || 'Gemini Pro 18 ወራት');
+
+    const formatItem = (lnk) => {
+      const safe = String(lnk || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return /^https?:\/\//i.test(String(lnk || '').trim())
+        ? `<a href="${safe}">${safe}</a>`
+        : `<code>${safe}</code>`;
+    };
 
     if (lang === 'en') {
       let text =
         `✅ <b>Delivered!</b>\n` +
         `━━━━━━━━━━━━━━━━━━━\n` +
-        `🆔 <b>${orderId}</b>\n` +
-        `📦 <b>Gemini Pro 18M × ${linkArray.length}</b>\n\n` +
+        `🆔 <b>${esc(orderId)}</b>\n` +
+        `📦 <b>${displayProdEn} × ${linkArray.length}</b>\n\n` +
         `🎁 <b>Your delivery:</b>\n`;
 
       linkArray.forEach((lnk, idx) => {
-        const safeHref = lnk.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         if (linkArray.length > 1) {
-          text += `\n${idx + 1}️⃣ <a href="${safeHref}">${safeHref}</a>\n`;
+          text += `\n${idx + 1}️⃣ ${formatItem(lnk)}\n`;
         } else {
-          text += `<a href="${safeHref}">${safeHref}</a>\n`;
+          text += `${formatItem(lnk)}\n`;
         }
       });
 
+      if (isGeminiDefault) {
+        text +=
+          `\n📋 <b>Activation Instructions:</b>\n` +
+          `• ⏰ <b>Please activate within 5 hours of receiving this link</b>\n` +
+          `• <b>Connect VPN for only activation, after activation you can turn off</b>\n` +
+          `• Click the provided activation link\n` +
+          `• Sign in to the target Gmail account\n` +
+          `• Select Activate Offer\n`;
+      }
+
       text +=
-        `\n📋 <b>Activation Instructions:</b>\n` +
-        `• ⏰ <b>Please activate within 5 hours of receiving this link</b>\n` +
-        `• <b>Connect VPN for only activation, after activation you can turn off</b>\n` +
-        `• Click the provided activation link\n` +
-        `• Sign in to the target Gmail account\n` +
-        `• Select Activate Offer\n\n` +
-        `❓ Issues? Contact: @${supportUser}\n\n` +
+        `\n❓ Issues? Contact: @${supportUser}\n\n` +
         `🙏 Thank you for shopping with us!`;
 
       return text;
@@ -439,27 +433,30 @@ const msg = {
     let text =
       `✅ <b>ትዕዛዝዎ ደርሷል! (Delivered)</b>\n` +
       `━━━━━━━━━━━━━━━━━━━\n` +
-      `🆔 <b>${orderId}</b>\n` +
-      `📦 <b>Gemini Pro 18 ወራት × ${linkArray.length}</b>\n\n` +
-      `🎁 <b>የተላከው ሊንክ (Your delivery):</b>\n`;
+      `🆔 <b>${esc(orderId)}</b>\n` +
+      `📦 <b>${displayProdAm} × ${linkArray.length}</b>\n\n` +
+      `🎁 <b>የተላከው መረጃ / ሊንክ (Your delivery):</b>\n`;
 
     linkArray.forEach((lnk, idx) => {
-      const safeHref = lnk.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       if (linkArray.length > 1) {
-        text += `\n${idx + 1}️⃣ <a href="${safeHref}">${safeHref}</a>\n`;
+        text += `\n${idx + 1}️⃣ ${formatItem(lnk)}\n`;
       } else {
-        text += `<a href="${safeHref}">${safeHref}</a>\n`;
+        text += `${formatItem(lnk)}\n`;
       }
     });
 
+    if (isGeminiDefault) {
+      text +=
+        `\n📋 <b>የአክቲቬሽን መመሪያ (Activation Instructions):</b>\n` +
+        `• ⏰ <b>እባክዎ ሊንኩ እንደደረሰዎት በ 5 ሰዓት ውስጥ አክቲቭ ያድርጉ!</b>\n` +
+        `• <b>Connect VPN for only activation, after activation you can turn off</b> (VPN የሚያስፈልገው ለአክቲቬሽን ብቻ ነው፤ አክቲቭ ካደረጉ በኋላ ማጥፋት ይችላሉ)\n` +
+        `• Click the provided activation link (የተላከውን ሊንክ ይጫኑ)\n` +
+        `• Sign in to the target Gmail account (በሚፈልጉት Gmail Account ይግቡ)\n` +
+        `• Select Activate Offer ("Activate Offer" የሚለውን ይጫኑ)\n`;
+    }
+
     text +=
-      `\n📋 <b>የአክቲቬሽን መመሪያ (Activation Instructions):</b>\n` +
-      `• ⏰ <b>እባክዎ ሊንኩ እንደደረሰዎት በ 5 ሰዓት ውስጥ አክቲቭ ያድርጉ!</b>\n` +
-      `• <b>Connect VPN for only activation, after activation you can turn off</b> (VPN የሚያስፈልገው ለአክቲቬሽን ብቻ ነው፤ አክቲቭ ካደረጉ በኋላ ማጥፋት ይችላሉ)\n` +
-      `• Click the provided activation link (የተላከውን ሊንክ ይጫኑ)\n` +
-      `• Sign in to the target Gmail account (በሚፈልጉት Gmail Account ይግቡ)\n` +
-      `• Select Activate Offer ("Activate Offer" የሚለውን ይጫኑ)\n\n` +
-      `❓ ችግር ካጋጠመዎት ያነጋግሩን፦ @${supportUser}\n\n` +
+      `\n❓ ችግር ካጋጠመዎት ያነጋግሩን፦ @${supportUser}\n\n` +
       `🙏 እኛን ስለመረጡ እናመሰግናለን!`;
 
     return text;
@@ -655,6 +652,7 @@ const msg = {
     return (
       `🔔 <b>አዲስ ትዕዛዝ!</b>\n\n` +
       `🔢 ትዕዛዝ: <code>${esc(order.orderId)}</code>\n` +
+      `🛍️ ምርት: <b>${esc(order.productName || config.productName)}</b>\n` +
       `👤 ስም: <b>${esc(fullName)}</b>\n` +
       `🔗 ዩዘርኔም: <b>${esc(username)}</b>\n` +
       `🆔 Telegram ID: <code>${order.userId}</code>\n` +

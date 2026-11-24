@@ -10,6 +10,8 @@ const checkoutAttemptSchema = new mongoose.Schema(
       lastName: { type: String, default: '' },
     },
     quantity: { type: Number, default: 1 },
+    productSlug: { type: String, default: 'gemini-pro-18m', index: true },
+    productName: { type: String, default: 'Gemini Pro 18 Months' },
     amount: { type: Number, required: true },
     currency: {
       type: String,
