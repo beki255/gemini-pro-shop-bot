@@ -1283,8 +1283,66 @@ function createAdminRouter(bot) {
       checkout.remindersCount = (checkout.remindersCount || 0) + 1;
       checkout.lastReminderAt = new Date();
       await checkout.save();
+      realtimeEvents.emitAdminEvent('checkout_updated', { status: 'reminded', source: 'web' });
 
       return res.json({ success: true, message: 'Reminder sent to customer!' });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Permanently Delete CheckoutAttempt from Database
+  router.delete('/checkouts/:id', requireAuth, async (req, res) => {
+    try {
+      const checkout = await CheckoutAttempt.findById(req.params.id);
+      if (!checkout) return res.status(404).json({ error: 'Checkout not found' });
+
+      // 1. If still awaiting receipt, release any reserved stocks not tied to an order
+      if (checkout.status === 'awaiting_receipt' && checkout.stockIds && checkout.stockIds.length > 0) {
+        await Stock.updateMany(
+          {
+            _id: { $in: checkout.stockIds },
+            isSold: false,
+            orderId: null,
+          },
+          {
+            $set: {
+              isReserved: false,
+              reservedAt: null,
+              reservedBy: null,
+              reservedMethod: null,
+            },
+          }
+        );
+      }
+
+      // 2. Permanently delete CheckoutAttempt from MongoDB
+      await CheckoutAttempt.deleteOne({ _id: checkout._id });
+
+      // 3. Remove/clear Telegram admin alert message if present
+      if (checkout.adminAlertMessageId && config.adminId) {
+        try {
+          await bot.telegram.deleteMessage(config.adminId, checkout.adminAlertMessageId);
+        } catch {
+          await bot.telegram
+            .editMessageReplyMarkup(config.adminId, checkout.adminAlertMessageId, undefined, {
+              inline_keyboard: [],
+            })
+            .catch(() => {});
+        }
+      }
+
+      // 4. Broadcast live update to Web Admin clients
+      realtimeEvents.emitAdminEvent('checkout_updated', {
+        checkoutId: String(checkout._id),
+        status: 'deleted',
+        source: 'web',
+      });
+
+      return res.json({
+        success: true,
+        message: 'Checkout permanently deleted from database.',
+      });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

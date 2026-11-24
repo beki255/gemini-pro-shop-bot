@@ -1322,6 +1322,7 @@
         btnDelete: 'Delete',
         btnDeleteOrder: 'Delete Order',
         toastOrderDeleted: 'Order permanently deleted from database!',
+        toastCheckoutDeleted: 'Checkout permanently deleted from database!',
       },
       am: {
         loginTitle: 'የአስተዳዳሪ ፖርታል',
@@ -1495,6 +1496,7 @@
         btnDelete: 'ሰርዝ',
         btnDeleteOrder: 'ትዕዛዝ አጥፋ',
         toastOrderDeleted: 'ትዕዛዙ ከዳታቤዝ ሙሉ በሙሉ ተሰርዟል!',
+        toastCheckoutDeleted: 'የክፍያ ሙከራው ከዳታቤዝ ሙሉ በሙሉ ተሰርዟል!',
       }
     };
 
@@ -2738,6 +2740,7 @@
             actions.push(`<button onclick="openOrderDetail('${escapeHtml(c.orderId)}')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition">${escapeHtml(c.orderId)}</button>`);
           }
           actions.push(`<button onclick="openDmModal(${c.userId}, '${escapeHtml(fullName).replace(/'/g, "\\'")}')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 transition">DM</button>`);
+          actions.push(`<button onclick="handleDeleteCheckout('${c._id}')" class="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition" title="Delete Checkout"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>`);
 
           return `
             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
@@ -2766,6 +2769,23 @@
       try {
         await api(`/checkouts/${id}/remind`, { method: 'POST' });
         showToast('Reminder sent to customer via Telegram bot!');
+        loadCheckoutsData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleDeleteCheckout(id) {
+      if (!id) return;
+      const confirmText = state.lang === 'en'
+        ? 'Permanently delete this checkout record from the database? This cannot be undone.'
+        : 'ይህ የክፍያ ሙከራ (Checkout) ከዳታቤዝ ሙሉ በሙሉ ይጥፋ? ይህን መመለስ አይቻልም።';
+      if (!confirm(confirmText)) return;
+
+      try {
+        await api(`/checkouts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        showToast(t('toastCheckoutDeleted'));
+        syncSidebarBadges();
         loadCheckoutsData();
       } catch (err) {
         showToast(err.message, 'error');
