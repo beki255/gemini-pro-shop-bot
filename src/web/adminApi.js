@@ -1,0 +1,816 @@
+// src/web/adminApi.js - Complete Admin Web REST API
+const express = require('express');
+const mongoose = require('mongoose');
+const config = require('../config');
+const User = require('../models/User');
+const Stock = require('../models/Stock');
+const SoldStock = require('../models/SoldStock');
+const Order = require('../models/Order');
+const CheckoutAttempt = require('../models/CheckoutAttempt');
+const settingsService = require('../services/settingsService');
+const otpService = require('../services/otpService');
+const msg = require('../utils/messages');
+const keyboards = require('../utils/keyboard');
+
+function createAdminRouter(bot) {
+  const router = express.Router();
+
+  // ─── Authentication Middleware ───────────────────────────
+  const requireAuth = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized. Please login.' });
+    }
+    const token = authHeader.split(' ')[1];
+    const session = otpService.verifySession(token);
+    if (!session) {
+      return res.status(401).json({ error: 'Session expired or invalid.' });
+    }
+    req.adminSession = session;
+    next();
+  };
+
+  // ─── 1. Authentication Endpoints ─────────────────────────
+  router.post('/login', async (req, res) => {
+    try {
+      const { method, code, username, password } = req.body;
+
+      if (method === 'otp') {
+        const isValid = otpService.verifyOtp(code);
+        if (!isValid) {
+          return res.status(400).json({ error: 'Invalid or expired OTP code. Please get a fresh code from the bot.' });
+        }
+        const token = otpService.createSession('admin');
+        return res.json({ success: true, token, username: 'admin' });
+      }
+
+      if (method === 'credentials') {
+        const isValid = await otpService.verifyCredentials(username, password);
+        if (!isValid) {
+          return res.status(400).json({ error: 'Incorrect username or password.' });
+        }
+        const token = otpService.createSession(username);
+        return res.json({ success: true, token, username });
+      }
+
+      return res.status(400).json({ error: 'Invalid login method. Use "otp" or "credentials".' });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/auth/me', requireAuth, (req, res) => {
+    return res.json({ authenticated: true, username: req.adminSession.username });
+  });
+
+  router.post('/logout', requireAuth, (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    otpService.destroySession(token);
+    return res.json({ success: true });
+  });
+
+  // ─── 2. Dashboard / Overview ─────────────────────────────
+  router.get('/overview', requireAuth, async (req, res) => {
+    try {
+      const [
+        totalOrders,
+        pendingOrders,
+        approvedOrders,
+        rejectedOrders,
+        availableStock,
+        reservedStock,
+        soldStock,
+        totalUsers,
+        awaitingCheckouts,
+        recentOrders,
+      ] = await Promise.all([
+        Order.countDocuments(),
+        Order.countDocuments({ status: 'pending' }),
+        Order.countDocuments({ status: 'approved' }),
+        Order.countDocuments({ status: 'rejected' }),
+        Stock.countDocuments({ isSold: false, isReserved: false }),
+        Stock.countDocuments({ isSold: false, isReserved: true }),
+        Stock.countDocuments({ isSold: true }),
+        User.countDocuments(),
+        CheckoutAttempt.countDocuments({ status: 'awaiting_receipt' }),
+        Order.find().sort({ createdAt: -1 }).limit(6).lean(),
+      ]);
+
+      // Calculate total revenue from approved orders
+      const revenueAgg = await Order.aggregate([
+        { $match: { status: 'approved' } },
+        {
+          $group: {
+            _id: '$currency',
+            total: { $sum: '$amount' },
+          },
+        },
+      ]);
+
+      let totalRevenueEtb = 0;
+      let totalRevenueUsdt = 0;
+      revenueAgg.forEach((r) => {
+        if (r._id === 'USDT') totalRevenueUsdt = r.total;
+        else totalRevenueEtb += r.total;
+      });
+
+      // Today's orders
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const todayApproved = await Order.countDocuments({
+        status: 'approved',
+        createdAt: { $gte: startOfToday },
+      });
+
+      return res.json({
+        store: {
+          isOpen: settingsService.getIsAcceptingOrders(),
+          productName: config.productName,
+          productPrice: config.productPrice,
+          usdtRate: config.payment.usdtRate,
+          usdtPrice: config.calculateUsdtPrice(),
+          proofChannel: config.proofChannel.username,
+        },
+        counts: {
+          totalOrders,
+          pendingOrders,
+          approvedOrders,
+          rejectedOrders,
+          availableStock,
+          reservedStock,
+          soldStock,
+          totalStock: availableStock + reservedStock + soldStock,
+          totalUsers,
+          awaitingCheckouts,
+          todayApproved,
+        },
+        revenue: {
+          etb: totalRevenueEtb,
+          usdt: totalRevenueUsdt,
+        },
+        recentOrders,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── 3. Store Status & Settings ──────────────────────────
+  router.post('/store-status', requireAuth, async (req, res) => {
+    try {
+      const { isOpen } = req.body;
+      const status = typeof isOpen === 'boolean'
+        ? await settingsService.setAcceptingOrders(isOpen)
+        : await settingsService.toggleAcceptingOrders();
+      return res.json({ success: true, isOpen: status });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/settings/price', requireAuth, async (req, res) => {
+    try {
+      const { price } = req.body;
+      const newPrice = await settingsService.setProductPrice(price);
+      return res.json({ success: true, price: newPrice });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  });
+
+  router.post('/settings/usdt-rate', requireAuth, async (req, res) => {
+    try {
+      const { rate } = req.body;
+      const newRate = await settingsService.setUsdtRate(rate);
+      return res.json({ success: true, rate: newRate });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  });
+
+  router.post('/settings/credentials', requireAuth, async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (username) await otpService.setAdminUsername(username);
+      if (password) await otpService.setAdminPassword(password);
+      return res.json({ success: true, message: 'Admin credentials updated successfully.' });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  });
+
+  // ─── 4. Orders Management ────────────────────────────────
+  router.get('/orders', requireAuth, async (req, res) => {
+    try {
+      const { status = 'all', search = '', page = 1, limit = 15 } = req.query;
+      const query = {};
+
+      if (status && status !== 'all') {
+        query.status = status;
+      }
+
+      if (search) {
+        const cleanSearch = String(search).trim();
+        query.$or = [
+          { orderId: { $regex: cleanSearch, $options: 'i' } },
+          { 'userInfo.username': { $regex: cleanSearch, $options: 'i' } },
+          { 'userInfo.firstName': { $regex: cleanSearch, $options: 'i' } },
+        ];
+        if (!isNaN(cleanSearch)) {
+          query.$or.push({ userId: Number(cleanSearch) });
+        }
+      }
+
+      const p = Math.max(1, parseInt(page, 10) || 1);
+      const lim = Math.max(1, Math.min(100, parseInt(limit, 10) || 15));
+      const skip = (p - 1) * lim;
+
+      const [orders, total] = await Promise.all([
+        Order.find(query).sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
+        Order.countDocuments(query),
+      ]);
+
+      return res.json({
+        orders,
+        total,
+        page: p,
+        totalPages: Math.ceil(total / lim) || 1,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/orders/:orderId', requireAuth, async (req, res) => {
+    try {
+      const order = await Order.findOne({ orderId: req.params.orderId }).lean();
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      // Fetch customer details
+      const customer = await User.findOne({ telegramId: order.userId }).lean();
+
+      // Resolve receipt image URL if receiptFileId is present
+      let receiptUrl = null;
+      if (order.receiptFileId) {
+        try {
+          const fileLink = await bot.telegram.getFileLink(order.receiptFileId);
+          receiptUrl = fileLink.href;
+        } catch {}
+      }
+
+      return res.json({
+        order,
+        customer,
+        receiptUrl,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/orders/:orderId/receipt-url', requireAuth, async (req, res) => {
+    try {
+      const order = await Order.findOne({ orderId: req.params.orderId }).lean();
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      if (!order.receiptFileId) return res.status(404).json({ error: 'No receipt file recorded' });
+
+      const fileLink = await bot.telegram.getFileLink(order.receiptFileId);
+      return res.json({ url: fileLink.href });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Approve Order
+  router.post('/orders/:orderId/approve', requireAuth, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const { manualLinks } = req.body; // Array or string of activation links
+
+      const order = await Order.findOne({ orderId });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      if (order.status === 'approved') {
+        return res.status(400).json({ error: 'Order is already approved.' });
+      }
+
+      const neededQty = order.quantity || 1;
+      let linksToDeliver = [];
+
+      if (manualLinks && Array.isArray(manualLinks) && manualLinks.length > 0) {
+        linksToDeliver = manualLinks.map((l) => String(l).trim()).filter(Boolean);
+      } else if (typeof manualLinks === 'string' && manualLinks.trim()) {
+        linksToDeliver = manualLinks.split('\n').map((l) => l.trim()).filter(Boolean);
+      }
+
+      // If manual links were provided and meet the quantity
+      if (linksToDeliver.length >= neededQty) {
+        // Record as SoldStock
+        for (const link of linksToDeliver) {
+          await SoldStock.create({
+            link,
+            description: config.productName,
+            orderId: order.orderId,
+            userId: order.userId,
+            buyerUsername: order.userInfo?.username || null,
+            buyerName: `${order.userInfo?.firstName || ''} ${order.userInfo?.lastName || ''}`.trim(),
+            amount: order.amount,
+            paymentMethod: order.paymentMethod,
+            processedBy: config.adminId,
+          });
+        }
+      } else {
+        // Find reserved or available stock from database
+        let stocks = [];
+        const stockIds = order.stockIds && order.stockIds.length > 0
+          ? order.stockIds
+          : order.stockId ? [order.stockId] : [];
+
+        if (stockIds.length > 0) {
+          stocks = await Stock.find({ _id: { $in: stockIds } });
+        }
+
+        if (stocks.length < neededQty) {
+          const linkedStocks = await Stock.find({ orderId: order._id });
+          if (linkedStocks.length > 0) stocks = linkedStocks;
+        }
+
+        if (stocks.length < neededQty) {
+          const remaining = neededQty - stocks.length;
+          const existingIds = stocks.map((s) => s._id);
+          const available = await Stock.find({
+            _id: { $nin: existingIds },
+            isSold: false,
+            isReserved: false,
+          }).limit(remaining);
+          stocks = stocks.concat(available);
+        }
+
+        if (stocks.length < neededQty) {
+          return res.status(400).json({
+            error: `Not enough stock in database (${stocks.length}/${neededQty} available). Please provide manual activation links or add stock first.`,
+            requiresManualLinks: true,
+            availableInDb: stocks.length,
+            needed: neededQty,
+          });
+        }
+
+        // Mark stocks sold
+        linksToDeliver = stocks.map((s) => s.link);
+        for (const stock of stocks) {
+          stock.isSold = true;
+          stock.isReserved = false;
+          stock.soldAt = new Date();
+          stock.orderId = order._id;
+          await stock.save();
+
+          await SoldStock.create({
+            link: stock.link,
+            description: config.productName,
+            orderId: order.orderId,
+            userId: order.userId,
+            buyerUsername: order.userInfo?.username || null,
+            buyerName: `${order.userInfo?.firstName || ''} ${order.userInfo?.lastName || ''}`.trim(),
+            amount: order.amount,
+            paymentMethod: order.paymentMethod,
+            processedBy: config.adminId,
+          });
+        }
+      }
+
+      // Update Order
+      order.status = 'approved';
+      order.deliveredLinks = linksToDeliver;
+      order.deliveredLink = linksToDeliver[0];
+      order.processedAt = new Date();
+      order.processedBy = config.adminId;
+      await order.save();
+
+      // Update user order count
+      await User.findOneAndUpdate(
+        { telegramId: order.userId },
+        { $inc: { totalOrders: 1 } },
+        { upsert: true }
+      );
+
+      // Send activation notification to customer via bot
+      try {
+        const customer = await User.findOne({ telegramId: order.userId });
+        const custLang = customer && customer.language ? customer.language : 'am';
+        await bot.telegram.sendMessage(
+          order.userId,
+          msg.orderApproved(linksToDeliver, order.orderId, custLang),
+          {
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+            ...keyboards.deliveredLinksKeyboard(linksToDeliver, custLang),
+          }
+        );
+      } catch (sendErr) {
+        console.error('Failed to send Telegram message to customer:', sendErr.message);
+      }
+
+      return res.json({
+        success: true,
+        message: `Order ${order.orderId} approved and links delivered!`,
+        deliveredLinks: linksToDeliver,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Reject Order
+  router.post('/orders/:orderId/reject', requireAuth, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const { reason = 'Invalid payment receipt' } = req.body;
+
+      const order = await Order.findOne({ orderId });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      if (order.status === 'approved') {
+        return res.status(400).json({ error: 'Cannot reject an already approved order.' });
+      }
+
+      // Free any reserved stocks
+      const stockIds = order.stockIds && order.stockIds.length > 0
+        ? order.stockIds
+        : order.stockId ? [order.stockId] : [];
+
+      if (stockIds.length > 0) {
+        await Stock.updateMany(
+          { _id: { $in: stockIds } },
+          {
+            isReserved: false,
+            reservedBy: null,
+            reservedAt: null,
+            reservedMethod: null,
+            orderId: null,
+          }
+        );
+      }
+
+      order.status = 'rejected';
+      order.adminNote = reason;
+      order.processedAt = new Date();
+      order.processedBy = config.adminId;
+      await order.save();
+
+      // Notify customer
+      try {
+        const customer = await User.findOne({ telegramId: order.userId });
+        const custLang = customer && customer.language ? customer.language : 'am';
+        await bot.telegram.sendMessage(
+          order.userId,
+          msg.orderRejected(order.orderId, reason, custLang),
+          { parse_mode: 'HTML' }
+        );
+      } catch (sendErr) {
+        console.error('Failed to notify customer on rejection:', sendErr.message);
+      }
+
+      return res.json({ success: true, message: `Order ${order.orderId} rejected.` });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Resend Order Links
+  router.post('/orders/:orderId/resend', requireAuth, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const order = await Order.findOne({ orderId });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const links = order.deliveredLinks && order.deliveredLinks.length > 0
+        ? order.deliveredLinks
+        : order.deliveredLink ? [order.deliveredLink] : [];
+
+      if (links.length === 0) {
+        return res.status(400).json({ error: 'No delivered links found on this order.' });
+      }
+
+      const customer = await User.findOne({ telegramId: order.userId });
+      const custLang = customer && customer.language ? customer.language : 'am';
+
+      await bot.telegram.sendMessage(
+        order.userId,
+        msg.orderApproved(links, order.orderId, custLang),
+        {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          ...keyboards.deliveredLinksKeyboard(links, custLang),
+        }
+      );
+
+      return res.json({ success: true, message: `Links resent to customer ${order.userId}!` });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── 5. Stock Management ─────────────────────────────────
+  router.get('/stocks', requireAuth, async (req, res) => {
+    try {
+      const { filter = 'all', search = '', page = 1, limit = 20 } = req.query;
+      const query = {};
+
+      if (filter === 'available') {
+        query.isSold = false;
+        query.isReserved = false;
+      } else if (filter === 'reserved') {
+        query.isSold = false;
+        query.isReserved = true;
+      } else if (filter === 'sold') {
+        query.isSold = true;
+      }
+
+      if (search) {
+        query.link = { $regex: String(search).trim(), $options: 'i' };
+      }
+
+      const p = Math.max(1, parseInt(page, 10) || 1);
+      const lim = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
+      const skip = (p - 1) * lim;
+
+      const [stocks, total, available, reserved, sold] = await Promise.all([
+        Stock.find(query).sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
+        Stock.countDocuments(query),
+        Stock.countDocuments({ isSold: false, isReserved: false }),
+        Stock.countDocuments({ isSold: false, isReserved: true }),
+        Stock.countDocuments({ isSold: true }),
+      ]);
+
+      return res.json({
+        stocks,
+        total,
+        page: p,
+        totalPages: Math.ceil(total / lim) || 1,
+        stats: {
+          available,
+          reserved,
+          sold,
+          totalAll: available + reserved + sold,
+        },
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/stocks', requireAuth, async (req, res) => {
+    try {
+      const { links } = req.body;
+      if (!links) return res.status(400).json({ error: 'No links provided.' });
+
+      let list = [];
+      if (Array.isArray(links)) {
+        list = links.map((l) => String(l).trim()).filter(Boolean);
+      } else {
+        list = String(links).split('\n').map((l) => l.trim()).filter(Boolean);
+      }
+
+      let added = 0;
+      const duplicates = [];
+
+      for (const link of list) {
+        try {
+          await Stock.create({
+            link,
+            description: config.productName,
+            addedBy: config.adminId,
+          });
+          added++;
+        } catch (e) {
+          if (e.code === 11000) {
+            duplicates.push(link);
+          }
+        }
+      }
+
+      return res.json({
+        success: true,
+        added,
+        duplicateCount: duplicates.length,
+        duplicates,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.delete('/stocks/:id', requireAuth, async (req, res) => {
+    try {
+      const deleted = await Stock.findByIdAndDelete(req.params.id);
+      if (!deleted) return res.status(404).json({ error: 'Stock item not found' });
+      return res.json({ success: true, message: 'Stock item deleted.' });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── 6. Checkouts (Abandoned carts) ───────────────────────
+  router.get('/checkouts', requireAuth, async (req, res) => {
+    try {
+      const { status = 'all', page = 1, limit = 15 } = req.query;
+      const query = {};
+      if (status && status !== 'all') {
+        query.status = status;
+      }
+
+      const p = Math.max(1, parseInt(page, 10) || 1);
+      const lim = Math.max(1, Math.min(100, parseInt(limit, 10) || 15));
+      const skip = (p - 1) * lim;
+
+      const [checkouts, total] = await Promise.all([
+        CheckoutAttempt.find(query).sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
+        CheckoutAttempt.countDocuments(query),
+      ]);
+
+      return res.json({
+        checkouts,
+        total,
+        page: p,
+        totalPages: Math.ceil(total / lim) || 1,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/checkouts/:id/remind', requireAuth, async (req, res) => {
+    try {
+      const checkout = await CheckoutAttempt.findById(req.params.id);
+      if (!checkout) return res.status(404).json({ error: 'Checkout not found' });
+
+      const customer = await User.findOne({ telegramId: checkout.userId });
+      const custLang = customer && customer.language ? customer.language : 'am';
+      const isEn = custLang === 'en';
+
+      const reminderText = isEn
+        ? `👋 <b>Reminder about your pending order:</b>\n\nYou started ordering <b>${checkout.quantity}x Gemini Pro 18 Months</b> (${checkout.amount} ${checkout.currency || 'ETB'}) via <b>${checkout.paymentMethod}</b>.\n\nPlease upload your payment screenshot/receipt here so we can activate your subscription!`
+        : `👋 <b>ያላለቀ የክፍያ ማስታወሻ:</b>\n\n<b>${checkout.quantity}x የ Gemini Pro 18 Months</b> (${checkout.amount} ${checkout.currency || 'ብር'}) በ <b>${checkout.paymentMethod}</b> ለማዘዝ ጀምረው ነበር።\n\nእባክዎ ክፍያውን ፈጽመው የከፈሉበትን ደረሰኝ/ስክሪንሾት እዚህ ይላኩልን፤ ወዲያው እናረጋግጣለን!`;
+
+      await bot.telegram.sendMessage(checkout.userId, reminderText, { parse_mode: 'HTML' });
+
+      checkout.remindersCount = (checkout.remindersCount || 0) + 1;
+      checkout.lastReminderAt = new Date();
+      await checkout.save();
+
+      return res.json({ success: true, message: 'Reminder sent to customer!' });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── 7. Customer / Users Management ──────────────────────
+  router.get('/users', requireAuth, async (req, res) => {
+    try {
+      const { search = '', page = 1, limit = 15 } = req.query;
+      const query = {};
+
+      if (search) {
+        const cleanSearch = String(search).trim();
+        query.$or = [
+          { username: { $regex: cleanSearch, $options: 'i' } },
+          { firstName: { $regex: cleanSearch, $options: 'i' } },
+          { lastName: { $regex: cleanSearch, $options: 'i' } },
+        ];
+        if (!isNaN(cleanSearch)) {
+          query.$or.push({ telegramId: Number(cleanSearch) });
+        }
+      }
+
+      const p = Math.max(1, parseInt(page, 10) || 1);
+      const lim = Math.max(1, Math.min(100, parseInt(limit, 10) || 15));
+      const skip = (p - 1) * lim;
+
+      const [users, total] = await Promise.all([
+        User.find(query).sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
+        User.countDocuments(query),
+      ]);
+
+      return res.json({
+        users,
+        total,
+        page: p,
+        totalPages: Math.ceil(total / lim) || 1,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/users/:telegramId', requireAuth, async (req, res) => {
+    try {
+      const telegramId = Number(req.params.telegramId);
+      const user = await User.findOne({ telegramId }).lean();
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      const orders = await Order.find({ userId: telegramId }).sort({ createdAt: -1 }).lean();
+
+      return res.json({ user, orders });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Direct Message (DM) to User
+  router.post('/users/:telegramId/dm', requireAuth, async (req, res) => {
+    try {
+      const telegramId = Number(req.params.telegramId);
+      const { message } = req.body;
+      if (!message || !message.trim()) {
+        return res.status(400).json({ error: 'Message cannot be empty.' });
+      }
+
+      const formatted = `💬 <b>ከአስተዳዳሪው የተላከ መልዕክት:</b>\n\n${message.trim()}`;
+      await bot.telegram.sendMessage(telegramId, formatted, { parse_mode: 'HTML' });
+
+      return res.json({ success: true, message: `DM sent to ${telegramId}!` });
+    } catch (err) {
+      return res.status(500).json({ error: `Failed to send DM: ${err.message}` });
+    }
+  });
+
+  // ─── 8. Broadcast & Proof Channel Post ───────────────────
+  router.post('/broadcast', requireAuth, async (req, res) => {
+    try {
+      const { message, buttonText, buttonUrl } = req.body;
+      if (!message || !message.trim()) {
+        return res.status(400).json({ error: 'Broadcast message cannot be empty.' });
+      }
+
+      const users = await User.find({ isBlocked: false }).select('telegramId').lean();
+      let sent = 0;
+      let failed = 0;
+
+      const extra = { parse_mode: 'HTML' };
+      if (buttonText && buttonUrl) {
+        extra.reply_markup = {
+          inline_keyboard: [[{ text: buttonText, url: buttonUrl }]],
+        };
+      }
+
+      // Fire in background batches
+      for (const u of users) {
+        try {
+          await bot.telegram.sendMessage(u.telegramId, message.trim(), extra);
+          sent++;
+          await new Promise((r) => setTimeout(r, 50)); // rate limit protection
+        } catch {
+          failed++;
+        }
+      }
+
+      return res.json({
+        success: true,
+        total: users.length,
+        sent,
+        failed,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/channel-post', requireAuth, async (req, res) => {
+    try {
+      const { text } = req.body;
+      const channel = config.proofChannel.username;
+      if (!channel) {
+        return res.status(400).json({ error: 'Proof channel not configured in .env' });
+      }
+
+      const botMe = await bot.telegram.getMe();
+      const buyUrl = `https://t.me/${botMe.username}?start=buy`;
+
+      const extra = {
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🛒 አሁኑኑ ይዘዙ (Buy Now)', url: buyUrl }],
+          ],
+        },
+      };
+
+      const defaultText = text && text.trim() ? text.trim() : (
+        `🔥 <b>Gemini Pro 18 Months አክቲቬሽን በታላቅ ቅናሽ!</b>\n\n` +
+        `✅ 18 ወራት ሙሉ አገልግሎት\n` +
+        `✅ 2TB Cloud Storage\n` +
+        `✅ የላቀ AI አቅም (Gemini Advanced)\n` +
+        `💰 ዋጋ: <b>${config.productPrice} ብር</b> ብቻ!\n\n` +
+        `👉 ከታች ባለው አዝራር በቦቱ በደቂቃዎች ውስጥ ይዘዙ!`
+      );
+
+      await bot.telegram.sendMessage(channel, defaultText, extra);
+
+      return res.json({ success: true, message: `Post published to channel ${channel}!` });
+    } catch (err) {
+      return res.status(500).json({ error: `Failed to post to channel: ${err.message}` });
+    }
+  });
+
+  return router;
+}
+
+module.exports = { createAdminRouter };

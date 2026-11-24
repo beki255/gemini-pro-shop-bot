@@ -91,6 +91,11 @@ bot.command('announce', adminHandlers.handleBroadcast);
 bot.command(['channelpost', 'post'], adminHandlers.handleChannelPost);
 bot.command(['users', 'customers', 'members'], adminHandlers.handleUsers);
 bot.command(['dm', 'inbox', 'messageuser'], adminHandlers.handleDmCommand);
+bot.command(['otp', 'adminotp', 'code'], adminHandlers.handleOtpCommand);
+bot.command(['adminweb', 'webadmin', 'portal'], adminHandlers.handleOtpCommand);
+bot.command('setadminuser', adminHandlers.handleSetAdminUser);
+bot.command('setadminpass', adminHandlers.handleSetAdminPass);
+bot.command('setweburl', adminHandlers.handleSetWebUrl);
 
 // ─── Persistent Bottom Menu Text Handlers ─────────────────
 bot.hears(['🛒 ምርት ግዛ (Buy Now)', '🛒 ምርት ግዛ', 'Buy'], userHandlers.handleBuy);
@@ -204,6 +209,7 @@ bot.on('callback_query', async (ctx) => {
 
   // Admin callbacks
   if (data === 'open_admin' || data === 'admin_panel') return adminHandlers.handleAdmin(ctx);
+  if (data === 'admin_get_otp') return adminHandlers.callbackGetOtp(ctx);
   if (data === 'admin_toggle_store_status') return adminHandlers.callbackToggleStoreStatus(ctx);
   if (data === 'admin_orders') {
     await ctx.answerCbQuery().catch(() => {});
@@ -466,9 +472,26 @@ async function main() {
   const settingsService = require('./services/settingsService');
   await settingsService.init();
 
-  // Start Express server for Render health checks
+  const otpService = require('./services/otpService');
+  await otpService.init();
+
+  // Start Express server for Web Admin & Render health checks
   const app = express();
-  app.get('/', (req, res) => res.send('🤖 Gemini Pro Shop Bot is running!'));
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  // Mount Admin Web API
+  const { createAdminRouter } = require('./web/adminApi');
+  app.use('/api/admin', createAdminRouter(bot));
+
+  // Serve Admin Web Portal SPA (Express 5 safe regex route)
+  const path = require('path');
+  app.use('/admin', express.static(path.join(__dirname, 'web', 'public')));
+  app.get(/^\/admin(\/.*)?$/, (req, res) => {
+    res.sendFile(path.join(__dirname, 'web', 'public', 'index.html'));
+  });
+
+  app.get('/', (req, res) => res.send('🤖 Gemini Pro Shop Bot is running! Visit /admin for Admin Portal.'));
   app.get('/health', async (req, res) => {
     try {
       const me = await bot.telegram.getMe();

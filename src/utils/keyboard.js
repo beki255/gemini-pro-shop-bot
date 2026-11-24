@@ -487,8 +487,23 @@ const keyboards = {
       style: isAcceptingOrders ? 'success' : 'danger',
     };
 
+    const otpService = require('../services/otpService');
+    const portalUrl = otpService.getWebUrl();
+
     return Markup.inlineKeyboard([
       [statusBtn],
+      [
+        {
+          text: isEn ? '🌐 Admin Web Portal' : '🌐 Admin Web Portal ክፈት',
+          url: portalUrl,
+        },
+      ],
+      [
+        {
+          text: isEn ? '🔑 Web Login OTP' : '🔑 የWeb መግቢያ ኮድ (OTP)',
+          callback_data: 'admin_get_otp',
+        },
+      ],
       [
         {
           text: isEn ? '📊 Statistics' : '📊 ስታቲስቲክስ',

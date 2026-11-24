@@ -3510,8 +3510,64 @@ const callbackCancelChannelPost = adminOnly(async (ctx) => {
   });
 });
 
+// ─── Web Admin Portal, OTP & Credentials ──────────────────
+const otpService = require('../services/otpService');
+
+const handleOtpCommand = adminOnly(async (ctx) => {
+  const code = otpService.generateOtp(ctx.from.id);
+  const portalUrl = otpService.getWebUrl();
+
+  const msgText = `🔐 <b>Web Admin Login Code</b>\n\nCode: <code>${code}</code>\n<b>ለ5 ደቂቃ ያገለግላል።</b>\nPortal: ${portalUrl}`;
+  return ctx.reply(msgText, {
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🌐 Admin Web Portal ክፈት', url: portalUrl }],
+        [{ text: '🔙 Admin Panel', callback_data: 'admin_panel' }],
+      ],
+    },
+  });
+});
+
+const callbackGetOtp = adminOnly(async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  return handleOtpCommand(ctx);
+});
+
+const handleSetAdminUser = adminOnly(async (ctx) => {
+  const newUsername = ctx.message.text.replace('/setadminuser', '').trim();
+  if (!newUsername) {
+    return ctx.reply('⚠️ አጠቃቀም: `/setadminuser <username>`', { parse_mode: 'Markdown' });
+  }
+  await otpService.setAdminUsername(newUsername);
+  return ctx.reply(`✅ የዌብ አስተዳዳሪ ተጠቃሚ ስም (Username) ወደ \`${newUsername}\` ተቀይሯል!`, { parse_mode: 'Markdown' });
+});
+
+const handleSetAdminPass = adminOnly(async (ctx) => {
+  const newPass = ctx.message.text.replace('/setadminpass', '').trim();
+  if (!newPass) {
+    return ctx.reply('⚠️ አጠቃቀም: `/setadminpass <password>`', { parse_mode: 'Markdown' });
+  }
+  await otpService.setAdminPassword(newPass);
+  return ctx.reply(`✅ የዌብ አስተዳዳሪ የይለፍ ቃል (Password) በተሳካ ሁኔታ ተቀይሯል!`, { parse_mode: 'Markdown' });
+});
+
+const handleSetWebUrl = adminOnly(async (ctx) => {
+  const newUrl = ctx.message.text.replace('/setweburl', '').trim();
+  if (!newUrl) {
+    return ctx.reply('⚠️ አጠቃቀም: `/setweburl https://example.com`', { parse_mode: 'Markdown' });
+  }
+  await otpService.setWebUrl(newUrl);
+  return ctx.reply(`✅ የዌብ ፖርታል ሊንክ ወደ \`${newUrl}/admin\` ተቀይሯል!`, { parse_mode: 'Markdown' });
+});
+
 module.exports = {
   handleAdmin,
+  handleOtpCommand,
+  callbackGetOtp,
+  handleSetAdminUser,
+  handleSetAdminPass,
+  handleSetWebUrl,
   handleAddStock,
   handleAddStockBulk,
   handleRestock,

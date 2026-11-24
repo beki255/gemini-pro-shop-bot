@@ -1,0 +1,1964 @@
+<!DOCTYPE html>
+<html lang="am" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Pro Shop — Admin Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', '"Noto Sans Ethiopic"', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.4); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.7); }
+    .glass { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen antialiased flex flex-col font-sans transition-colors duration-200">
+
+  <!-- ==================== AUTH OVERLAY (DUAL LOGIN) ==================== -->
+  <div id="authScreen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 glass hidden">
+    <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-7 sm:p-8 relative transition-all">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 bg-brand-500/10 text-brand-600 dark:text-brand-400 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white" data-i18n="loginTitle">Admin Portal</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" data-i18n="loginSubtitle">Sign in to manage Gemini Pro store</p>
+      </div>
+
+      <!-- Login Tabs: OTP vs Password -->
+      <div class="flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl mb-6">
+        <button id="tabBtnOtp" onclick="switchLoginTab('otp')" class="flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-300 shadow-sm flex items-center justify-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+          <span data-i18n="tabTelegramOtp">Telegram OTP</span>
+        </button>
+        <button id="tabBtnPass" onclick="switchLoginTab('pass')" class="flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+          <span data-i18n="tabPassword">User & Password</span>
+        </button>
+      </div>
+
+      <!-- OTP Form -->
+      <form id="formOtp" onsubmit="handleLoginOtp(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2" data-i18n="otpLabel">6-Digit Login Code</label>
+          <input type="text" id="otpCodeInput" maxlength="6" placeholder="123456" autocomplete="one-time-code" class="w-full text-center tracking-[0.4em] text-2xl font-mono py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition" required>
+        </div>
+        <p class="text-xs text-slate-500 dark:text-slate-400 text-center" data-i18n="otpHint">
+          Send <code class="text-brand-600 dark:text-brand-400 font-bold">/otp</code> or click "Web Login OTP" in your Telegram bot to get your code.
+        </p>
+        <button type="submit" id="btnSubmitOtp" class="w-full py-3 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold shadow-lg shadow-brand-500/25 transition flex items-center justify-center gap-2">
+          <span data-i18n="btnLogin">Sign In</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </button>
+      </form>
+
+      <!-- Password Form -->
+      <form id="formPass" onsubmit="handleLoginPass(event)" class="space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1" data-i18n="userLabel">Username</label>
+          <input type="text" id="userInput" placeholder="admin" class="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition" required>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1" data-i18n="passLabel">Password</label>
+          <input type="password" id="passInput" placeholder="••••••••" class="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition" required>
+        </div>
+        <button type="submit" id="btnSubmitPass" class="w-full py-3 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold shadow-lg shadow-brand-500/25 transition flex items-center justify-center gap-2">
+          <span data-i18n="btnLogin">Sign In</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </button>
+      </form>
+
+      <!-- Language & Theme Switcher on Login -->
+      <div class="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+        <button type="button" onclick="toggleTheme()" class="hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1">
+          <span id="loginThemeIcon">🌙</span> <span id="loginThemeText">Theme</span>
+        </button>
+        <button type="button" onclick="toggleLanguage()" class="hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1 font-medium">
+          <span id="loginLangFlag">🇬🇧</span> <span id="loginLangText">English</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN DASHBOARD LAYOUT ==================== -->
+  <div id="mainLayout" class="flex-1 flex overflow-hidden">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-30 transition-transform duration-200 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:-translate-x-full">
+      <!-- Brand Header -->
+      <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-brand-500/20 font-bold text-lg">
+            G
+          </div>
+          <div>
+            <div class="font-bold text-base leading-tight text-slate-900 dark:text-white">Gemini Pro</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium" data-i18n="portalBadge">Admin Portal</div>
+          </div>
+        </div>
+        <button onclick="toggleMobileSidebar()" class="md:hidden text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+        <button onclick="navigateView('overview')" id="nav-overview" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          <span data-i18n="navDashboard">Dashboard</span>
+        </button>
+
+        <button onclick="navigateView('orders')" id="nav-orders" class="nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+            <span data-i18n="navOrders">Orders</span>
+          </div>
+          <span id="sidebarPendingBadge" class="hidden px-2 py-0.5 text-xs font-bold rounded-full bg-amber-500 text-white">0</span>
+        </button>
+
+        <button onclick="navigateView('stock')" id="nav-stock" class="nav-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            <span data-i18n="navStock">Stock Links</span>
+          </div>
+          <span id="sidebarStockBadge" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">0</span>
+        </button>
+
+        <button onclick="navigateView('checkouts')" id="nav-checkouts" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+          <span data-i18n="navCheckouts">Checkouts</span>
+        </button>
+
+        <button onclick="navigateView('users')" id="nav-users" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <span data-i18n="navUsers">Customers</span>
+        </button>
+
+        <button onclick="navigateView('marketing')" id="nav-marketing" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+          <span data-i18n="navMarketing">Broadcast & Channel</span>
+        </button>
+
+        <button onclick="navigateView('settings')" id="nav-settings" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          <span data-i18n="navSettings">Settings</span>
+        </button>
+      </nav>
+
+      <!-- Store Status Mini Card in Sidebar -->
+      <div class="p-4 m-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 dark:text-slate-400" data-i18n="storeStatus">Store Status</span>
+          <span id="sidebarStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+        </div>
+        <div id="sidebarStatusText" class="text-xs font-bold text-slate-800 dark:text-slate-200 mb-2">Open (Accepting)</div>
+        <button onclick="toggleStoreStatus()" id="sidebarStatusToggleBtn" class="w-full py-1.5 px-3 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition" data-i18n="btnToggleStatus">
+          Toggle Status
+        </button>
+      </div>
+
+      <!-- User & Logout -->
+      <div class="p-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2 overflow-hidden">
+          <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-300">
+            A
+          </div>
+          <div class="truncate">
+            <div id="sidebarUsername" class="text-xs font-bold truncate text-slate-800 dark:text-slate-200">admin</div>
+            <div class="text-[10px] text-emerald-500 font-semibold flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span> Online
+            </div>
+          </div>
+        </div>
+        <button onclick="handleLogout()" title="Logout" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MOBILE SIDEBAR BACKDROP -->
+    <div id="sidebarBackdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 z-20 bg-slate-900/50 glass hidden md:hidden"></div>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+
+      <!-- TOP HEADER -->
+      <header class="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between z-10 flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <button onclick="toggleMobileSidebar()" class="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <h2 id="headerTitle" class="text-lg font-bold text-slate-900 dark:text-white">Dashboard</h2>
+        </div>
+
+        <!-- Header Actions -->
+        <div class="flex items-center gap-2 sm:gap-3">
+          <!-- Refresh Button -->
+          <button onclick="refreshCurrentView()" title="Refresh" class="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          </button>
+
+          <!-- Theme Toggle -->
+          <button onclick="toggleTheme()" class="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center gap-1.5 text-xs font-semibold">
+            <span id="headerThemeIcon">🌙</span>
+          </button>
+
+          <!-- Language Switcher -->
+          <button onclick="toggleLanguage()" class="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center gap-1.5 text-xs font-bold">
+            <span id="headerLangFlag">🇪🇹</span>
+            <span id="headerLangText">አማርኛ</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- SCROLLABLE VIEW CONTAINER -->
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- ==================== VIEW 1: OVERVIEW / DASHBOARD ==================== -->
+        <section id="view-overview" class="view-panel space-y-6">
+          <!-- Top Stat Cards Grid -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <!-- Approved Orders / Sales -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400" data-i18n="statApprovedOrders">Approved Sales</span>
+                <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </span>
+              </div>
+              <div id="statOrdersApproved" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">0</div>
+              <div class="mt-2 text-xs text-slate-500 flex items-center gap-1">
+                <span data-i18n="todaySales">Today:</span> <b id="statTodayApproved" class="text-emerald-500">0</b>
+              </div>
+            </div>
+
+            <!-- Revenue ETB -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400" data-i18n="statRevenue">Total Revenue</span>
+                <span class="p-2 rounded-xl bg-brand-500/10 text-brand-500">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </span>
+              </div>
+              <div id="statRevenueEtb" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">0 ETB</div>
+              <div id="statRevenueUsdt" class="mt-2 text-xs font-medium text-slate-500">0.00 USDT</div>
+            </div>
+
+            <!-- Available Stock -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400" data-i18n="statStock">Available Stock</span>
+                <span class="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                </span>
+              </div>
+              <div id="statStockAvailable" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">0</div>
+              <div class="mt-2 text-xs text-slate-500 flex items-center gap-1">
+                <span data-i18n="reservedStock">Reserved:</span> <b id="statStockReserved" class="text-amber-500">0</b>
+              </div>
+            </div>
+
+            <!-- Pending Orders -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400" data-i18n="statPending">Pending Orders</span>
+                <span class="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </span>
+              </div>
+              <div id="statOrdersPending" class="text-2xl sm:text-3xl font-extrabold text-amber-500">0</div>
+              <div class="mt-2 text-xs text-slate-500">
+                <button onclick="navigateView('orders', { status: 'pending' })" class="text-brand-600 dark:text-brand-400 font-semibold hover:underline" data-i18n="reviewPending">Review Pending →</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Action Bar -->
+          <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center font-bold">
+                ⚡
+              </div>
+              <div>
+                <div class="font-bold text-sm text-slate-900 dark:text-white" data-i18n="quickActionsTitle">Quick Actions</div>
+                <div class="text-xs text-slate-500" data-i18n="quickActionsSubtitle">Frequently used store operations</div>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="openAddStockModal()" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs shadow-md shadow-brand-500/20 transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <span data-i18n="btnAddStock">Add Stock</span>
+              </button>
+              <button onclick="navigateView('marketing')" class="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6"/></svg>
+                <span data-i18n="btnBroadcast">Broadcast</span>
+              </button>
+              <button onclick="navigateView('settings')" class="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2"/></svg>
+                <span data-i18n="btnPricing">Change Price</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Recent Orders Table Preview -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h3 class="font-bold text-base text-slate-900 dark:text-white" data-i18n="recentOrders">Recent Orders</h3>
+              <button onclick="navigateView('orders')" class="text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline" data-i18n="viewAllOrders">View All Orders →</button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 dark:bg-slate-800/50 text-xs font-bold uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th class="p-3.5 pl-5" data-i18n="thOrderId">Order ID</th>
+                    <th class="p-3.5" data-i18n="thCustomer">Customer</th>
+                    <th class="p-3.5" data-i18n="thMethod">Method</th>
+                    <th class="p-3.5" data-i18n="thAmount">Amount</th>
+                    <th class="p-3.5" data-i18n="thStatus">Status</th>
+                    <th class="p-3.5 pr-5 text-right" data-i18n="thAction">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="recentOrdersTableBody" class="divide-y divide-slate-200 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                  <tr><td colspan="6" class="p-8 text-center text-slate-400" data-i18n="loading">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== VIEW 2: ORDERS ==================== -->
+        <section id="view-orders" class="view-panel space-y-6 hidden">
+          <!-- Filters & Search -->
+          <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <!-- Filter Tabs -->
+            <div class="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-semibold">
+              <button onclick="setOrdersFilter('all')" id="btnOrderFilterAll" class="px-3 py-1.5 rounded-lg transition bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" data-i18n="filterAll">All</button>
+              <button onclick="setOrdersFilter('pending')" id="btnOrderFilterPending" class="px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white" data-i18n="filterPending">Pending</button>
+              <button onclick="setOrdersFilter('approved')" id="btnOrderFilterApproved" class="px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white" data-i18n="filterApproved">Approved</button>
+              <button onclick="setOrdersFilter('rejected')" id="btnOrderFilterRejected" class="px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white" data-i18n="filterRejected">Rejected</button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="relative flex-1 min-w-[200px] max-w-xs">
+              <input type="text" id="orderSearchInput" onkeyup="handleOrderSearch(event)" placeholder="Search order ID or customer..." class="w-full text-xs py-2 pl-8 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+          </div>
+
+          <!-- Orders Table -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 dark:bg-slate-800/50 text-xs font-bold uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th class="p-3.5 pl-5" data-i18n="thOrderId">Order ID</th>
+                    <th class="p-3.5" data-i18n="thCustomer">Customer</th>
+                    <th class="p-3.5" data-i18n="thQty">Qty</th>
+                    <th class="p-3.5" data-i18n="thMethod">Method</th>
+                    <th class="p-3.5" data-i18n="thAmount">Amount</th>
+                    <th class="p-3.5" data-i18n="thReceipt">Receipt</th>
+                    <th class="p-3.5" data-i18n="thStatus">Status</th>
+                    <th class="p-3.5" data-i18n="thDate">Date</th>
+                    <th class="p-3.5 pr-5 text-right" data-i18n="thAction">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersTableBody" class="divide-y divide-slate-200 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                  <tr><td colspan="9" class="p-8 text-center text-slate-400" data-i18n="loading">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Orders Pagination -->
+            <div id="ordersPagination" class="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <div id="ordersPageInfo">Page 1 of 1</div>
+              <div class="flex gap-2">
+                <button onclick="changeOrdersPage(-1)" id="btnOrdersPrev" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50" data-i18n="btnPrev">Previous</button>
+                <button onclick="changeOrdersPage(1)" id="btnOrdersNext" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50" data-i18n="btnNext">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== VIEW 3: STOCK ==================== -->
+        <section id="view-stock" class="view-panel space-y-6 hidden">
+          <!-- Stock Header with Add Button -->
+          <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-semibold">
+              <button onclick="setStockFilter('available')" id="btnStockFilterAvailable" class="px-3 py-1.5 rounded-lg transition bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" data-i18n="filterAvailable">Available</button>
+              <button onclick="setStockFilter('reserved')" id="btnStockFilterReserved" class="px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white" data-i18n="filterReserved">Reserved</button>
+              <button onclick="setStockFilter('sold')" id="btnStockFilterSold" class="px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white" data-i18n="filterSold">Sold</button>
+              <button onclick="setStockFilter('all')" id="btnStockFilterAll" class="px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white" data-i18n="filterAll">All</button>
+            </div>
+
+            <button onclick="openAddStockModal()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs shadow-md shadow-brand-500/20 transition flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span data-i18n="btnAddStock">Add Stock Links</span>
+            </button>
+          </div>
+
+          <!-- Stock Table -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 dark:bg-slate-800/50 text-xs font-bold uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th class="p-3.5 pl-5" data-i18n="thLink">Activation Link</th>
+                    <th class="p-3.5" data-i18n="thProduct">Product</th>
+                    <th class="p-3.5" data-i18n="thStatus">Status</th>
+                    <th class="p-3.5" data-i18n="thAddedDate">Added Date</th>
+                    <th class="p-3.5 pr-5 text-right" data-i18n="thAction">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="stockTableBody" class="divide-y divide-slate-200 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                  <tr><td colspan="5" class="p-8 text-center text-slate-400" data-i18n="loading">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Stock Pagination -->
+            <div id="stockPagination" class="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <div id="stockPageInfo">Page 1 of 1</div>
+              <div class="flex gap-2">
+                <button onclick="changeStockPage(-1)" id="btnStockPrev" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50" data-i18n="btnPrev">Previous</button>
+                <button onclick="changeStockPage(1)" id="btnStockNext" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50" data-i18n="btnNext">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== VIEW 4: CHECKOUTS ==================== -->
+        <section id="view-checkouts" class="view-panel space-y-6 hidden">
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 class="font-bold text-base text-slate-900 dark:text-white" data-i18n="checkoutsTitle">Active Checkouts & Abandoned Carts</h3>
+                <p class="text-xs text-slate-500 mt-0.5" data-i18n="checkoutsSubtitle">Send reminders directly to customers who started checkout</p>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 dark:bg-slate-800/50 text-xs font-bold uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th class="p-3.5 pl-5" data-i18n="thCustomer">Customer</th>
+                    <th class="p-3.5" data-i18n="thMethod">Method</th>
+                    <th class="p-3.5" data-i18n="thAmount">Amount</th>
+                    <th class="p-3.5" data-i18n="thStatus">Status</th>
+                    <th class="p-3.5" data-i18n="thReminders">Reminders</th>
+                    <th class="p-3.5" data-i18n="thDate">Date</th>
+                    <th class="p-3.5 pr-5 text-right" data-i18n="thAction">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="checkoutsTableBody" class="divide-y divide-slate-200 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                  <tr><td colspan="7" class="p-8 text-center text-slate-400" data-i18n="loading">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== VIEW 5: CUSTOMERS / USERS ==================== -->
+        <section id="view-users" class="view-panel space-y-6 hidden">
+          <!-- Users Search Bar -->
+          <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-4">
+            <div class="relative flex-1 max-w-md">
+              <input type="text" id="usersSearchInput" onkeyup="handleUsersSearch(event)" placeholder="Search by name, username or Telegram ID..." class="w-full text-xs py-2 pl-8 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+          </div>
+
+          <!-- Users Table -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 dark:bg-slate-800/50 text-xs font-bold uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th class="p-3.5 pl-5" data-i18n="thCustomer">Customer</th>
+                    <th class="p-3.5" data-i18n="thTelegramId">Telegram ID</th>
+                    <th class="p-3.5" data-i18n="thLanguage">Language</th>
+                    <th class="p-3.5" data-i18n="thTotalOrders">Total Orders</th>
+                    <th class="p-3.5" data-i18n="thJoinedDate">Joined Date</th>
+                    <th class="p-3.5 pr-5 text-right" data-i18n="thAction">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody" class="divide-y divide-slate-200 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                  <tr><td colspan="6" class="p-8 text-center text-slate-400" data-i18n="loading">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Users Pagination -->
+            <div id="usersPagination" class="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <div id="usersPageInfo">Page 1 of 1</div>
+              <div class="flex gap-2">
+                <button onclick="changeUsersPage(-1)" id="btnUsersPrev" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50" data-i18n="btnPrev">Previous</button>
+                <button onclick="changeUsersPage(1)" id="btnUsersNext" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50" data-i18n="btnNext">Next</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== VIEW 6: BROADCAST & CHANNEL ==================== -->
+        <section id="view-marketing" class="view-panel space-y-6 hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Broadcast Card -->
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+                  📢
+                </div>
+                <div>
+                  <h3 class="font-bold text-base text-slate-900 dark:text-white" data-i18n="broadcastTitle">Broadcast to All Users</h3>
+                  <p class="text-xs text-slate-500" data-i18n="broadcastSubtitle">Sends a message to every registered customer via Telegram bot</p>
+                </div>
+              </div>
+
+              <form onsubmit="handleSendBroadcast(event)" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 mb-1" data-i18n="broadcastMessage">Message (HTML Supported)</label>
+                  <textarea id="broadcastMessageInput" rows="5" placeholder="🎉 Special Offer! ..." class="w-full text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" required></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="btnText">Button Text (Optional)</label>
+                    <input type="text" id="broadcastBtnTextInput" placeholder="🛒 Buy Now" class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="btnUrl">Button URL (Optional)</label>
+                    <input type="url" id="broadcastBtnUrlInput" placeholder="https://t.me/..." class="w-full text-xs py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                  </div>
+                </div>
+
+                <button type="submit" id="btnSubmitBroadcast" class="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-md shadow-purple-500/20 transition flex items-center justify-center gap-1.5">
+                  <span data-i18n="btnSendBroadcast">Send Broadcast</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Proof Channel Post Card -->
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                  🚀
+                </div>
+                <div>
+                  <h3 class="font-bold text-base text-slate-900 dark:text-white" data-i18n="channelPostTitle">Post to Proof Channel</h3>
+                  <p class="text-xs text-slate-500" data-i18n="channelPostSubtitle">Publishes promo announcement with "Buy Now" button to channel</p>
+                </div>
+              </div>
+
+              <form onsubmit="handleSendChannelPost(event)" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 mb-1" data-i18n="channelPostText">Post Content (HTML)</label>
+                  <textarea id="channelPostTextInput" rows="6" placeholder="🔥 Gemini Pro 18 Months አክቲቬሽን በታላቅ ቅናሽ! ..." class="w-full text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+                </div>
+
+                <p class="text-xs text-slate-500" data-i18n="channelPostHint">
+                  Leaves default promotional text if left empty. A "Buy Now" button linking directly to your bot will be automatically attached.
+                </p>
+
+                <button type="submit" id="btnSubmitChannelPost" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-1.5">
+                  <span data-i18n="btnPublishChannel">Publish to Channel</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== VIEW 7: SETTINGS ==================== -->
+        <section id="view-settings" class="view-panel space-y-6 hidden">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Product Pricing -->
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <span>💰</span> <span data-i18n="pricingSettingsTitle">Pricing & Currency</span>
+              </h3>
+
+              <form onsubmit="handleUpdatePrice(event)" class="space-y-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="labelEtbPrice">Product Price (ETB)</label>
+                  <div class="flex gap-2">
+                    <input type="number" id="settingPriceInput" min="1" step="1" class="flex-1 text-sm py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" required>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl transition" data-i18n="btnSave">Save</button>
+                  </div>
+                </div>
+              </form>
+
+              <form onsubmit="handleUpdateUsdtRate(event)" class="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="labelUsdtRate">USDT Exchange Rate (ETB / USDT)</label>
+                  <div class="flex gap-2">
+                    <input type="number" id="settingUsdtRateInput" min="1" step="1" class="flex-1 text-sm py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" required>
+                    <button type="submit" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl transition" data-i18n="btnSave">Save</button>
+                  </div>
+                  <div id="settingCalculatedUsdt" class="text-xs text-slate-500 mt-1">Calculated: 0.00 USDT</div>
+                </div>
+              </form>
+            </div>
+
+            <!-- Admin Credentials -->
+            <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <span>🔐</span> <span data-i18n="credentialsSettingsTitle">Admin Login Credentials</span>
+              </h3>
+
+              <form onsubmit="handleUpdateCredentials(event)" class="space-y-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="userLabel">Username</label>
+                  <input type="text" id="settingUsernameInput" placeholder="admin" class="w-full text-sm py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="newPasswordLabel">New Password</label>
+                  <input type="password" id="settingPasswordInput" placeholder="Leave blank to keep unchanged" class="w-full text-sm py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                </div>
+                <button type="submit" class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl transition" data-i18n="btnUpdateCredentials">Update Credentials</button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- 1. ORDER DETAIL / RECEIPT MODAL -->
+  <div id="modalOrder" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 glass hidden">
+    <div class="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-base font-bold text-slate-900 dark:text-white" data-i18n="orderDetailTitle">Order Details:</span>
+          <span id="modalOrderId" class="font-mono text-base font-bold text-brand-600 dark:text-brand-400">ORD-XXXX</span>
+        </div>
+        <button onclick="closeModal('modalOrder')" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-5">
+        <!-- Customer & Order Specs -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-xs">
+          <div>
+            <div class="text-slate-400 font-semibold uppercase" data-i18n="thCustomer">Customer</div>
+            <div id="modalCustomerName" class="font-bold text-slate-900 dark:text-white mt-0.5 truncate">-</div>
+            <div id="modalCustomerUser" class="text-slate-500 font-mono text-[11px] truncate">-</div>
+          </div>
+          <div>
+            <div class="text-slate-400 font-semibold uppercase" data-i18n="thAmount">Amount</div>
+            <div id="modalOrderAmount" class="font-bold text-slate-900 dark:text-white mt-0.5">-</div>
+            <div id="modalOrderQty" class="text-slate-500 text-[11px]">-</div>
+          </div>
+          <div>
+            <div class="text-slate-400 font-semibold uppercase" data-i18n="thMethod">Method</div>
+            <div id="modalOrderMethod" class="font-bold text-slate-900 dark:text-white mt-0.5">-</div>
+          </div>
+          <div>
+            <div class="text-slate-400 font-semibold uppercase" data-i18n="thStatus">Status</div>
+            <div id="modalOrderStatusBadge" class="mt-0.5">-</div>
+          </div>
+        </div>
+
+        <!-- Receipt Image Preview -->
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2" data-i18n="paymentReceiptImage">Payment Receipt Image</div>
+          <div id="modalReceiptContainer" class="bg-slate-100 dark:bg-slate-800 rounded-xl p-4 text-center min-h-[160px] flex items-center justify-center border border-dashed border-slate-300 dark:border-slate-700">
+            <span class="text-xs text-slate-400" data-i18n="noReceipt">No receipt photo attached</span>
+          </div>
+        </div>
+
+        <!-- Delivered Links List if already approved -->
+        <div id="modalDeliveredContainer" class="hidden">
+          <div class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2" data-i18n="deliveredLinks">Delivered Activation Links</div>
+          <div id="modalDeliveredLinksList" class="space-y-1.5 font-mono text-xs p-3 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl break-all"></div>
+        </div>
+      </div>
+
+      <!-- Action Footer -->
+      <div id="modalOrderFooter" class="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
+        <button onclick="closeModal('modalOrder')" class="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition" data-i18n="btnClose">Close</button>
+        <button id="btnModalReject" onclick="openRejectModal()" class="px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition border border-rose-300 dark:border-rose-800" data-i18n="btnReject">Reject</button>
+        <button id="btnModalApprove" onclick="handleApproveOrder()" class="px-5 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md shadow-emerald-600/20 transition" data-i18n="btnApprove">Approve & Deliver</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. REJECT ORDER MODAL -->
+  <div id="modalReject" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 glass hidden">
+    <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+      <h3 class="font-bold text-base text-slate-900 dark:text-white" data-i18n="rejectOrderTitle">Reject Order</h3>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="rejectReasonLabel">Reason (will be sent to customer)</label>
+        <select id="rejectReasonSelect" onchange="handleRejectSelectChange(this)" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white mb-2">
+          <option value="የክፍያ ደረሰኙ አይነበብም / የተቆረጠ ነው (Unreadable receipt)">የክፍያ ደረሰኙ አይነበብም / የተቆረጠ ነው (Unreadable receipt)</option>
+          <option value="ትክክለኛ ያልሆነ የክፍያ ስክሪንሾት (Invalid receipt)">ትክክለኛ ያልሆነ የክፍያ ስክሪንሾት (Invalid receipt)</option>
+          <option value="ክፍያው በሒሳባችን ላይ አልገባም (Payment not received)">ክፍያው በሒሳባችን ላይ አልገባም (Payment not received)</option>
+          <option value="የተከፈለው መጠን ከተጠየቀው ያነሰ ነው (Incorrect amount)">የተከፈለው መጠን ከተጠየቀው ያነሰ ነው (Incorrect amount)</option>
+          <option value="custom">ሌላ ምክንያት ጻፍ (Custom reason)...</option>
+        </select>
+        <textarea id="rejectReasonCustom" rows="2" placeholder="Explain rejection reason..." class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white hidden"></textarea>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeModal('modalReject')" class="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl" data-i18n="btnCancel">Cancel</button>
+        <button onclick="submitRejectOrder()" class="px-4 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-md shadow-rose-600/20" data-i18n="btnConfirmReject">Confirm Reject</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. ADD STOCK MODAL -->
+  <div id="modalAddStock" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 glass hidden">
+    <div class="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-base text-slate-900 dark:text-white" data-i18n="addStockTitle">Add Activation Stock</h3>
+        <button onclick="closeModal('modalAddStock')" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1" data-i18n="addStockLabel">Paste Links (One URL per line)</label>
+        <textarea id="addStockTextarea" rows="6" placeholder="https://one.google.com/redeem/...\nhttps://one.google.com/redeem/..." class="w-full font-mono text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" required></textarea>
+        <div class="text-[11px] text-slate-400 mt-1" data-i18n="addStockHint">Duplicates will be skipped automatically.</div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeModal('modalAddStock')" class="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl" data-i18n="btnCancel">Cancel</button>
+        <button onclick="submitAddStock()" class="px-5 py-2 text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white rounded-xl shadow-md shadow-brand-500/20" data-i18n="btnSubmitStock">Add to Stock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. CUSTOMER DM MODAL -->
+  <div id="modalDm" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 glass hidden">
+    <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-bold text-base text-slate-900 dark:text-white" data-i18n="dmTitle">Send Direct Message</h3>
+        <button onclick="closeModal('modalDm')" class="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="text-xs text-slate-500">
+        <span data-i18n="dmTo">Sending to:</span> <b id="dmRecipientName" class="text-slate-900 dark:text-white">Customer</b> (<code id="dmRecipientId">0</code>)
+      </div>
+      <div>
+        <textarea id="dmMessageText" rows="4" placeholder="Type your message to customer here..." class="w-full text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" required></textarea>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeModal('modalDm')" class="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl" data-i18n="btnCancel">Cancel</button>
+        <button onclick="submitSendDm()" class="px-5 py-2 text-xs font-semibold bg-brand-600 hover:bg-brand-700 text-white rounded-xl shadow-md shadow-brand-500/20" data-i18n="btnSendDm">Send Message</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- ==================== CLIENT JAVASCRIPT ==================== -->
+  <script>
+    // ─── STATE MANAGEMENT ──────────────────────────────────────
+    const state = {
+      token: localStorage.getItem('admin_token') || '',
+      user: null,
+      lang: localStorage.getItem('admin_lang') || 'am', // 'am' or 'en'
+      theme: localStorage.getItem('admin_theme') || 'dark', // 'dark' or 'light'
+      currentView: 'overview',
+      currentOrder: null,
+      ordersFilter: 'all',
+      ordersPage: 1,
+      ordersSearch: '',
+      stockFilter: 'available',
+      stockPage: 1,
+      usersPage: 1,
+      usersSearch: '',
+      activeDmTelegramId: null,
+    };
+
+    // ─── PURE I18N DICTIONARY (ZERO MIXING) ────────────────────
+    const i18n = {
+      en: {
+        loginTitle: 'Admin Portal',
+        loginSubtitle: 'Sign in to manage Gemini Pro store',
+        tabTelegramOtp: 'Telegram OTP',
+        tabPassword: 'User & Password',
+        otpLabel: '6-Digit Login Code',
+        otpHint: 'Send /otp or click "Web Login OTP" in your Telegram bot to get your code.',
+        btnLogin: 'Sign In',
+        userLabel: 'Username',
+        passLabel: 'Password',
+        portalBadge: 'Admin Portal',
+        navDashboard: 'Dashboard',
+        navOrders: 'Orders',
+        navStock: 'Stock Links',
+        navCheckouts: 'Checkouts',
+        navUsers: 'Customers',
+        navMarketing: 'Broadcast & Channel',
+        navSettings: 'Settings',
+        storeStatus: 'Store Status',
+        btnToggleStatus: 'Toggle Status',
+        statApprovedOrders: 'Approved Sales',
+        todaySales: 'Today:',
+        statRevenue: 'Total Revenue',
+        statStock: 'Available Stock',
+        reservedStock: 'Reserved:',
+        statPending: 'Pending Orders',
+        reviewPending: 'Review Pending →',
+        quickActionsTitle: 'Quick Actions',
+        quickActionsSubtitle: 'Frequently used store operations',
+        btnAddStock: 'Add Stock Links',
+        btnBroadcast: 'Broadcast',
+        btnPricing: 'Change Price',
+        recentOrders: 'Recent Orders',
+        viewAllOrders: 'View All Orders →',
+        thOrderId: 'Order ID',
+        thCustomer: 'Customer',
+        thQty: 'Qty',
+        thMethod: 'Method',
+        thAmount: 'Amount',
+        thReceipt: 'Receipt',
+        thStatus: 'Status',
+        thDate: 'Date',
+        thAction: 'Action',
+        thLink: 'Activation Link',
+        thProduct: 'Product',
+        thAddedDate: 'Added Date',
+        thTelegramId: 'Telegram ID',
+        thLanguage: 'Language',
+        thTotalOrders: 'Total Orders',
+        thJoinedDate: 'Joined Date',
+        thReminders: 'Reminders',
+        filterAll: 'All',
+        filterPending: 'Pending',
+        filterApproved: 'Approved',
+        filterRejected: 'Rejected',
+        filterAvailable: 'Available',
+        filterReserved: 'Reserved',
+        filterSold: 'Sold',
+        checkoutsTitle: 'Active Checkouts & Abandoned Carts',
+        checkoutsSubtitle: 'Send reminders directly to customers who started checkout',
+        broadcastTitle: 'Broadcast to All Users',
+        broadcastSubtitle: 'Sends a message to every registered customer via Telegram bot',
+        broadcastMessage: 'Message (HTML Supported)',
+        btnText: 'Button Text (Optional)',
+        btnUrl: 'Button URL (Optional)',
+        btnSendBroadcast: 'Send Broadcast',
+        channelPostTitle: 'Post to Proof Channel',
+        channelPostSubtitle: 'Publishes promo announcement with "Buy Now" button to channel',
+        channelPostText: 'Post Content (HTML)',
+        channelPostHint: 'Leaves default promotional text if left empty. A "Buy Now" button will be attached automatically.',
+        btnPublishChannel: 'Publish to Channel',
+        pricingSettingsTitle: 'Pricing & Currency',
+        labelEtbPrice: 'Product Price (ETB)',
+        labelUsdtRate: 'USDT Exchange Rate (ETB / USDT)',
+        credentialsSettingsTitle: 'Admin Login Credentials',
+        newPasswordLabel: 'New Password',
+        btnUpdateCredentials: 'Update Credentials',
+        btnSave: 'Save',
+        orderDetailTitle: 'Order Details:',
+        paymentReceiptImage: 'Payment Receipt Image',
+        noReceipt: 'No receipt photo attached',
+        deliveredLinks: 'Delivered Activation Links',
+        btnClose: 'Close',
+        btnReject: 'Reject',
+        btnApprove: 'Approve & Deliver',
+        rejectOrderTitle: 'Reject Order',
+        rejectReasonLabel: 'Reason (will be sent to customer)',
+        btnCancel: 'Cancel',
+        btnConfirmReject: 'Confirm Reject',
+        addStockTitle: 'Add Activation Stock',
+        addStockLabel: 'Paste Links (One URL per line)',
+        addStockHint: 'Duplicates will be skipped automatically.',
+        btnSubmitStock: 'Add to Stock',
+        dmTitle: 'Send Direct Message',
+        dmTo: 'Sending to:',
+        btnSendDm: 'Send Message',
+        btnPrev: 'Previous',
+        btnNext: 'Next',
+        loading: 'Loading...',
+        statusOpen: 'Open (Accepting Orders)',
+        statusPaused: 'Paused (Out of Stock)',
+        toastCopied: 'Copied to clipboard!',
+        toastApproved: 'Order approved and link sent to customer!',
+        toastRejected: 'Order rejected and customer notified.',
+        toastStockAdded: 'Stock links added successfully.',
+        toastDmSent: 'Direct message sent to customer via bot!',
+      },
+      am: {
+        loginTitle: 'የአስተዳዳሪ ፖርታል',
+        loginSubtitle: 'የ Gemini Pro ሱቅን ለማስተዳደር ይግቡ',
+        tabTelegramOtp: 'የቴሌግራም OTP',
+        tabPassword: 'መለያና የይለፍ ቃል',
+        otpLabel: 'ባለ 6 ድጂት መግቢያ ኮድ',
+        otpHint: 'ኮዱን ለማግኘት በቴሌግራም ቦቱ /otp ብለው ይላኩ ወይም "Web Login OTP" የሚለውን ይጫኑ።',
+        btnLogin: 'ግባ',
+        userLabel: 'የተጠቃሚ ስም',
+        passLabel: 'የይለፍ ቃል',
+        portalBadge: 'የአስተዳዳሪ ፖርታል',
+        navDashboard: 'ዳሽቦርድ',
+        navOrders: 'ትዕዛዞች',
+        navStock: 'የስቶክ ሊንኮች',
+        navCheckouts: 'በክፍያ ላይ ያሉ',
+        navUsers: 'ደንበኞች',
+        navMarketing: 'ማስታወቂያና ቻናል',
+        navSettings: 'ማስተካከያ',
+        storeStatus: 'የሱቁ ሁኔታ',
+        btnToggleStatus: 'ሁኔታ ቀይር',
+        statApprovedOrders: 'የጸደቁ ሽያጮች',
+        todaySales: 'የዛሬ:',
+        statRevenue: 'አጠቃላይ ገቢ',
+        statStock: 'ዝግጁ ስቶክ',
+        reservedStock: 'የተያዘ:',
+        statPending: 'ጥበቃ ላይ ያሉ',
+        reviewPending: 'አረጋግጥ →',
+        quickActionsTitle: 'ፈጣን ተግባራት',
+        quickActionsSubtitle: 'ተደጋጋሚ የሱቅ ስራዎች',
+        btnAddStock: 'ስቶክ ጨምር',
+        btnBroadcast: 'ማስታወቂያ',
+        btnPricing: 'ዋጋ ቀይር',
+        recentOrders: 'የቅርብ ትዕዛዞች',
+        viewAllOrders: 'ሁሉንም ትዕዛዞች እይ →',
+        thOrderId: 'የትዕዛዝ ቁጥር',
+        thCustomer: 'ደንበኛ',
+        thQty: 'ብዛት',
+        thMethod: 'የክፍያ መንገድ',
+        thAmount: 'መጠን',
+        thReceipt: 'ደረሰኝ',
+        thStatus: 'ሁኔታ',
+        thDate: 'ቀን',
+        thAction: 'ድርጊት',
+        thLink: 'አክቲቬሽን ሊንክ',
+        thProduct: 'ምርት',
+        thAddedDate: 'የተጨመረበት ቀን',
+        thTelegramId: 'ቴሌግራም ID',
+        thLanguage: 'ቋንቋ',
+        thTotalOrders: 'ጠቅላላ ትዕዛዝ',
+        thJoinedDate: 'የተመዘገበበት',
+        thReminders: 'ማስታወሻዎች',
+        filterAll: 'ሁሉም',
+        filterPending: 'በጥበቃ ላይ',
+        filterApproved: 'የጸደቁ',
+        filterRejected: 'ውድቅ የተደረጉ',
+        filterAvailable: 'ያሉ',
+        filterReserved: 'የተያዙ',
+        filterSold: 'የተሸጡ',
+        checkoutsTitle: 'በክፍያ ላይ ያሉና ያልተጠናቀቁ ትዕዛዞች',
+        checkoutsSubtitle: 'ክፍያ ጀምረው ላልጨረሱ ደንበኞች በቀጥታ ማስታወሻ ይላኩ',
+        broadcastTitle: 'ለሁሉም ደንበኞች መልዕክት ላክ (Broadcast)',
+        broadcastSubtitle: 'በቦቱ በኩል ለተመዘገቡ ደንበኞች በሙሉ ማስታወቂያ ይልካል',
+        broadcastMessage: 'መልዕክት (HTML ይቻላል)',
+        btnText: 'የአዝራሩ ጽሑፍ (አስገዳጅ ያልሆነ)',
+        btnUrl: 'የአዝራሩ ሊንክ (አስገዳጅ ያልሆነ)',
+        btnSendBroadcast: 'ማስታወቂያ ላክ',
+        channelPostTitle: 'ወደ ቻናል ፖስት አድርግ',
+        channelPostSubtitle: 'የ"ምርት ግዛ" አዝራር ያለው ማስታወቂያ ወደ ማረጋገጫ ቻናሉ ይለጥፋል',
+        channelPostText: 'የመልዕክቱ ይዘት (HTML)',
+        channelPostHint: 'ባዶ ከሆነ መደበኛውን የማስተዋወቂያ ጽሑፍ ይልካል፤ የቦቱ መግዣ አዝራር አብሮ ይለጠፋል።',
+        btnPublishChannel: 'ወደ ቻናል ፖስት አድርግ',
+        pricingSettingsTitle: 'የዋጋና ተመን ማስተካከያ',
+        labelEtbPrice: 'የምርት ዋጋ (በብር)',
+        labelUsdtRate: 'የ USDT ተመን (ብር / USDT)',
+        credentialsSettingsTitle: 'የአስተዳዳሪ መለያና የይለፍ ቃል',
+        newPasswordLabel: 'አዲስ የይለፍ ቃል',
+        btnUpdateCredentials: 'መለያ አዘምን',
+        btnSave: 'አስቀምጥ',
+        orderDetailTitle: 'የትዕዛዝ ዝርዝር:',
+        paymentReceiptImage: 'የክፍያ ደረሰኝ ምስል',
+        noReceipt: 'ምንም የደረሰኝ ፎቶ አልተያያዘም',
+        deliveredLinks: 'የተላኩ አክቲቬሽን ሊንኮች',
+        btnClose: 'ዝጋ',
+        btnReject: 'ውድቅ አድርግ',
+        btnApprove: 'አጽድቅና ሊንክ ላክ',
+        rejectOrderTitle: 'ትዕዛዝ ውድቅ ማድረጊያ',
+        rejectReasonLabel: 'ምክንያት (ወደ ደንበኛው ይላካል)',
+        btnCancel: 'ተመለስ',
+        btnConfirmReject: 'አረጋግጥና ውድቅ አድርግ',
+        addStockTitle: 'ስቶክ ሊንኮችን መጨመሪያ',
+        addStockLabel: 'ሊንኮችን ያስገቡ (በየመስመሩ አንድ ሊንክ)',
+        addStockHint: 'ቀድሞ የነበሩ ሊንኮች በራሳቸው ይዘለላሉ።',
+        btnSubmitStock: 'ወደ ስቶክ አስገባ',
+        dmTitle: 'ለደንበኛው መልዕክት ላክ (DM)',
+        dmTo: 'የሚላክለት:',
+        btnSendDm: 'መልዕክት ላክ',
+        btnPrev: 'የቀደመው',
+        btnNext: 'ቀጣይ',
+        loading: 'በመጫን ላይ...',
+        statusOpen: 'ክፍት ነው (ትዕዛዝ ይቀበላል)',
+        statusPaused: 'ቆሟል (ስቶክ አልቋል)',
+        toastCopied: 'ተቀድቷል!',
+        toastApproved: 'ትዕዛዙ ጸድቋል፤ ሊንኩ ለደንበኛው ተልኳል!',
+        toastRejected: 'ትዕዛዙ ውድቅ ተደርጓል፤ ለደንበኛው ተነግሯል።',
+        toastStockAdded: 'የስቶክ ሊንኮች በተሳካ ሁኔታ ተጨምረዋል።',
+        toastDmSent: 'መልዕክቱ ለደንበኛው በቦቱ ተልኳል!',
+      }
+    };
+
+    function t(key) {
+      const dict = i18n[state.lang] || i18n.am;
+      return dict[key] || key;
+    }
+
+    function applyTranslations() {
+      document.querySelectorAll('[data-i18n]').forEach((el) => {
+        const key = el.getAttribute('data-i18n');
+        if (i18n[state.lang] && i18n[state.lang][key]) {
+          el.textContent = i18n[state.lang][key];
+        }
+      });
+
+      // Update switcher buttons
+      const isEn = state.lang === 'en';
+      const flag = isEn ? '🇬🇧' : '🇪🇹';
+      const label = isEn ? 'English' : 'አማርኛ';
+
+      const hFlag = document.getElementById('headerLangFlag');
+      const hText = document.getElementById('headerLangText');
+      if (hFlag) hFlag.textContent = flag;
+      if (hText) hText.textContent = label;
+
+      const lFlag = document.getElementById('loginLangFlag');
+      const lText = document.getElementById('loginLangText');
+      if (lFlag) lFlag.textContent = flag;
+      if (lText) lText.textContent = label;
+
+      // Update active view title
+      updateHeaderTitle();
+    }
+
+    function toggleLanguage() {
+      state.lang = state.lang === 'en' ? 'am' : 'en';
+      localStorage.setItem('admin_lang', state.lang);
+      document.documentElement.lang = state.lang;
+      applyTranslations();
+      refreshCurrentView();
+    }
+
+    // ─── THEME TOGGLE (LIGHT / DARK) ───────────────────────────
+    function applyTheme() {
+      const isDark = state.theme === 'dark';
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+
+      const icon = isDark ? '🌙' : '☀️';
+      const hIcon = document.getElementById('headerThemeIcon');
+      if (hIcon) hIcon.textContent = icon;
+      const lIcon = document.getElementById('loginThemeIcon');
+      if (lIcon) lIcon.textContent = icon;
+    }
+
+    function toggleTheme() {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('admin_theme', state.theme);
+      applyTheme();
+    }
+
+    // ─── TOAST NOTIFICATIONS ──────────────────────────────────
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const bg = type === 'success' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white';
+      toast.className = `${bg} px-4 py-3 rounded-xl shadow-xl text-xs font-semibold flex items-center justify-between gap-3 pointer-events-auto transition-all transform duration-200 translate-y-2 opacity-0`;
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 250);
+      }, 3500);
+    }
+
+    // ─── API CLIENT HELPER ────────────────────────────────────
+    async function api(endpoint, options = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      if (state.token) {
+        headers['Authorization'] = `Bearer ${state.token}`;
+      }
+
+      try {
+        const res = await fetch(`/api/admin${endpoint}`, { ...options, headers });
+        if (res.status === 401) {
+          state.token = '';
+          localStorage.removeItem('admin_token');
+          showAuthScreen();
+          throw new Error('Session expired');
+        }
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Request failed');
+        }
+        return data;
+      } catch (err) {
+        console.error(`API Error [${endpoint}]:`, err.message);
+        throw err;
+      }
+    }
+
+    // ─── AUTHENTICATION FLOW ──────────────────────────────────
+    function showAuthScreen() {
+      document.getElementById('authScreen').classList.remove('hidden');
+    }
+
+    function hideAuthScreen() {
+      document.getElementById('authScreen').classList.add('hidden');
+    }
+
+    function switchLoginTab(tab) {
+      const isOtp = tab === 'otp';
+      document.getElementById('formOtp').classList.toggle('hidden', !isOtp);
+      document.getElementById('formPass').classList.toggle('hidden', isOtp);
+
+      const tabOtp = document.getElementById('tabBtnOtp');
+      const tabPass = document.getElementById('tabBtnPass');
+
+      if (isOtp) {
+        tabOtp.className = 'flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-300 shadow-sm flex items-center justify-center gap-1.5';
+        tabPass.className = 'flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-1.5';
+        document.getElementById('otpCodeInput').focus();
+      } else {
+        tabPass.className = 'flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-300 shadow-sm flex items-center justify-center gap-1.5';
+        tabOtp.className = 'flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-1.5';
+        document.getElementById('userInput').focus();
+      }
+    }
+
+    async function handleLoginOtp(e) {
+      e.preventDefault();
+      const code = document.getElementById('otpCodeInput').value.trim();
+      const btn = document.getElementById('btnSubmitOtp');
+      btn.disabled = true;
+      btn.textContent = t('loading');
+
+      try {
+        const res = await api('/login', {
+          method: 'POST',
+          body: JSON.stringify({ method: 'otp', code }),
+        });
+        state.token = res.token;
+        localStorage.setItem('admin_token', res.token);
+        hideAuthScreen();
+        initDashboard();
+        showToast('Logged in successfully!');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t('btnLogin');
+      }
+    }
+
+    async function handleLoginPass(e) {
+      e.preventDefault();
+      const username = document.getElementById('userInput').value.trim();
+      const password = document.getElementById('passInput').value;
+      const btn = document.getElementById('btnSubmitPass');
+      btn.disabled = true;
+      btn.textContent = t('loading');
+
+      try {
+        const res = await api('/login', {
+          method: 'POST',
+          body: JSON.stringify({ method: 'credentials', username, password }),
+        });
+        state.token = res.token;
+        localStorage.setItem('admin_token', res.token);
+        hideAuthScreen();
+        initDashboard();
+        showToast('Logged in successfully!');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t('btnLogin');
+      }
+    }
+
+    function handleLogout() {
+      api('/logout', { method: 'POST' }).catch(() => {});
+      state.token = '';
+      localStorage.removeItem('admin_token');
+      showAuthScreen();
+    }
+
+    // ─── NAVIGATION & VIEWS ───────────────────────────────────
+    function navigateView(viewName, params = {}) {
+      state.currentView = viewName;
+
+      // Update sidebar nav highlights
+      document.querySelectorAll('.nav-item').forEach((el) => {
+        el.classList.remove('bg-brand-50', 'dark:bg-brand-950/40', 'text-brand-600', 'dark:text-brand-400');
+        el.classList.add('text-slate-600', 'dark:text-slate-400');
+      });
+      const activeNav = document.getElementById(`nav-${viewName}`);
+      if (activeNav) {
+        activeNav.classList.remove('text-slate-600', 'dark:text-slate-400');
+        activeNav.classList.add('bg-brand-50', 'dark:bg-brand-950/40', 'text-brand-600', 'dark:text-brand-400');
+      }
+
+      // Hide all view panels and show target
+      document.querySelectorAll('.view-panel').forEach((el) => el.classList.add('hidden'));
+      const targetPanel = document.getElementById(`view-${viewName}`);
+      if (targetPanel) targetPanel.classList.remove('hidden');
+
+      // Close mobile drawer if open
+      const sb = document.getElementById('sidebar');
+      const bd = document.getElementById('sidebarBackdrop');
+      sb.classList.add('max-md:-translate-x-full');
+      bd.classList.add('hidden');
+
+      updateHeaderTitle();
+
+      // Load view data
+      if (viewName === 'overview') loadOverviewData();
+      else if (viewName === 'orders') {
+        if (params.status) state.ordersFilter = params.status;
+        loadOrdersData();
+      }
+      else if (viewName === 'stock') loadStockData();
+      else if (viewName === 'checkouts') loadCheckoutsData();
+      else if (viewName === 'users') loadUsersData();
+      else if (viewName === 'settings') loadSettingsData();
+    }
+
+    function updateHeaderTitle() {
+      const titles = {
+        overview: t('navDashboard'),
+        orders: t('navOrders'),
+        stock: t('navStock'),
+        checkouts: t('navCheckouts'),
+        users: t('navUsers'),
+        marketing: t('navMarketing'),
+        settings: t('navSettings'),
+      };
+      const titleEl = document.getElementById('headerTitle');
+      if (titleEl) titleEl.textContent = titles[state.currentView] || 'Dashboard';
+    }
+
+    function toggleMobileSidebar() {
+      const sb = document.getElementById('sidebar');
+      const bd = document.getElementById('sidebarBackdrop');
+      const isClosed = sb.classList.contains('max-md:-translate-x-full');
+      if (isClosed) {
+        sb.classList.remove('max-md:-translate-x-full');
+        bd.classList.remove('hidden');
+      } else {
+        sb.classList.add('max-md:-translate-x-full');
+        bd.classList.add('hidden');
+      }
+    }
+
+    function refreshCurrentView() {
+      navigateView(state.currentView);
+    }
+
+    // ─── OVERVIEW DATA ────────────────────────────────────────
+    async function loadOverviewData() {
+      try {
+        const data = await api('/overview');
+
+        // Store status
+        updateStoreStatusUI(data.store.isOpen);
+
+        // Stats cards
+        document.getElementById('statOrdersApproved').textContent = data.counts.approvedOrders;
+        document.getElementById('statTodayApproved').textContent = data.counts.todayApproved;
+        document.getElementById('statRevenueEtb').textContent = `${data.revenue.etb.toLocaleString()} ETB`;
+        document.getElementById('statRevenueUsdt').textContent = `${data.revenue.usdt.toFixed(2)} USDT`;
+        document.getElementById('statStockAvailable').textContent = data.counts.availableStock;
+        document.getElementById('statStockReserved').textContent = data.counts.reservedStock;
+        document.getElementById('statOrdersPending').textContent = data.counts.pendingOrders;
+
+        // Badges
+        const pendingBadge = document.getElementById('sidebarPendingBadge');
+        if (data.counts.pendingOrders > 0) {
+          pendingBadge.textContent = data.counts.pendingOrders;
+          pendingBadge.classList.remove('hidden');
+        } else {
+          pendingBadge.classList.add('hidden');
+        }
+        document.getElementById('sidebarStockBadge').textContent = data.counts.availableStock;
+
+        // Render Recent Orders preview
+        const tbody = document.getElementById('recentOrdersTableBody');
+        if (!data.recentOrders || data.recentOrders.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">No orders yet.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = data.recentOrders.map((o) => {
+          const custName = o.userInfo?.firstName || o.userInfo?.username || `User ${o.userId}`;
+          const statusBadge = getStatusBadgeHtml(o.status);
+          return `
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+              <td class="p-3.5 pl-5 font-mono font-bold text-xs text-brand-600 dark:text-brand-400">${o.orderId}</td>
+              <td class="p-3.5 font-medium text-xs">${escapeHtml(custName)}</td>
+              <td class="p-3.5 text-xs font-semibold">${o.paymentMethod}</td>
+              <td class="p-3.5 font-bold text-xs">${o.amount} ${o.currency || 'ETB'}</td>
+              <td class="p-3.5">${statusBadge}</td>
+              <td class="p-3.5 pr-5 text-right">
+                <button onclick="openOrderDetail('${o.orderId}')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition">View</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ─── STORE STATUS TOGGLE ──────────────────────────────────
+    async function toggleStoreStatus() {
+      try {
+        const res = await api('/store-status', { method: 'POST', body: JSON.stringify({}) });
+        updateStoreStatusUI(res.isOpen);
+        showToast(res.isOpen ? t('statusOpen') : t('statusPaused'));
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function updateStoreStatusUI(isOpen) {
+      const dot = document.getElementById('sidebarStatusDot');
+      const text = document.getElementById('sidebarStatusText');
+      if (isOpen) {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50';
+        text.textContent = t('statusOpen');
+        text.className = 'text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-2';
+      } else {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50';
+        text.textContent = t('statusPaused');
+        text.className = 'text-xs font-bold text-rose-600 dark:text-rose-400 mb-2';
+      }
+    }
+
+    // ─── ORDERS MANAGEMENT ────────────────────────────────────
+    function setOrdersFilter(filter) {
+      state.ordersFilter = filter;
+      state.ordersPage = 1;
+
+      // Update filter tabs
+      ['all', 'pending', 'approved', 'rejected'].forEach((f) => {
+        const btn = document.getElementById(`btnOrderFilter${f.charAt(0).toUpperCase() + f.slice(1)}`);
+        if (btn) {
+          if (f === filter) {
+            btn.className = 'px-3 py-1.5 rounded-lg transition bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm';
+          } else {
+            btn.className = 'px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white';
+          }
+        }
+      });
+
+      loadOrdersData();
+    }
+
+    function handleOrderSearch(e) {
+      state.ordersSearch = e.target.value.trim();
+      state.ordersPage = 1;
+      if (state.orderSearchTimeout) clearTimeout(state.orderSearchTimeout);
+      state.orderSearchTimeout = setTimeout(loadOrdersData, 300);
+    }
+
+    function changeOrdersPage(delta) {
+      state.ordersPage += delta;
+      loadOrdersData();
+    }
+
+    async function loadOrdersData() {
+      const tbody = document.getElementById('ordersTableBody');
+      tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">${t('loading')}</td></tr>`;
+
+      try {
+        const res = await api(`/orders?status=${state.ordersFilter}&search=${encodeURIComponent(state.ordersSearch)}&page=${state.ordersPage}&limit=15`);
+
+        // Pagination controls
+        document.getElementById('ordersPageInfo').textContent = `Page ${res.page} of ${res.totalPages} (${res.total} orders)`;
+        document.getElementById('btnOrdersPrev').disabled = res.page <= 1;
+        document.getElementById('btnOrdersNext').disabled = res.page >= res.totalPages;
+
+        if (!res.orders || res.orders.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">No matching orders found.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = res.orders.map((o) => {
+          const custName = o.userInfo?.firstName || o.userInfo?.username || `User ${o.userId}`;
+          const dateStr = new Date(o.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+          const hasReceipt = Boolean(o.receiptFileId);
+
+          return `
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+              <td class="p-3.5 pl-5 font-mono font-bold text-xs text-brand-600 dark:text-brand-400">${o.orderId}</td>
+              <td class="p-3.5">
+                <div class="font-semibold text-xs text-slate-900 dark:text-white">${escapeHtml(custName)}</div>
+                <div class="text-[11px] text-slate-400 font-mono">ID: ${o.userId}</div>
+              </td>
+              <td class="p-3.5 text-xs font-semibold">${o.quantity || 1}</td>
+              <td class="p-3.5 text-xs font-medium">${o.paymentMethod}</td>
+              <td class="p-3.5 font-bold text-xs">${o.amount} ${o.currency || 'ETB'}</td>
+              <td class="p-3.5">
+                ${hasReceipt
+                  ? `<span class="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-blue-500/10 text-blue-500">Photo</span>`
+                  : `<span class="text-slate-400 text-xs">-</span>`
+                }
+              </td>
+              <td class="p-3.5">${getStatusBadgeHtml(o.status)}</td>
+              <td class="p-3.5 text-xs text-slate-400 whitespace-nowrap">${dateStr}</td>
+              <td class="p-3.5 pr-5 text-right whitespace-nowrap">
+                <button onclick="openOrderDetail('${o.orderId}')" class="px-3 py-1.5 text-xs font-semibold rounded-xl bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 hover:bg-brand-100 transition">View</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ─── ORDER DETAIL & RECEIPT MODAL ─────────────────────────
+    async function openOrderDetail(orderId) {
+      try {
+        const res = await api(`/orders/${orderId}`);
+        state.currentOrder = res.order;
+        const o = res.order;
+
+        document.getElementById('modalOrderId').textContent = o.orderId;
+        const fullName = `${o.userInfo?.firstName || ''} ${o.userInfo?.lastName || ''}`.trim() || 'No Name';
+        document.getElementById('modalCustomerName').textContent = fullName;
+        document.getElementById('modalCustomerUser').textContent = o.userInfo?.username ? `@${o.userInfo.username}` : `ID: ${o.userId}`;
+        document.getElementById('modalOrderAmount').textContent = `${o.amount} ${o.currency || 'ETB'}`;
+        document.getElementById('modalOrderQty').textContent = `Qty: ${o.quantity || 1}`;
+        document.getElementById('modalOrderMethod').textContent = o.paymentMethod;
+        document.getElementById('modalOrderStatusBadge').innerHTML = getStatusBadgeHtml(o.status);
+
+        // Receipt photo
+        const rContainer = document.getElementById('modalReceiptContainer');
+        if (res.receiptUrl) {
+          rContainer.innerHTML = `
+            <a href="${res.receiptUrl}" target="_blank" title="Click to view full image">
+              <img src="${res.receiptUrl}" alt="Receipt" class="max-h-72 rounded-lg shadow-md mx-auto object-contain hover:opacity-95 transition">
+            </a>
+          `;
+        } else {
+          rContainer.innerHTML = `<span class="text-xs text-slate-400">${t('noReceipt')}</span>`;
+        }
+
+        // Delivered links preview if approved
+        const dContainer = document.getElementById('modalDeliveredContainer');
+        const dList = document.getElementById('modalDeliveredLinksList');
+        const links = o.deliveredLinks || (o.deliveredLink ? [o.deliveredLink] : []);
+        if (o.status === 'approved' && links.length > 0) {
+          dContainer.classList.remove('hidden');
+          dList.innerHTML = links.map((l) => `<div class="p-1.5 bg-emerald-500/10 rounded"><a href="${l}" target="_blank" class="hover:underline">${escapeHtml(l)}</a></div>`).join('');
+        } else {
+          dContainer.classList.add('hidden');
+        }
+
+        // Action buttons visibility
+        const isPending = o.status === 'pending';
+        document.getElementById('btnModalApprove').classList.toggle('hidden', !isPending);
+        document.getElementById('btnModalReject').classList.toggle('hidden', !isPending);
+
+        openModal('modalOrder');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleApproveOrder() {
+      if (!state.currentOrder) return;
+      const orderId = state.currentOrder.orderId;
+      const btn = document.getElementById('btnModalApprove');
+      btn.disabled = true;
+      btn.textContent = t('loading');
+
+      try {
+        const res = await api(`/orders/${orderId}/approve`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+        showToast(t('toastApproved'));
+        closeModal('modalOrder');
+        refreshCurrentView();
+      } catch (err) {
+        if (err.message && err.message.includes('Not enough stock')) {
+          // Prompt for manual link
+          const manual = prompt(`${err.message}\n\nPlease paste activation link(s) here to deliver immediately (one per line):`);
+          if (manual && manual.trim()) {
+            try {
+              await api(`/orders/${orderId}/approve`, {
+                method: 'POST',
+                body: JSON.stringify({ manualLinks: manual }),
+              });
+              showToast(t('toastApproved'));
+              closeModal('modalOrder');
+              refreshCurrentView();
+            } catch (innerErr) {
+              showToast(innerErr.message, 'error');
+            }
+          }
+        } else {
+          showToast(err.message, 'error');
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t('btnApprove');
+      }
+    }
+
+    function openRejectModal() {
+      openModal('modalReject');
+    }
+
+    function handleRejectSelectChange(select) {
+      const customBox = document.getElementById('rejectReasonCustom');
+      customBox.classList.toggle('hidden', select.value !== 'custom');
+    }
+
+    async function submitRejectOrder() {
+      if (!state.currentOrder) return;
+      const select = document.getElementById('rejectReasonSelect');
+      let reason = select.value;
+      if (reason === 'custom') {
+        reason = document.getElementById('rejectReasonCustom').value.trim() || 'Payment unverified';
+      }
+
+      try {
+        await api(`/orders/${state.currentOrder.orderId}/reject`, {
+          method: 'POST',
+          body: JSON.stringify({ reason }),
+        });
+        showToast(t('toastRejected'));
+        closeModal('modalReject');
+        closeModal('modalOrder');
+        refreshCurrentView();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ─── STOCK MANAGEMENT ─────────────────────────────────────
+    function setStockFilter(filter) {
+      state.stockFilter = filter;
+      state.stockPage = 1;
+
+      ['available', 'reserved', 'sold', 'all'].forEach((f) => {
+        const btn = document.getElementById(`btnStockFilter${f.charAt(0).toUpperCase() + f.slice(1)}`);
+        if (btn) {
+          if (f === filter) {
+            btn.className = 'px-3 py-1.5 rounded-lg transition bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm';
+          } else {
+            btn.className = 'px-3 py-1.5 rounded-lg transition text-slate-500 hover:text-slate-900 dark:hover:text-white';
+          }
+        }
+      });
+
+      loadStockData();
+    }
+
+    function changeStockPage(delta) {
+      state.stockPage += delta;
+      loadStockData();
+    }
+
+    async function loadStockData() {
+      const tbody = document.getElementById('stockTableBody');
+      tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">${t('loading')}</td></tr>`;
+
+      try {
+        const res = await api(`/stocks?filter=${state.stockFilter}&page=${state.stockPage}&limit=20`);
+
+        document.getElementById('stockPageInfo').textContent = `Page ${res.page} of ${res.totalPages} (${res.total} links)`;
+        document.getElementById('btnStockPrev').disabled = res.page <= 1;
+        document.getElementById('btnStockNext').disabled = res.page >= res.totalPages;
+
+        if (!res.stocks || res.stocks.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400">No stock links found.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = res.stocks.map((s) => {
+          let statusBadge = `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500">Available</span>`;
+          if (s.isSold) {
+            statusBadge = `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-400">Sold</span>`;
+          } else if (s.isReserved) {
+            statusBadge = `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-500">Reserved</span>`;
+          }
+
+          const dateStr = new Date(s.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+          return `
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+              <td class="p-3.5 pl-5 font-mono text-xs max-w-xs truncate">
+                <a href="${escapeHtml(s.link)}" target="_blank" class="text-brand-600 dark:text-brand-400 hover:underline">${escapeHtml(s.link)}</a>
+              </td>
+              <td class="p-3.5 text-xs text-slate-500">${s.description || 'Gemini Pro'}</td>
+              <td class="p-3.5">${statusBadge}</td>
+              <td class="p-3.5 text-xs text-slate-400">${dateStr}</td>
+              <td class="p-3.5 pr-5 text-right">
+                <button onclick="handleDeleteStock('${s._id}')" class="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition" title="Delete">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function openAddStockModal() {
+      document.getElementById('addStockTextarea').value = '';
+      openModal('modalAddStock');
+    }
+
+    async function submitAddStock() {
+      const links = document.getElementById('addStockTextarea').value.trim();
+      if (!links) return;
+
+      try {
+        const res = await api('/stocks', {
+          method: 'POST',
+          body: JSON.stringify({ links }),
+        });
+        showToast(`Added ${res.added} stock links!`);
+        closeModal('modalAddStock');
+        refreshCurrentView();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleDeleteStock(id) {
+      if (!confirm('Are you sure you want to delete this stock link?')) return;
+      try {
+        await api(`/stocks/${id}`, { method: 'DELETE' });
+        showToast('Stock link deleted.');
+        loadStockData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ─── CHECKOUTS (ABANDONED CARTS) ──────────────────────────
+    async function loadCheckoutsData() {
+      const tbody = document.getElementById('checkoutsTableBody');
+      tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">${t('loading')}</td></tr>`;
+
+      try {
+        const res = await api('/checkouts?limit=20');
+        if (!res.checkouts || res.checkouts.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">No active checkouts found.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = res.checkouts.map((c) => {
+          const custName = c.userInfo?.firstName || c.userInfo?.username || `User ${c.userId}`;
+          const dateStr = new Date(c.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+          const isAwaiting = c.status === 'awaiting_receipt';
+
+          return `
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+              <td class="p-3.5 pl-5">
+                <div class="font-semibold text-xs text-slate-900 dark:text-white">${escapeHtml(custName)}</div>
+                <div class="text-[11px] text-slate-400 font-mono">ID: ${c.userId}</div>
+              </td>
+              <td class="p-3.5 text-xs font-semibold">${c.paymentMethod}</td>
+              <td class="p-3.5 font-bold text-xs">${c.amount} ${c.currency || 'ETB'}</td>
+              <td class="p-3.5">
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${isAwaiting ? 'bg-amber-500/10 text-amber-500' : 'bg-slate-500/10 text-slate-400'}">${c.status}</span>
+              </td>
+              <td class="p-3.5 text-xs text-slate-500">${c.remindersCount || 0}</td>
+              <td class="p-3.5 text-xs text-slate-400 whitespace-nowrap">${dateStr}</td>
+              <td class="p-3.5 pr-5 text-right">
+                ${isAwaiting
+                  ? `<button onclick="sendCheckoutReminder('${c._id}')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 hover:bg-brand-100 transition">Remind</button>`
+                  : '-'
+                }
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function sendCheckoutReminder(id) {
+      try {
+        await api(`/checkouts/${id}/remind`, { method: 'POST' });
+        showToast('Reminder sent to customer via Telegram bot!');
+        loadCheckoutsData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ─── CUSTOMERS / USERS MANAGEMENT ─────────────────────────
+    function handleUsersSearch(e) {
+      state.usersSearch = e.target.value.trim();
+      state.usersPage = 1;
+      if (state.usersSearchTimeout) clearTimeout(state.usersSearchTimeout);
+      state.usersSearchTimeout = setTimeout(loadUsersData, 300);
+    }
+
+    function changeUsersPage(delta) {
+      state.usersPage += delta;
+      loadUsersData();
+    }
+
+    async function loadUsersData() {
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">${t('loading')}</td></tr>`;
+
+      try {
+        const res = await api(`/users?search=${encodeURIComponent(state.usersSearch)}&page=${state.usersPage}&limit=15`);
+
+        document.getElementById('usersPageInfo').textContent = `Page ${res.page} of ${res.totalPages} (${res.total} users)`;
+        document.getElementById('btnUsersPrev').disabled = res.page <= 1;
+        document.getElementById('btnUsersNext').disabled = res.page >= res.totalPages;
+
+        if (!res.users || res.users.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">No registered users found.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = res.users.map((u) => {
+          const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'No Name';
+          const username = u.username ? `@${u.username}` : 'No username';
+          const dateStr = new Date(u.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+
+          return `
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+              <td class="p-3.5 pl-5">
+                <div class="font-semibold text-xs text-slate-900 dark:text-white">${escapeHtml(fullName)}</div>
+                <div class="text-[11px] text-slate-400">${escapeHtml(username)}</div>
+              </td>
+              <td class="p-3.5 font-mono text-xs text-slate-500">${u.telegramId}</td>
+              <td class="p-3.5 text-xs font-semibold uppercase">${u.language || 'am'}</td>
+              <td class="p-3.5 text-xs font-bold">${u.totalOrders || 0}</td>
+              <td class="p-3.5 text-xs text-slate-400">${dateStr}</td>
+              <td class="p-3.5 pr-5 text-right whitespace-nowrap">
+                <button onclick="openDmModal(${u.telegramId}, '${escapeHtml(fullName)}')" class="px-3 py-1.5 text-xs font-semibold rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 hover:bg-purple-100 transition">Message (DM)</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function openDmModal(telegramId, name) {
+      state.activeDmTelegramId = telegramId;
+      document.getElementById('dmRecipientName').textContent = name;
+      document.getElementById('dmRecipientId').textContent = telegramId;
+      document.getElementById('dmMessageText').value = '';
+      openModal('modalDm');
+    }
+
+    async function submitSendDm() {
+      if (!state.activeDmTelegramId) return;
+      const message = document.getElementById('dmMessageText').value.trim();
+      if (!message) return;
+
+      try {
+        await api(`/users/${state.activeDmTelegramId}/dm`, {
+          method: 'POST',
+          body: JSON.stringify({ message }),
+        });
+        showToast(t('toastDmSent'));
+        closeModal('modalDm');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ─── MARKETING / BROADCAST & CHANNEL ──────────────────────
+    async function handleSendBroadcast(e) {
+      e.preventDefault();
+      const message = document.getElementById('broadcastMessageInput').value.trim();
+      const buttonText = document.getElementById('broadcastBtnTextInput').value.trim();
+      const buttonUrl = document.getElementById('broadcastBtnUrlInput').value.trim();
+      const btn = document.getElementById('btnSubmitBroadcast');
+      btn.disabled = true;
+      btn.textContent = t('loading');
+
+      try {
+        const res = await api('/broadcast', {
+          method: 'POST',
+          body: JSON.stringify({ message, buttonText, buttonUrl }),
+        });
+        showToast(`Broadcast sent! (${res.sent} delivered, ${res.failed} failed)`);
+        document.getElementById('broadcastMessageInput').value = '';
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t('btnSendBroadcast');
+      }
+    }
+
+    async function handleSendChannelPost(e) {
+      e.preventDefault();
+      const text = document.getElementById('channelPostTextInput').value.trim();
+      const btn = document.getElementById('btnSubmitChannelPost');
+      btn.disabled = true;
+      btn.textContent = t('loading');
+
+      try {
+        await api('/channel-post', {
+          method: 'POST',
+          body: JSON.stringify({ text }),
+        });
+        showToast('Published announcement to Proof Channel!');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t('btnPublishChannel');
+      }
+    }
+
+    // ─── SETTINGS ─────────────────────────────────────────────
+    async function loadSettingsData() {
+      try {
+        const data = await api('/overview');
+        document.getElementById('settingPriceInput').value = data.store.productPrice;
+        document.getElementById('settingUsdtRateInput').value = data.store.usdtRate;
+        document.getElementById('settingCalculatedUsdt').textContent = `Calculated: ${data.store.usdtPrice} USDT`;
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleUpdatePrice(e) {
+      e.preventDefault();
+      const price = Number(document.getElementById('settingPriceInput').value);
+      try {
+        await api('/settings/price', { method: 'POST', body: JSON.stringify({ price }) });
+        showToast('Price updated!');
+        loadSettingsData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleUpdateUsdtRate(e) {
+      e.preventDefault();
+      const rate = Number(document.getElementById('settingUsdtRateInput').value);
+      try {
+        await api('/settings/usdt-rate', { method: 'POST', body: JSON.stringify({ rate }) });
+        showToast('USDT rate updated!');
+        loadSettingsData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function handleUpdateCredentials(e) {
+      e.preventDefault();
+      const username = document.getElementById('settingUsernameInput').value.trim();
+      const password = document.getElementById('settingPasswordInput').value;
+      if (!username && !password) return;
+
+      try {
+        await api('/settings/credentials', {
+          method: 'POST',
+          body: JSON.stringify({ username, password }),
+        });
+        showToast('Credentials updated successfully!');
+        document.getElementById('settingPasswordInput').value = '';
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ─── UTILITIES & HELPERS ──────────────────────────────────
+    function getStatusBadgeHtml(status) {
+      if (status === 'approved') {
+        return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500">Approved</span>`;
+      }
+      if (status === 'pending') {
+        return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-500">Pending</span>`;
+      }
+      return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-500">Rejected</span>`;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function openModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) modal.classList.add('hidden');
+    }
+
+    // Close modals on Escape key
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.fixed.z-50:not(#authScreen)').forEach((m) => m.classList.add('hidden'));
+      }
+    });
+
+    // ─── BOOTSTRAP APP ────────────────────────────────────────
+    async function initDashboard() {
+      try {
+        const me = await api('/auth/me');
+        document.getElementById('sidebarUsername').textContent = me.username || 'admin';
+        navigateView('overview');
+      } catch {
+        showAuthScreen();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      applyTheme();
+      applyTranslations();
+
+      if (!state.token) {
+        showAuthScreen();
+      } else {
+        initDashboard();
+      }
+    });
+  </script>
+</body>
+</html>
