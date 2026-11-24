@@ -486,6 +486,12 @@ async function main() {
 
   // Serve Admin Web Portal SPA (Express 5 safe regex route)
   const path = require('path');
+  app.get('/favicon.ico', (req, res) => {
+    res.sendFile(path.join(__dirname, 'web', 'public', 'favicon.png'));
+  });
+  app.get('/favicon.svg', (req, res) => {
+    res.sendFile(path.join(__dirname, 'web', 'public', 'favicon.svg'));
+  });
   app.use('/admin', express.static(path.join(__dirname, 'web', 'public')));
   app.get(/^\/admin(\/.*)?$/, (req, res) => {
     res.sendFile(path.join(__dirname, 'web', 'public', 'index.html'));
